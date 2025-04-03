@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.10.7/.schema/devbox.schema.json",
+  "packages": [
+    "eksctl@latest",
+    "kubectl@latest",
+    "envsubst@latest",
+    "awscli2@latest"
+  ],
+  "env": {
+    "AT": "ice:examples/eks"
+  },
+  "shell": {
+    "init_hook": [
+      "export PATH=$(pwd)/.devbox/bin:$PATH",
+      "[ -f .devbox/bin/clickhouse ] || (curl https://clickhouse.com/ | sh && mv clickhouse .devbox/bin/)"
+    ]
+  }
+}

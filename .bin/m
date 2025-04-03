@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#
+# An alias for ./mvnw that works from anywhere inside the repo.
+#
+set -euo pipefail
+
+DIR="$(dirname "${BASH_SOURCE[0]}")/.."
+exec "$DIR/mvnw" -f "$DIR/pom.xml" "$@"

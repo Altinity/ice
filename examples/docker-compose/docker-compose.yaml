@@ -1,0 +1,83 @@
+services:
+  minio:
+    image: minio/minio:RELEASE.2025-03-12T18-04-18Z
+    restart: unless-stopped
+    command: [ 'server', '/data', '--address', ':8999', '--console-address', ':9001' ]
+    environment:
+      MINIO_ROOT_USER: miniouser
+      MINIO_ROOT_PASSWORD: miniopassword
+    ports:
+      - '8999:8999' # 9000 is taken by clickhouse
+      - '9001:9001' # web console
+    volumes:
+      - minio:/data
+  minio-init:
+    image: minio/mc:RELEASE.2025-03-12T17-29-24Z
+    restart: on-failure  # run once and exit
+    entrypoint: >
+      /bin/sh -c "
+      sleep 1; until /usr/bin/mc alias set local http://minio:8999 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do echo waiting for minio to start...; sleep 1; done;
+      /usr/bin/mc mb --ignore-existing local/bucket1;
+      exit 0;
+      "
+    environment:
+      MINIO_ROOT_USER: miniouser
+      MINIO_ROOT_PASSWORD: miniopassword
+    depends_on:
+      - minio
+  ice-rest-catalog:
+    image: altinity/ice-rest-catalog:local
+    restart: unless-stopped
+    ports:
+      - '5000:5000' # iceberg/http
+    configs:
+      - source: ice-rest-catalog-yaml
+        target: /etc/ice/ice-rest-catalog.yaml
+    volumes:
+      # for access to /var/lib/ice-rest-catalog/db.sqlite
+      - ./docker-compose.volumes/ice-rest-catalog/var/lib/ice-rest-catalog:/var/lib/ice-rest-catalog
+    depends_on:
+      - minio-init
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1" # insecure
+    ports:
+      - "8123:8123" # clickhouse/http
+      - "9000:9000" # clickhouse/native
+    configs:
+      - source: clickhouse-init
+        target: /docker-entrypoint-initdb.d/init-db.sh
+    volumes:
+      # for access to clickhouse-logs
+      - ./docker-compose.volumes/clickhouse/var/log/clickhouse-server:/var/log/clickhouse-server
+    depends_on:
+      - ice-rest-catalog
+configs:
+  clickhouse-init:
+    content: |
+      #!/bin/bash
+      exec clickhouse client --query $"
+        SET allow_experimental_database_iceberg = 1;
+
+        DROP DATABASE IF EXISTS ice;
+
+        CREATE DATABASE ice
+          ENGINE = DataLakeCatalog('http://ice-rest-catalog:5000')
+          SETTINGS catalog_type = 'rest',
+            auth_header = 'Authorization: Bearer foo',
+            storage_endpoint = 'http://minio:8999',
+            warehouse = 's3://bucket1/';
+      "
+  ice-rest-catalog-yaml:
+    content: |
+      uri: "jdbc:sqlite:file:/var/lib/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500"
+      warehouse: s3://bucket1
+      s3.endpoint: http://minio:8999
+      s3.access-key-id: "miniouser"
+      s3.secret-access-key: "miniopassword"
+      ice.token: foo
+      ice.s3.region: minio
+volumes:
+  minio:

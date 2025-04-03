@@ -1,0 +1,28 @@
+<configuration>
+
+  <logger name="org.apache.iceberg.CatalogUtil" level="WARN"/>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+
+  <!-- Uncomment to enable S3 request/response logging. -->
+  <!--
+      <logger name="software.amazon.awssdk.request" level="DEBUG">
+          <appender-ref ref="CONSOLE"/>
+      </logger>
+  -->
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.err</target>
+    <encoder>
+      <!-- FIXME: stacktrace filtering has perf implications -->
+      <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n%rEx{full,
+        picocli,
+        software.amazon.awssdk.core.internal,
+        java.base
+        }
+      </pattern>
+    </encoder>
+  </appender>
+</configuration>

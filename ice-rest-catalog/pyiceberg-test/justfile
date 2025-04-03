@@ -1,0 +1,13 @@
+set quiet
+
+[private]
+help:
+   just --list
+
+# ruff check
+check:
+  uv tool run ruff check
+
+# ruff format
+format:
+  uv tool run ruff format

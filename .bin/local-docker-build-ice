@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+./mvnw -pl ice validate # fail-fast
+
+# TODO: s/latest/nonroot, s/debug/debug-nonroot
+docker build --build-arg BASE_IMAGE_TAG=latest -t altinity/ice:local -f ice/Dockerfile .
+docker build --build-arg BASE_IMAGE_TAG=debug -t altinity/ice:debug-local -f ice/Dockerfile .

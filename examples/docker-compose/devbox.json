@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.10.7/.schema/devbox.schema.json",
+  "packages": [
+  ],
+  "env": {
+    "AT": "ice:examples/docker-compose"
+  },
+  "shell": {
+    "init_hook": [
+      "export PATH=$(pwd)/.devbox/bin:$PATH",
+      "[ -f .devbox/bin/clickhouse ] || (curl https://clickhouse.com/ | sh && mv clickhouse .devbox/bin/)"
+    ]
+  }
+}

@@ -11,10 +11,17 @@ insert_final_newline = true
 [*.md]
 trim_trailing_whitespace = false
 
+# https://github.com/google/google-java-format
 [*.{java,xml}]
+indent_style = space
+indent_size = 2
+
+# https://github.com/astral-sh/ruff
+[*.py]
 indent_style = space
 indent_size = 4
 
+# just don't... use https://github.com/casey/just
 [Makefile]
 indent_style = tab
 indent_size = 4

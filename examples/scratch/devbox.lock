@@ -1,0 +1,104 @@
+{
+  "lockfile_version": "1",
+  "packages": {
+    "github:NixOS/nixpkgs/nixpkgs-unstable": {
+      "resolved": "github:NixOS/nixpkgs/b2b0718004cc9a5bca610326de0a82e6ea75920b?lastModified=1744096231&narHash=sha256-kUfx3FKU1Etnua3EaKvpeuXs7zoFiAcli1gBwkPvGSs%3D"
+    },
+    "minio-client@latest": {
+      "last_modified": "2025-03-16T16:17:41Z",
+      "resolved": "github:NixOS/nixpkgs/8f76cf16b17c51ae0cc8e55488069593f6dab645#minio-client",
+      "source": "devbox-search",
+      "version": "2025-03-12T17-29-24Z",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/6s1l3j1shn92h4jh7c11mgrgaqr19fn4-minio-client-2025-03-12T17-29-24Z",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/6s1l3j1shn92h4jh7c11mgrgaqr19fn4-minio-client-2025-03-12T17-29-24Z"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/wcb7x051g005hmmj2rbqk0s1hwj5k97h-minio-client-2025-03-12T17-29-24Z",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/wcb7x051g005hmmj2rbqk0s1hwj5k97h-minio-client-2025-03-12T17-29-24Z"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/wy58ah7aki6s6fa9nh6qd1h9s7z0582c-minio-client-2025-03-12T17-29-24Z",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/wy58ah7aki6s6fa9nh6qd1h9s7z0582c-minio-client-2025-03-12T17-29-24Z"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/v2wwx3b83bcp03z7xnxcg44y6y2npj1h-minio-client-2025-03-12T17-29-24Z",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/v2wwx3b83bcp03z7xnxcg44y6y2npj1h-minio-client-2025-03-12T17-29-24Z"
+        }
+      }
+    },
+    "minio@latest": {
+      "last_modified": "2025-03-11T17:52:14Z",
+      "resolved": "github:NixOS/nixpkgs/0d534853a55b5d02a4ababa1d71921ce8f0aee4c#minio",
+      "source": "devbox-search",
+      "version": "2025-02-07T23-21-09Z",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/ddljfpg0a54z9w6l9310pilmn6fpb714-minio-2025-02-07T23-21-09Z",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/ddljfpg0a54z9w6l9310pilmn6fpb714-minio-2025-02-07T23-21-09Z"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/1lmygdq7h7v07lbvfdn9famxp8ilmsra-minio-2025-02-07T23-21-09Z",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/1lmygdq7h7v07lbvfdn9famxp8ilmsra-minio-2025-02-07T23-21-09Z"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/znlk0mr42bfqb49sgfgjysfjq2vaa4cs-minio-2025-02-07T23-21-09Z",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/znlk0mr42bfqb49sgfgjysfjq2vaa4cs-minio-2025-02-07T23-21-09Z"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/5sk32yv6ywr7lj1ds0ga54yb73vjlarf-minio-2025-02-07T23-21-09Z",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/5sk32yv6ywr7lj1ds0ga54yb73vjlarf-minio-2025-02-07T23-21-09Z"
+        }
+      }
+    }
+  }
+}

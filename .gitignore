@@ -1,0 +1,7 @@
+target
+/demo/data
+/demo/clickhouse-udfs.xml
+/ice-rest-catalog/pyiceberg-test/.venv
+/ice-rest-catalog/pyiceberg-test/*.cached
+/release
+.devbox

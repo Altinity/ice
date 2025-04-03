@@ -1,0 +1,37 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: ice-rest-catalog
+  region: ${AWS_REGION}
+iam:
+  withOIDC: true
+  serviceAccounts:
+    # This is obviously not meant for production.
+    # IAM role should be limited to specific bucket(s) (among other things).
+    - metadata:
+        name: ice-rest-catalog
+        namespace: ice
+      attachPolicyARNs:
+        - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+    - metadata:
+        name: cluster-autoscaler
+        namespace: kube-system
+      wellKnownPolicies:
+        autoScaler: true
+      roleName: eksctl-cluster-autoscaler-role
+      roleOnly: true
+nodeGroups:
+  - name: "ng-1"
+    tags:
+      k8s.io/cluster-autoscaler/enabled: "true"
+      k8s.io/cluster-autoscaler/ice-rest-catalog: "owned"
+    desiredCapacity: 1
+    iam:
+      withAddonPolicies:
+        ebs: true
+addons:
+  - name: aws-ebs-csi-driver
+    version: latest
+    attachPolicyARNs:
+      - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+    resolveConflicts: overwrite

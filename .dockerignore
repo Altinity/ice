@@ -1,0 +1,14 @@
+**/target
+**/.local
+.idea
+**/*.iml
+demo
+examples
+clickhouse
+ice-rest-catalog/pyiceberg-test
+.git
+release
+.bin
+**/Dockerfile
+**/Dockerfile.*
+**/.devbox

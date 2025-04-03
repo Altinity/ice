@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+DIR="$(dirname "${BASH_SOURCE[0]}")"
+
+for arg in "$@"; do
+  if [[ "$arg" == "--undo" ]]; then
+    rm -f "$DIR/ice"
+    rm -f "$DIR/ice-rest-catalog"
+    exit 0
+  fi
+done
+
+ln -sv "$DIR/local-ice" "$DIR/ice"
+ln -sv "$DIR/local-ice-rest-catalog" "$DIR/ice-rest-catalog"

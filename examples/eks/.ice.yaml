@@ -1,0 +1,6 @@
+catalog:
+  default:
+    uri: http://localhost:5000
+    header.authorization: bearer foo
+    write.parquet.compression-codec: snappy
+    ice.http.cache: var/cache/ice/http

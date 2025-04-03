@@ -1,0 +1,12 @@
+catalog:
+  default:
+    uri: http://localhost:5000
+    header.authorization: bearer foo
+    # FIXME: why s3.endpoint, etc? for client?
+    s3.endpoint: http://localhost:9000
+    # s3.access_key_id: miniouser
+    # s3.secret_access_key: miniopassword
+    client.region: mino
+    # TODO: test
+    write.parquet.compression-codec: snappy
+    ice.http.cache: data/ice/http/cache

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/../ice-rest-catalog/pyiceberg-test"
+
+uv run ice_create_table.py ns1.table1 --location=s3://bucket1/ns1/table1 --schema-from-parquet \
+  https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
+
+uv run ice_insert.py ns1.table1 \
+  https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
+
+uv tool run pyiceberg[pyarrow] describe ns1.table1

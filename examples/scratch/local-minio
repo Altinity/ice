@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+
+set -a
+source "$DIR/minio.env"
+set +a
+
+mkdir -p "$DIR/data/minio"
+
+# TODO: link to download page similar to ./clickhouse
+# TODO: docker run as a fallback ...
+exec minio server "$DIR/data/minio" --console-address ":9001" "$@"

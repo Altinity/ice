@@ -1,0 +1,91 @@
+# ServiceAccount below is created by eksctl.
+#
+# apiVersion: v1
+# kind: ServiceAccount
+# metadata:
+#   name: ice-rest-catalog
+#   annotations:
+#     eks.amazonaws.com/role-arn: "..."
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ice-rest-catalog
+stringData:
+  ice-rest-catalog.yaml: |
+    uri: "jdbc:sqlite:file:/var/lib/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500"
+    warehouse: s3://${CATALOG_BUCKET}
+    ice.token: foo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ice-rest-catalog
+spec:
+  selector:
+    app: ice-rest-catalog
+  ports:
+    - port: 5000
+      name: iceberg
+    - port: 5001
+      name: debug
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ice-rest-catalog
+  labels:
+    app: ice-rest-catalog
+spec:
+  serviceName: ice-rest-catalog
+  selector:
+    matchLabels:
+      app: ice-rest-catalog
+  template:
+    metadata:
+      labels:
+        app: ice-rest-catalog
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5001"
+    spec:
+      serviceAccountName: ice-rest-catalog
+      volumes:
+        - name: etc
+          secret:
+            secretName: ice-rest-catalog
+      containers:
+        - name: iceberg
+          image: altinity/ice-rest-catalog:local
+          # imagePullPolicy: "Always"
+          ports:
+            - containerPort: 5000 # iceberg
+            - containerPort: 5001 # /{healthz,livez,readyz,metrics}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5001
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5001
+            initialDelaySeconds: 60
+            timeoutSeconds: 10
+          volumeMounts:
+            - name: etc
+              mountPath: /etc/ice
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/ice-rest-catalog
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: gp2
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
