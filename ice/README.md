@@ -1,6 +1,6 @@
 # ice-rest-catalog
 
-A CLI for loading data into Iceberg REST catalogs (with ability to be used as ClickHouse UDF handler).
+A CLI for loading data into Iceberg REST catalogs.
 
 ## Status
 
@@ -11,10 +11,4 @@ A CLI for loading data into Iceberg REST catalogs (with ability to be used as Cl
 
 ## Reference
 
-TABLE GOES HERE
-TODO: link to section in ice/README.md instead
-
-### ClickHouse UDFs
-
-TABLE GOES HERE
-TODO: link to section in ice/README.md instead
+TBD

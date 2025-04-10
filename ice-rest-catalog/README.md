@@ -13,5 +13,4 @@ A dead-simple Iceberg REST Catalog.
 
 ## Reference
 
-TABLE GOES HERE
-TODO: link to section in ice/README.md instead
+TBD

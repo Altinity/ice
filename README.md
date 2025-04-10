@@ -3,7 +3,7 @@
 A suite of tools aiming at simplifying [Iceberg](https://iceberg.apache.org/)+[ClickHouse](https://clickhouse.com/) deployment
 
 - [ice-rest-catalog](ice-rest-catalog/) - A dead-simple Iceberg REST catalog. 
-- [ice](ice/) - A CLI for loading data into Iceberg REST catalogs  (like `ice-rest-catalog` :)).
+- [ice](ice/) - A CLI for loading data into Iceberg REST catalogs.
 
 ## Installation
 
