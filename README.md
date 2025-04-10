@@ -8,7 +8,7 @@ A suite of tools aiming at simplifying [Iceberg](https://iceberg.apache.org/)+[C
 ## Installation
 
 Pre-built binaries\* (+ links to Docker images for [ice](https://hub.docker.com/r/altinity/ice) and [ice-rest-catalog](https://hub.docker.com/r/altinity/ice-rest-catalog)) are available form [GitHub Releases](https://github.com/Altinity/ice/releases) page.
-\* currently require `java` 21+ to run (available [here](https://adoptium.net/installation/)).  
+> \* currently require `java` 21+ to run (available [here](https://adoptium.net/installation/)).  
 
 ## Usage
 
