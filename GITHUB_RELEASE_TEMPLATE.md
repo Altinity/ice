@@ -18,8 +18,8 @@ gh release download --repo altinity/ice REPLACE_WITH_TAG -p ice-REPLACE_WITH_VER
 
 <!-- TODO: @digest -->
 
-- `altinity/ice:REPLACE_WITH_TAG`
-- `altinity/ice:debug-REPLACE_WITH_TAG`
+- `altinity/ice:REPLACE_WITH_VER`
+- `altinity/ice:debug-REPLACE_WITH_VER`
 
 ### ice-rest-catalog
 
@@ -32,5 +32,5 @@ gh release download --repo altinity/ice REPLACE_WITH_TAG -p ice-rest-catalog-REP
 
 <!-- TODO: @digest -->
 
-- `altinity/ice-rest-catalog:REPLACE_WITH_TAG`
-- `altinity/ice-rest-catalog:debug-REPLACE_WITH_TAG`
+- `altinity/ice-rest-catalog:REPLACE_WITH_VER`
+- `altinity/ice-rest-catalog:debug-REPLACE_WITH_VER`

@@ -35,14 +35,15 @@ if ! $push; then
   exit 0
 fi
 
+VERSION_TAG="v$VERSION"
 github-release delete --user altinity --repo ice --tag "$VERSION_TAG" || true
 
 cat release/GITHUB_RELEASE.md | github-release release \
-  --target "master" --user "altinity" --repo "ice" --tag "$VERSION_TAG" --name "$VERSION" --description -
+  --target master --user altinity --repo ice --tag "$VERSION_TAG" --name "$VERSION_TAG" --description -
 sleep 7
 for f in ice ice-rest-catalog; do
     echo "Uploading $f..." >&2
-    github-release upload --user altinity --repo ice --tag "$VERSION_TAG" --name "$f" --file "$f/target/$f-jar"
+    github-release upload --user altinity --repo ice --tag "$VERSION_TAG" --name "$f-$VERSION" --file "$f/target/$f-jar"
 done
 
 docker-build-ice --push
