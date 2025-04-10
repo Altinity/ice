@@ -90,6 +90,22 @@ default:
 <tr><td>
 
 ```shell
+ice create-table flowers.irys -p --schema-from-parquet\
+  file://iris.parquet
+```
+
+</td><td>
+
+Creates table named `irys` inside `flowers` namespace
+using schema from the input (`iris.parquet` file in this case).  
+`-p` is used to ignore TableAlreadyExistsError.
+
+Supported URI schemes: `file://`, `https://`, `http://`, `s3://`.
+
+</td></tr>
+<tr><td>
+
+```shell
 ice insert flowers.irys -p \
   file://iris.parquet
 ```
