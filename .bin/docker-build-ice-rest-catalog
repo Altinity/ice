@@ -10,8 +10,12 @@ image_name=altinity/ice-rest-catalog
 
 # TODO: s/latest/nonroot
 for q in "" "debug-"; do
-  docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=${q}latest-amd64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$VERSION-amd64" -f ice-rest-catalog/Dockerfile .
-  docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=${q}latest-arm64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$VERSION-arm64" -f ice-rest-catalog/Dockerfile .
+  base_image_prefix="$q"
+  if [[ "$q" == "" ]]; then
+    base_image_prefix="latest-"
+  fi
+  docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=${base_image_prefix}amd64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$VERSION-amd64" -f ice-rest-catalog/Dockerfile .
+  docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=${base_image_prefix}arm64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$VERSION-arm64" -f ice-rest-catalog/Dockerfile .
 done
 # TODO: :debug-with-ice
 
@@ -38,6 +42,7 @@ for q in "" "debug-"; do
 done
 
 for q in "" "debug-"; do
+  docker pull "$image_name:$q$VERSION"
   docker image tag "$image_name:$q$VERSION" "$image_name:${q}latest"
   docker push "$image_name:${q}latest"
 done

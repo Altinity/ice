@@ -6,7 +6,7 @@ test -n "$VERSION" || (echo 'VERSION env variable must be set' >&2; exit 1)
 
 ./mvnw clean verify
 
-rm -f release
+rm -rf release/
 
 _undo_mvn_version_set() {
   ./mvnw versions:revert
@@ -17,7 +17,9 @@ trap _undo_mvn_version_set EXIT
 ./mvnw clean package -Dmaven.test.skip=true
 _undo_mvn_version_set
 
+echo >&2 'Building ice Docker image'
 docker-build-ice
+echo >&2 'Building ice-rest-catalog Docker image'
 docker-build-ice-rest-catalog
 
 render-github-release-template
@@ -36,6 +38,8 @@ if ! $push; then
 fi
 
 VERSION_TAG="v$VERSION"
+
+# TODO: go install github.com/aktau/github-release@v0.10.0
 github-release delete --user altinity --repo ice --tag "$VERSION_TAG" || true
 
 cat release/GITHUB_RELEASE.md | github-release release \
@@ -46,5 +50,7 @@ for f in ice ice-rest-catalog; do
     github-release upload --user altinity --repo ice --tag "$VERSION_TAG" --name "$f-$VERSION" --file "$f/target/$f-jar"
 done
 
+echo >&2 'Pushing ice Docker image'
 docker-build-ice --push
+echo >&2 'Pushing ice-rest-catalog Docker image'
 docker-build-ice-rest-catalog --push
