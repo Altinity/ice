@@ -5,6 +5,10 @@ A suite of tools aiming at simplifying [Iceberg](https://iceberg.apache.org/)+[C
 - [ice-rest-catalog](ice-rest-catalog/) - A dead-simple Iceberg REST catalog. 
 - [ice](ice/) - A CLI for loading data into Iceberg REST catalogs.
 
+## Demo
+
+> `ice-rest-catalog` as Iceberg REST Catalog + `ice` to insert data + `clickhouse` to query
+
 [![demo](https://github.com/user-attachments/assets/529087ae-a124-442e-b3e7-00eb07b33e80)](examples/scratch/)
 
 ## Installation
