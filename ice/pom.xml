@@ -438,6 +438,8 @@
                   <mainClass>com.altinity.ice.Main</mainClass>
                   <manifestEntries>
                     <Multi-Release>true</Multi-Release>
+                    <!-- for class.getPackage().getImplementationVersion() -->
+                    <Implementation-Version>${project.version}</Implementation-Version>
                   </manifestEntries>
                 </transformer>
               </transformers>

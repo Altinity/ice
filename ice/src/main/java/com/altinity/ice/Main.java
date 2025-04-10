@@ -17,22 +17,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 
 // TODO: cmd/* -> CatalogActions
 // TODO: move contents in this package to internal/ & Main to separate package
-@Command(
+@CommandLine.Command(
     name = "ice",
     description = "Iceberg REST Catalog client.",
     mixinStandardHelpOptions = true,
-    scope = CommandLine.ScopeType.INHERIT)
+    scope = CommandLine.ScopeType.INHERIT,
+    versionProvider = Main.VersionProvider.class)
 public final class Main {
+
+  static class VersionProvider implements CommandLine.IVersionProvider {
+    public String[] getVersion() {
+      return new String[] {Main.class.getPackage().getImplementationVersion()};
+    }
+  }
 
   private static final String PREFIX = "ICE_";
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
-  @Option(
+  @CommandLine.Option(
       names = {"-c", "--config"},
       description = "/path/to/config.yaml ($CWD/.ice.yaml by default)",
       scope = CommandLine.ScopeType.INHERIT)
@@ -92,7 +97,7 @@ public final class Main {
     return p;
   }
 
-  @Command(name = "check", description = "Check configuration.")
+  @CommandLine.Command(name = "check", description = "Check configuration.")
   void check() throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
       Check.run(catalog);
@@ -100,7 +105,7 @@ public final class Main {
     }
   }
 
-  @Command(name = "describe", description = "Describe catalog/namespace/table.")
+  @CommandLine.Command(name = "describe", description = "Describe catalog/namespace/table.")
   void describe() throws IOException {
     // TODO: check ti has namespace
     // TODO: pyiceberg describe
@@ -110,18 +115,18 @@ public final class Main {
   }
 
   // TODO: merge into put?
-  @Command(name = "create-table", description = "Create table.")
+  @CommandLine.Command(name = "create-table", description = "Create table.")
   void createTable(
       @CommandLine.Parameters(
               arity = "1",
               paramLabel = "<name>",
               description = "table name (e.g. ns1.table1)")
           String name,
-      @Option(
+      @CommandLine.Option(
               names = {"-p"},
               description = "create table if not exists")
           boolean createTableIfNotExists,
-      @Option(
+      @CommandLine.Option(
               arity = "1",
               required = true,
               names = "--schema-from-parquet",
@@ -134,14 +139,14 @@ public final class Main {
     }
   }
 
-  @Command(name = "insert", description = "Write data to catalog.")
+  @CommandLine.Command(name = "insert", description = "Write data to catalog.")
   void insert(
       @CommandLine.Parameters(
               arity = "1",
               paramLabel = "<name>",
               description = "table name (e.g. ns1.table1)")
           String name,
-      @Option(
+      @CommandLine.Option(
               names = {"-p", "--create-table"},
               description = "create table if not exists")
           boolean createTableIfNotExists,
@@ -150,9 +155,11 @@ public final class Main {
               paramLabel = "<files>",
               description = "/path/to/file.parquet")
           String[] dataFiles,
-      @Option(names = "--no-copy", description = "add files to catalog without copying them")
+      @CommandLine.Option(
+              names = "--no-copy",
+              description = "add files to catalog without copying them")
           boolean noCopy,
-      @Option(names = "--dry-run", description = "skip transaction commit")
+      @CommandLine.Option(names = "--dry-run", description = "skip transaction commit")
           boolean dryRun // FIXME: no-commit
       ) throws IOException {
     // TODO: "s3a://sasquatch/test/nyc/taxis/yellow_tripdata_2024-12.parquet"

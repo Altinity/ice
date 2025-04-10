@@ -247,6 +247,10 @@
             <manifest>
               <mainClass>com.altinity.ice.rest.catalog.Main</mainClass>
             </manifest>
+            <manifestEntries>
+              <!-- for class.getPackage().getImplementationVersion() -->
+              <Implementation-Version>${project.version}</Implementation-Version>
+            </manifestEntries>
           </archive>
           <finalName>ice-rest-catalog</finalName>
         </configuration>

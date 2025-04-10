@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.iceberg.CatalogProperties;
@@ -38,27 +39,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 
-@Command(
+@CommandLine.Command(
     name = "ice-rest-catalog",
-    subcommands = {CommandLine.HelpCommand.class},
-    description = "Iceberg REST Catalog.")
-public final class Main {
+    description = "Iceberg REST Catalog.",
+    mixinStandardHelpOptions = true,
+    scope = CommandLine.ScopeType.INHERIT,
+    versionProvider = Main.VersionProvider.class)
+public final class Main implements Callable<Integer> {
+
+  static class VersionProvider implements CommandLine.IVersionProvider {
+    public String[] getVersion() {
+      return new String[] {Main.class.getPackage().getImplementationVersion()};
+    }
+  }
 
   private static final String PREFIX = "ICE_REST_CATALOG_";
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
-  @Option(
-      names = {"--version"},
-      versionHelp = true,
-      description = "print version information and exit")
-  boolean versionRequested;
-
-  @Option(
+  @CommandLine.Option(
       names = {"-c", "--config"},
       description = "/path/to/config.yaml ($CWD/.ice-rest-catalog.yaml by default)")
   String configFile;
@@ -257,16 +258,9 @@ public final class Main {
         });
   }
 
-  public static void main(String[] args) throws Exception {
-    Main cmd = new Main();
-    CommandLine commandLine = new CommandLine(cmd);
-    commandLine.parseArgs(args);
-    if (commandLine.isVersionHelpRequested()) {
-      System.out.println(Main.class.getPackage().getImplementationVersion());
-      return;
-    }
-
-    var config = loadConfig(cmd.configFile);
+  @Override
+  public Integer call() throws Exception {
+    var config = loadConfig(configFile);
 
     var awsRegion = config.getOrDefault("ice.s3.region", "");
     if (!awsRegion.isEmpty()) {
@@ -291,5 +285,11 @@ public final class Main {
     logger.info("Serving http://0.0.0.0:{}/{metrics,healtz,livez,readyz}", debugPort);
 
     httpServer.join();
+    return 0;
+  }
+
+  public static void main(String[] args) throws Exception {
+    int exitCode = new CommandLine(new Main()).execute(args);
+    System.exit(exitCode);
   }
 }
