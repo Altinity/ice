@@ -40,8 +40,5 @@ for q in "" "debug-"; do
   docker manifest push "$image_name:$q$VERSION"
 done
 
-for q in "" "debug-"; do
-  docker pull "$image_name:$q$VERSION"
-  docker image tag "$image_name:$q$VERSION" "$image_name:${q}latest"
-  docker push "$image_name:${q}latest"
-done
+regctl image copy "$image_name:$VERSION" "$image_name:latest"
+regctl image copy "$image_name:debug-$VERSION" "$image_name:debug"
