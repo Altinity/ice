@@ -38,7 +38,7 @@ import org.apache.parquet.schema.Type;
 
 public class ParquetAvroWriterWithINT96AsFIXEDSupport {
 
-  private Set<String> int96fields;
+  private final Set<String> int96fields;
 
   public ParquetAvroWriterWithINT96AsFIXEDSupport(Set<String> int96fields) {
     this.int96fields = int96fields;
