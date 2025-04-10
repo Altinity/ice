@@ -10,6 +10,7 @@ A dead-simple Iceberg REST Catalog.
 - [ ] az:// support.
 - [x] Authorization via Bearer token. 
 - [x] `:5001/{healtz,livez,readyz,metrics}` endpoints (for Kubernetes).
+- [ ] `etcd` backend support.
 
 ## Reference
 
