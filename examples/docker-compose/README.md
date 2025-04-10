@@ -2,7 +2,7 @@
 
 In the example below, we:
 
-- launch m`ice-rest-catalog`, minio (for s3:// storage) and clickhouse-server
+- launch `ice-rest-catalog`, minio (for s3:// storage) and clickhouse-server
 - insert data via `ice`
 - query data using clickhouse
 
