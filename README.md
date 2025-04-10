@@ -9,7 +9,7 @@ A suite of tools aiming at simplifying [Iceberg](https://iceberg.apache.org/)+[C
 
 > `ice-rest-catalog` as Iceberg REST Catalog + `ice` to insert data + `clickhouse` to query
 
-[![demo](https://github.com/user-attachments/assets/529087ae-a124-442e-b3e7-00eb07b33e80)](examples/scratch/)
+[![demo](https://github.com/user-attachments/assets/e3cfdb48-e7f0-4893-abe8-736c9655811d)](examples/scratch/)
 
 ## Installation
 
