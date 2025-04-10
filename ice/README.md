@@ -82,8 +82,8 @@ default:
           total-delete-files: "0"
           total-position-deletes: "0"
           total-equality-deletes: "0"
-          iceberg-version: "Apache Iceberg 1.8.1 (commit 9ce0fcf0af7becf25ad9fc996c3bad2afdcfd33d)"
-        location: s3://bucket1/nyc/taxis/metadata/snap-7548400764320456737-1-948836e4-244c-4b1a-968b-fba502880f16.avro
+          iceberg-version: "Apache Iceberg 1.8.1 (...)"
+        location: s3://bucket1/nyc/taxis/metadata/snap-...avro
 ```
 
 </td></tr>
