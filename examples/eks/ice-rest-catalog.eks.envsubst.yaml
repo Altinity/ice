@@ -56,7 +56,7 @@ spec:
             secretName: ice-rest-catalog
       containers:
         - name: iceberg
-          image: altinity/ice-rest-catalog:local
+          image: altinity/ice-rest-catalog:latest
           # imagePullPolicy: "Always"
           ports:
             - containerPort: 5000 # iceberg
