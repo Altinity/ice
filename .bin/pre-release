@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+VERSION=0.0.0-latest-master+$(git rev-parse --short HEAD)
+
+_undo_mvn_version_set() {
+  ./mvnw versions:revert
+}
+trap _undo_mvn_version_set EXIT
+./mvnw versions:set -DnewVersion=$VERSION
+
+./mvnw clean package -Dmaven.test.skip=true
+_undo_mvn_version_set
+
+VERSION_TAG="latest-master"
+
+# TODO: go install github.com/aktau/github-release@v0.10.0
+github-release delete --user altinity --repo ice --tag "$VERSION_TAG" || true
+sleep 7
+github-release release --pre-release \
+  --target master --user altinity --repo ice --tag "$VERSION_TAG" --name "$VERSION_TAG" --description "version: $VERSION"
+sleep 7
+for f in ice ice-rest-catalog; do
+    echo "Uploading $f..." >&2
+    github-release upload --user altinity --repo ice --tag "$VERSION_TAG" --name "$f-$VERSION" --file "$f/target/$f-jar"
+done
