@@ -1,4 +1,4 @@
-package com.altinity.ice.cmd;
+package com.altinity.ice.internal.cmd;
 
 import java.io.IOException;
 import org.apache.iceberg.rest.RESTCatalog;

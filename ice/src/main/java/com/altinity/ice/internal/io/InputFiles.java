@@ -1,6 +1,6 @@
-package com.altinity.ice.io;
+package com.altinity.ice.internal.io;
 
-import com.altinity.ice.crypto.Hash;
+import com.altinity.ice.internal.crypto.Hash;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.apache.iceberg.io.FileIO;
 
+// TODO: refactor: this entire class is a trainwreck
 public final class InputFiles {
 
   private InputFiles() {}

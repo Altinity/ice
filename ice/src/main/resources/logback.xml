@@ -2,7 +2,7 @@
 
   <logger name="org.apache.iceberg.CatalogUtil" level="WARN"/>
 
-  <root level="INFO">
+  <root level="WARN">
     <appender-ref ref="CONSOLE"/>
   </root>
 
@@ -15,14 +15,16 @@
 
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <target>System.err</target>
-    <encoder>
-      <!-- FIXME: stacktrace filtering has perf implications -->
-      <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n%rEx{full,
-        picocli,
-        software.amazon.awssdk.core.internal,
-        java.base
-        }
-      </pattern>
+    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+      <layout class="com.altinity.ice.internal.log.ColorAwarePatternLayout">
+        <!-- FIXME: stacktrace filtering has perf implications -->
+        <pattern>%gray(%d{yyyy-MM-dd HH:mm:ss} [%.11thread]) %highlight(%-4level) %gray(%logger{27} >) %msg%n%rEx{full,
+          picocli,
+          software.amazon.awssdk.core.internal,
+          java.base
+          }
+        </pattern>
+      </layout>
     </encoder>
   </appender>
 </configuration>

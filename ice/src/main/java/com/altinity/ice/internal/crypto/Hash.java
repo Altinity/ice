@@ -1,4 +1,4 @@
-package com.altinity.ice.crypto;
+package com.altinity.ice.internal.crypto;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

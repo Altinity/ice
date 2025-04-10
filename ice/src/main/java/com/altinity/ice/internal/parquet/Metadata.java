@@ -1,4 +1,4 @@
-package com.altinity.ice.parquet;
+package com.altinity.ice.internal.parquet;
 
 import static org.apache.parquet.bytes.BytesUtils.readIntLittleEndian;
 import static org.apache.parquet.format.Util.readFileCryptoMetaData;
@@ -55,7 +55,6 @@ public final class Metadata {
 
     long fileLen = file.getLength();
     String filePath = file.toString();
-    //        LOG.debug("File length {}", fileLen);
 
     int FOOTER_LENGTH_SIZE = 4;
     if (fileLen
@@ -69,7 +68,6 @@ public final class Metadata {
     // Read footer length and magic string - with a single seek
     byte[] magic = new byte[MAGIC.length];
     long fileMetadataLengthIndex = fileLen - magic.length - FOOTER_LENGTH_SIZE;
-    //        LOG.debug("reading footer index at {}", fileMetadataLengthIndex);
     f.seek(fileMetadataLengthIndex);
     int fileMetadataLength = readIntLittleEndian(f);
     //        f.readNBytes(magic, 0, magic.length); // FIXME: check how may bytes read
@@ -88,7 +86,6 @@ public final class Metadata {
     }
 
     long fileMetadataIndex = fileMetadataLengthIndex - fileMetadataLength;
-    //        LOG.debug("read footer length: {}, footer index: {}", fileMetadataLength,
     // fileMetadataIndex);
     if (fileMetadataIndex < magic.length || fileMetadataIndex >= fileMetadataLengthIndex) {
       throw new RuntimeException(
@@ -110,7 +107,6 @@ public final class Metadata {
     try {
       f.readFully(footerBytesBuffer);
       //            f.readNBytes(footerBytesBuffer.length); // FIXME: check how may bytes read
-      //            LOG.debug("Finished to read all footer bytes.");
       footerBytesBuffer.flip();
       InputStream footerBytesStream = ByteBufferInputStream.wrap(footerBytesBuffer);
 
