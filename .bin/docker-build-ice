@@ -35,3 +35,8 @@ for q in "" "debug-"; do
     --amend "$image_name:$q$VERSION-arm64"
   docker manifest push "$image_name:$q$VERSION"
 done
+
+for q in "" "debug-"; do
+  docker image tag "$image_name:$q$VERSION" "$image_name:${q}latest"
+  docker push "$image_name:${q}latest"
+done
