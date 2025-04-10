@@ -170,7 +170,8 @@ public final class Main {
         CreateTable.run(catalog, tableId, dataFiles[0], true);
       }
       if (noCopy) {
-        throw new UnsupportedOperationException("--no-copy is not fully tested yet and hence disabled");
+        throw new UnsupportedOperationException(
+            "--no-copy is not fully tested yet and hence disabled");
       }
       Insert.run(catalog, tableId, dataFiles, noCopy, dryRun);
     }
