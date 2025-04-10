@@ -1,4 +1,4 @@
-# ice ![build](https://github.com/altinity/ice/actions/workflows/verify.yaml/badge.svg)
+# ice [![build](https://github.com/altinity/ice/actions/workflows/verify.yaml/badge.svg)](https://github.com/altinity/ice/actions/workflows/verify.yaml)
 
 A suite of tools aiming at simplifying [Iceberg](https://iceberg.apache.org/)+[ClickHouse](https://clickhouse.com/) deployment
 
