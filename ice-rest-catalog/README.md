@@ -2,16 +2,20 @@
 
 A dead-simple Iceberg REST Catalog.
 
-## Status
-
-- [x] Configuration via `.ice-rest-catalog.yaml` (when present), env vars prefixed with `ICE_REST_CATALOG_` and `--config/-c=/path/to/config.yaml` CLI option.
-- [x] s3:// support.
-- [ ] gs:// support.
-- [ ] az:// support.
-- [x] Authorization via Bearer token. 
-- [x] `:5001/{healtz,livez,readyz,metrics}` endpoints (for Kubernetes).
-- [ ] `etcd` backend support.
-
 ## Reference
 
-TBD
+See [../examples/](../examples/) to get started.
+
+Generally speaking, all you need to start your own instance of `ice-rest-catalog` is to 
+create `.ice-rest-catalog.yaml` (sample config shown below) and then execute `ice-rest-catalog`. 
+That's it.
+
+```shell
+uri: "jdbc:sqlite:file:data/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500"
+warehouse: "s3://bucket1/"
+s3.endpoint: "http://localhost:9000/"
+s3.access-key-id: "miniouser"
+s3.secret-access-key: "miniopassword"
+ice.token: foo
+ice.s3.region: minio
+```
