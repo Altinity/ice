@@ -15,7 +15,7 @@ ice check
 
 </td><td>
 
-Check if `ice` is able to connect to the catalog using config in `$(pwd)/.ice.yaml`.
+Checks if `ice` is able to connect to the Iceberg REST Catalog using config in `$(pwd)/.ice.yaml`.
 
 Look for `.ice.yaml` files in [../examples/](../examples/) to get started. 
 
