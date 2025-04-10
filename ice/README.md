@@ -90,8 +90,8 @@ default:
 <tr><td>
 
 ```shell
-ice create-table flowers.irys -p --schema-from-parquet\
-  file://iris.parquet
+ice create-table flowers.irys -p \
+  --schema-from-parquet=file://iris.parquet
 ```
 
 </td><td>
