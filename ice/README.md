@@ -83,7 +83,7 @@ default:
           total-position-deletes: "0"
           total-equality-deletes: "0"
           iceberg-version: "Apache Iceberg 1.8.1 (...)"
-        location: s3://bucket1/nyc/taxis/metadata/snap-...avro
+        location: s3://bucket1/nyc/taxis/metadata/snap-...
 ```
 
 </td></tr>
