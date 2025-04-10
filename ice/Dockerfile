@@ -25,4 +25,4 @@ FROM gcr.io/distroless/java21-debian12:${BASE_IMAGE_TAG}
 
 COPY --from=build /app/ice/target/ice-jar /usr/local/bin/ice
 
-ENTRYPOINT ["/usr/local/bin/ice"]
+ENTRYPOINT ["java", "-jar", "/usr/local/bin/ice"]
