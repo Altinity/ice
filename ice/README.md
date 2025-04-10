@@ -83,7 +83,7 @@ default:
           total-position-deletes: "0"
           total-equality-deletes: "0"
           iceberg-version: "Apache Iceberg 1.8.1 (...)"
-        location: s3://bucket1/nyc/taxis/metadata/snap-...
+        location: s3://bucket1/nyc/taxis/metadata/snap-....avro
 ```
 
 </td></tr>
@@ -91,7 +91,8 @@ default:
 
 ```shell
 ice create-table flowers.irys -p \
-  --schema-from-parquet=file://iris.parquet
+  --schema-from-parquet \
+    file://iris.parquet
 ```
 
 </td><td>
