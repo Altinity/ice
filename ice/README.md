@@ -1,4 +1,4 @@
-# ice-rest-catalog
+# ice
 
 A CLI for loading data into Iceberg REST catalogs.
 
