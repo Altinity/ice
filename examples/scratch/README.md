@@ -36,6 +36,12 @@ date=2025-01-02/part-00000-8d6ab5af-1a45-4aa3-a345-109747904270-c000.snappy.parq
   s3://aws-public-blockchain/v1.0/btc/transactions/\
 date=2025-01-03/part-00000-56a0c524-82b4-494c-9408-990cdc225dc2-c000.snappy.parquet
 
+# upload file to minio using local-mc, 
+# then add file to the catalog without making a copy
+ice create-table flowers.iris_no_copy --schema-from-parquet=file://iris.parquet
+local-mc cp iris.parquet local/bucket1/flowers/iris_no_copy/
+ice insert flowers.iris_no_copy --no-copy s3://bucket1/flowers/iris_no_copy/iris.parquet
+
 # inspect
 ice describe
 
