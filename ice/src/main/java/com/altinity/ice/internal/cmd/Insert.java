@@ -104,11 +104,15 @@ public final class Insert {
           dataFileSizeInBytes = copy(readBuilder, writeBuilder);
         } else {
           if (dataFilesSet == null) {
-            dataFilesSet =
-                StreamSupport.stream(
-                        table.currentSnapshot().addedDataFiles(tableIO).spliterator(), false)
-                    .map(ContentFile::location)
-                    .collect(Collectors.toSet());
+            Snapshot snapshot = table.currentSnapshot();
+            if (snapshot != null) {
+              dataFilesSet =
+                  StreamSupport.stream(snapshot.addedDataFiles(tableIO).spliterator(), false)
+                      .map(ContentFile::location)
+                      .collect(Collectors.toSet());
+            } else {
+              dataFilesSet = Set.of();
+            }
           }
           if (dataFilesSet.contains(dataFile)) {
             throw new BadRequestException(
