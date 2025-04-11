@@ -79,6 +79,9 @@ select * from ice.`nyc.taxis` limit 10 FORMAT CSVWithNamesAndTypes;
 
 select count(*) from ice.`btc.transactions`;
 select * from ice.`btc.transactions` limit 10 FORMAT CSVWithNamesAndTypes;
+
+select count(*) from ice.`flowers.iris_no_copy`;
+select * from ice.`flowers.iris_no_copy` limit 10 FORMAT CSVWithNamesAndTypes;
 ```
 
 > The datasets used above:
