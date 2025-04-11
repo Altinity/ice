@@ -134,7 +134,7 @@ public final class Insert {
             metadata.getBlocks().stream().mapToLong(BlockMetaData::getRowCount).sum();
         DataFile df =
             new DataFiles.Builder(table.spec())
-                .withPath(replacePrefix(file, "s3a://", "s3://"))
+                .withPath(dataFile)
                 .withFormat("PARQUET")
                 .withRecordCount(recordCount)
                 .withFileSizeInBytes(dataFileSizeInBytes)
