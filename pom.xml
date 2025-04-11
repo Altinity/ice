@@ -19,7 +19,7 @@
     <parquet.version>1.15.1</parquet.version>
     <aws.java.sdk.version>2.31.13</aws.java.sdk.version>
     <picocli.version>4.7.6</picocli.version>
-    <snakeyaml.version>2.0</snakeyaml.version>
+    <snakeyaml.version>2.3</snakeyaml.version>
     <slf4j.version>2.0.17</slf4j.version>
     <logback.version>1.5.18</logback.version>
   </properties>
@@ -100,10 +100,10 @@
             ./mvnw -Dformat
 
             # test
-            ./mvnw clean verify
+            ./mvnw verify
 
             # publish a new version
-            release 0.1.0 --push
+            GITHUB_TOKEN=... VERSION=0.0.0-0 release --push
 
             # BONUS
 

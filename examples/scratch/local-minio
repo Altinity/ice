@@ -8,6 +8,4 @@ set +a
 
 mkdir -p "$DIR/data/minio"
 
-# TODO: link to download page similar to ./clickhouse
-# TODO: docker run as a fallback ...
 exec minio server "$DIR/data/minio" --console-address ":9001" "$@"

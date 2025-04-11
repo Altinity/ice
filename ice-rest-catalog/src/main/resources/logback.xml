@@ -24,7 +24,8 @@
           org.eclipse.jetty,
           jakarta.servlet,
           software.amazon.awssdk.core.internal,
-          java.base
+          java.base,
+          org.codehaus.mojo.exec
           }
         </pattern>
       </layout>

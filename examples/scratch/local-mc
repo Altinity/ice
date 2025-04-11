@@ -6,8 +6,7 @@ set -a
 source "$DIR/minio.env"
 set +a
 
-# TODO: link to download page similar to ./clickhouse
-# TODO: docker run as a fallback ...
 mkdir -p "$DIR/data/mc"
-mc --config-dir "$DIR/data/mc" alias set "local" "http://localhost:9000" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
+
+mc --config-dir "$DIR/data/mc" alias set "local" "http://localhost:9000" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
 exec mc --config-dir "$DIR/data/mc" "$@"

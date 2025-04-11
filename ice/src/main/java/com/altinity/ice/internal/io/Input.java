@@ -8,24 +8,42 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.rest.RESTCatalog;
 
 // TODO: refactor: this entire class is a trainwreck
-public final class InputFiles {
+public final class Input {
 
-  private InputFiles() {}
+  private Input() {}
+
+  public static FileIO newIO(String path, Table table) {
+    FileIO io = null;
+    if (path.startsWith("s3://") && (table == null || !path.startsWith(table.location()))) {
+      io = new S3FileIO();
+      // FIXME: this may not be what user wants
+      io.initialize(
+          Map.of(
+              "client.credentials-provider",
+              "software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider"));
+    }
+    return io;
+  }
 
   // TODO: turn into FileIO?
   // TODO: list() that supports wildcards in case of file:// and s3://
   // TODO: clear cached files on process exit
   // FIXME: method named "get" with side effects... classic
-  public static org.apache.iceberg.io.InputFile get(String path, String httpCachePath, FileIO io)
+  public static org.apache.iceberg.io.InputFile newFile(String path, RESTCatalog catalog, FileIO io)
       throws IOException {
     return switch (path) {
       case String s when (s.startsWith("http:") || s.startsWith("https:")) -> {
         // FIXME: use dedicated client
         String name = Hash.sha256(s);
         // FIXME: we don't really need to cache it if response contain Content-Length
+        String httpCachePath = catalog.properties().get("ice.http.cache");
         if (httpCachePath == null || httpCachePath.isEmpty()) {
           throw new IllegalArgumentException(
               "ice.http.cache must currently be set when ingesting from https?://");
@@ -65,6 +83,7 @@ public final class InputFiles {
   private static void createParentDirs(File file) throws IOException {
     File parent = file.getCanonicalFile().getParentFile();
     if (parent != null) {
+      //noinspection ResultOfMethodCallIgnored
       parent.mkdirs();
       if (!parent.isDirectory()) {
         throw new IOException("Unable to create parent directories of " + file);

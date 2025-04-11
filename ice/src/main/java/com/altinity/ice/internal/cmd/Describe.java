@@ -1,5 +1,7 @@
 package com.altinity.ice.internal.cmd;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -16,15 +18,47 @@ public final class Describe {
 
   private Describe() {}
 
-  // TODO: refactor to objects -> yaml/json; StringBuilder nonsense below is unreadable
-  public static void run(RESTCatalog catalog) throws IOException {
+  // TODO: refactor: the use of StringBuilder below is absolutely criminal
+  public static void run(RESTCatalog catalog, String target, boolean json) throws IOException {
+    String targetNamespace = null;
+    String targetTable = null;
+    if (target != null && !target.isEmpty()) {
+      // TODO: support catalog.ns.table
+      var s = target.split("[.]", 2);
+      switch (s.length) {
+        case 2:
+          targetNamespace = s[0];
+          targetTable = s[1];
+          break;
+        case 1:
+          targetNamespace = s[0];
+          break;
+      }
+    }
+    // FIXME: there is no need to list nss/tables when target is given
     var sb = new StringBuilder();
     List<Namespace> namespaces = catalog.listNamespaces();
-    sb.append("default:\n");
+    sb.append("default:");
+    boolean nsMatched = false;
     for (Namespace namespace : namespaces) {
-      sb.append("- " + namespace + ":\n");
+      if (targetNamespace != null && !targetNamespace.equals(namespace.toString())) {
+        continue;
+      }
+      if (!nsMatched) {
+        sb.append("\n");
+        nsMatched = true;
+      }
+      sb.append("- " + namespace + ":");
       List<TableIdentifier> tables = catalog.listTables(namespace);
+      boolean tableMatched = false;
       for (TableIdentifier tableId : tables) {
+        if (targetTable != null && !targetTable.equals(tableId.name())) {
+          continue;
+        }
+        if (!tableMatched) {
+          sb.append("\n");
+          tableMatched = true;
+        }
         sb.append("\t- " + tableId.name() + ":\n");
         Table table = catalog.loadTable(tableId);
         sb.append(
@@ -69,8 +103,25 @@ public final class Describe {
           sb.append("\t\t\t\tlocation: " + snapshot.manifestListLocation() + "\n");
         }
       }
+      if (!tableMatched) {
+        sb.append(" []\n");
+      }
     }
-    System.out.println(sb.toString().replace("\t", "  "));
+    if (!nsMatched) {
+      sb.append(" []\n");
+    }
+    String r = sb.toString().replace("\t", "  ");
+    if (json) {
+      r = convertYamlToJson(r);
+    }
+    System.out.println(r);
+  }
+
+  private static String convertYamlToJson(String yaml) throws IOException {
+    ObjectMapper yamlReader = new ObjectMapper(new YAMLFactory());
+    Object obj = yamlReader.readValue(yaml, Object.class);
+    ObjectMapper jsonWriter = new ObjectMapper();
+    return jsonWriter.writeValueAsString(obj);
   }
 
   private static String prefixEachLine(String v, String prefix) {

@@ -21,7 +21,7 @@ local-mc mb --ignore-existing local/bucket1
 ice-rest-catalog
 
 # insert data into catalog
-ice insert flowers.irys -p \
+ice insert flowers.iris -p \
   file://iris.parquet
 
 ice insert nyc.taxis -p \
@@ -65,8 +65,8 @@ SHOW DATABASES;
 SHOW TABLES FROM ice;
 SHOW CREATE TABLE ice.`nyc.taxis`;
 
-select count(*) from ice.`flowers.irys`;
-select * from ice.`flowers.irys` limit 10 FORMAT CSVWithNamesAndTypes;
+select count(*) from ice.`flowers.iris`;
+select * from ice.`flowers.iris` limit 10 FORMAT CSVWithNamesAndTypes;
 
 select count(*) from ice.`nyc.taxis`;
 select * from ice.`nyc.taxis` limit 10 FORMAT CSVWithNamesAndTypes;

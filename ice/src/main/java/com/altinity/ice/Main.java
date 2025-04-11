@@ -11,6 +11,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.AutoComplete;
 import picocli.CommandLine;
 
 @CommandLine.Command(
@@ -18,7 +19,8 @@ import picocli.CommandLine;
     description = "Iceberg REST Catalog client.",
     mixinStandardHelpOptions = true,
     scope = CommandLine.ScopeType.INHERIT,
-    versionProvider = Main.VersionProvider.class)
+    versionProvider = Main.VersionProvider.class,
+    subcommands = AutoComplete.GenerateCompletion.class)
 public final class Main {
 
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
@@ -53,9 +55,19 @@ public final class Main {
   }
 
   @CommandLine.Command(name = "describe", description = "Describe catalog/namespace/table.")
-  void describe() throws IOException {
+  void describe(
+      @CommandLine.Parameters(
+              arity = "0..1",
+              paramLabel = "<target>",
+              description = "Target (e.g. ns1.table1)")
+          String target,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
-      Describe.run(catalog);
+      Describe.run(catalog, target, json);
     }
   }
 
@@ -64,11 +76,15 @@ public final class Main {
       @CommandLine.Parameters(
               arity = "1",
               paramLabel = "<name>",
-              description = "table name (e.g. ns1.table1)")
+              description = "Table name (e.g. ns1.table1)")
           String name,
       @CommandLine.Option(
+              names = {"--location"},
+              description = "Table location (defaults to $warehouse/$namespace/$table)")
+          String location,
+      @CommandLine.Option(
               names = {"-p"},
-              description = "create table if not exists")
+              description = "Create table if not exists")
           boolean createTableIfNotExists,
       @CommandLine.Option(
               arity = "1",
@@ -78,7 +94,8 @@ public final class Main {
           String schemaFile)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
-      CreateTable.run(catalog, TableIdentifier.parse(name), schemaFile, createTableIfNotExists);
+      CreateTable.run(
+          catalog, TableIdentifier.parse(name), schemaFile, location, createTableIfNotExists);
     }
   }
 
@@ -108,7 +125,7 @@ public final class Main {
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
       TableIdentifier tableId = TableIdentifier.parse(name);
       if (createTableIfNotExists) {
-        CreateTable.run(catalog, tableId, dataFiles[0], true);
+        CreateTable.run(catalog, tableId, dataFiles[0], null, true);
       }
       Insert.run(catalog, tableId, dataFiles, noCopy, dryRun);
     }

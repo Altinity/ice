@@ -1,4 +1,3 @@
-import sys
 import pyarrow.parquet as pq
 from pyiceberg.catalog import load_catalog
 import localcache

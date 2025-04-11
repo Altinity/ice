@@ -90,14 +90,14 @@ default:
 <tr><td>
 
 ```shell
-ice create-table flowers.irys -p \
+ice create-table flowers.iris -p \
   --schema-from-parquet \
     file://iris.parquet
 ```
 
 </td><td>
 
-Creates table named `irys` inside `flowers` namespace
+Creates table named `iris` inside `flowers` namespace
 using schema from the input (`iris.parquet` file in this case).  
 `-p` is used to ignore TableAlreadyExistsError.
 
@@ -107,13 +107,13 @@ Supported URI schemes: `file://`, `https://`, `http://`, `s3://`.
 <tr><td>
 
 ```shell
-ice insert flowers.irys -p \
+ice insert flowers.iris -p \
   file://iris.parquet
 ```
 
 </td><td>
 
-`-p` is an alias for `--create-table`, which instructs `ice` to create a table named `irys` inside `flowers` namespace 
+`-p` is an alias for `--create-table`, which instructs `ice` to create a table named `iris` inside `flowers` namespace 
 using schema from the input (`iris.parquet` file in this case) (but only if the table does not exist yet).
 
 Once table is found, `ice` appends `iris.parquet` to the catalog.

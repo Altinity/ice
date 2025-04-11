@@ -1,23 +1,33 @@
 package com.altinity.ice.internal.cmd;
 
 import com.altinity.ice.internal.crypto.Hash;
-import com.altinity.ice.internal.io.InputFiles;
+import com.altinity.ice.internal.io.Input;
 import com.altinity.ice.internal.parquet.Metadata;
 import java.io.IOException;
-import java.util.*;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import org.apache.iceberg.*;
-import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.*;
+import org.apache.iceberg.mapping.MappingUtil;
+import org.apache.iceberg.mapping.NameMapping;
+import org.apache.iceberg.mapping.NameMappingParser;
 import org.apache.iceberg.parquet.Parquet;
+import org.apache.iceberg.parquet.ParquetSchemaUtil;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Insert {
+
+  private static final Logger logger = LoggerFactory.getLogger(Insert.class);
 
   private Insert() {}
 
@@ -35,105 +45,134 @@ public final class Insert {
     }
     Table table = catalog.loadTable(nsTable);
     if (table.location() == null || table.location().isEmpty()) {
+      // TODO: how do we even end up in this situation? pyiceberg?
       throw new UnsupportedOperationException(
-          "adding files to tables without location set is not currently supported");
+          "Adding files to tables without location set is not currently supported");
     }
-    Transaction transaction = table.newTransaction();
-    AppendFiles appendFiles = transaction.newAppend();
-    FileIO inputIO = null;
-    for (String file : dataFiles) {
-      if (file.startsWith("s3://")) {
-        // FIXME
-        inputIO = new S3FileIO();
-        inputIO.initialize(
-            Map.of(
-                "client.credentials-provider",
-                "software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider")); // TODO:
-        // remove
-        break;
-      }
-    }
-    try (FileIO io = table.io()) {
+    Transaction tx = table.newTransaction();
+    AppendFiles appendOp = tx.newAppend();
+    boolean tableNameMappingUpdated = false;
+    Set<String> dataFilesSet = null;
+    try (FileIO inputIO = Input.newIO(dataFiles[0], table);
+        FileIO tableIO = table.io()) {
       // TODO: parallel
       var prefix = System.currentTimeMillis() + "-";
       for (String file : dataFiles) {
-        InputFile inputFile =
-            InputFiles.get(file, catalog.properties().get("ice.http.cache"), inputIO);
+        InputFile inputFile = Input.newFile(file, catalog, inputIO == null ? tableIO : inputIO);
         ParquetMetadata metadata = Metadata.read(inputFile);
-        long fileSizeInBytes = inputFile.getLength();
+
+        if (!table
+            .schema()
+            .sameSchema(ParquetSchemaUtil.convert(metadata.getFileMetaData().getSchema()))) {
+          throw new BadRequestException(
+              String.format("%s's schema doesn't match table's schema", file));
+        }
+
         // assuming datafiles can be anywhere when table.location() is empty
         var noCopyPossible = file.startsWith(table.location());
         // TODO: check before uploading anything
         if (noCopy && !noCopyPossible) {
-          // TODO: explain
-          throw new IllegalArgumentException(file + " cannot be added to catalog without copy");
+          throw new IllegalArgumentException(
+              file + " cannot be added to catalog without copy"); // TODO: explain
         }
+        long dataFileSizeInBytes;
+        var dataFile = replacePrefix(file, "s3a://", "s3://");
         if (!noCopy) {
-          // warehouseLocation + "/" + namespace + "/" + tableName
           String name = Hash.sha256(file);
           // TODO: support custom format
-          var pathInWarehouse =
-              String.join(
-                  "/", table.location().replaceAll("/+$", ""), "data", prefix + name + ".parquet");
-
-          // TODO: check schemas match
-          OutputFile outputFile =
-              io.newOutputFile(replacePrefix(pathInWarehouse, "s3://", "s3a://"));
-          // TODO: support below with force flag (note that compression, etc. might be different)
-          /*
-          try (var d = outputFile.create()) {
-              try (var s = inputFile.newStream()) {
-                  s.transferTo(d);
-              }
-          }
-          */
-          // FIXME: project to the schema of the table?
+          dataFile =
+              String.format(
+                  "%s/%s/%s",
+                  table.location().replaceAll("/+$", ""), "data", prefix + name + ".parquet");
+          OutputFile outputFile = tableIO.newOutputFile(replacePrefix(dataFile, "s3://", "s3a://"));
+          // TODO: support transferTo below (note that compression, etc. might be different)
+          // try (var d = outputFile.create()) { try (var s = inputFile.newStream()) {
+          // s.transferTo(d); }}
           Parquet.ReadBuilder readBuilder =
               Parquet.read(inputFile)
-                  // https://github.com/apache/parquet-java/tree/master/parquet-avro
+                  .createReaderFunc(
+                      fileSchema -> GenericParquetReaders.buildReader(table.schema(), fileSchema))
                   .project(table.schema());
           // TODO: reuseContainers?
 
-          readBuilder.createReaderFunc(
-              fileSchema -> GenericParquetReaders.buildReader(table.schema(), fileSchema));
+          Parquet.WriteBuilder writeBuilder =
+              Parquet.write(outputFile)
+                  .createWriterFunc(GenericParquetWriter::buildWriter)
+                  .schema(table.schema());
 
-          try (CloseableIterable<Record> parquetReader = readBuilder.build()) {
-            Parquet.WriteBuilder writeBuilder =
-                Parquet.write(outputFile).schema(table.schema()); // TODO: forTable?
-            writeBuilder.createWriterFunc(GenericParquetWriter::buildWriter);
-
-            FileAppender<Record> writer = null;
-            try {
-              writer = writeBuilder.build();
-              writer.addAll(parquetReader);
-            } finally {
-              if (writer != null) {
-                writer.close();
-              }
-            }
-            fileSizeInBytes = writer.length();
+          // file size may have changed due to different compression, etc.
+          dataFileSizeInBytes = copy(readBuilder, writeBuilder);
+        } else {
+          if (dataFilesSet == null) {
+            dataFilesSet =
+                StreamSupport.stream(
+                        table.currentSnapshot().addedDataFiles(tableIO).spliterator(), false)
+                    .map(ContentFile::location)
+                    .collect(Collectors.toSet());
           }
-          file = pathInWarehouse; // TODO: refactor
+          if (dataFilesSet.contains(dataFile)) {
+            throw new BadRequestException(
+                String.format("%s is already part of the table", dataFile));
+          }
+          if (table.properties().get(TableProperties.DEFAULT_NAME_MAPPING) == null
+              && !tableNameMappingUpdated
+              && !ParquetSchemaUtil.hasIds(metadata.getFileMetaData().getSchema())) {
+            // attempts to updateProperties as part of tx result in
+            // java.lang.IllegalStateException: Cannot create new UpdateProperties: last operation
+            // has not committed
+            // TODO: move it out of here
+            setNameMapping(table, dryRun);
+            tableNameMappingUpdated = true;
+          }
+          dataFileSizeInBytes = inputFile.getLength();
         }
         long recordCount =
             metadata.getBlocks().stream().mapToLong(BlockMetaData::getRowCount).sum();
-        DataFile dataFile =
+        DataFile df =
             new DataFiles.Builder(table.spec())
                 .withPath(replacePrefix(file, "s3a://", "s3://"))
                 .withFormat("PARQUET")
                 .withRecordCount(recordCount)
-                .withFileSizeInBytes(fileSizeInBytes)
+                .withFileSizeInBytes(dataFileSizeInBytes)
+                // TODO: metrics
                 .build();
-        appendFiles.appendFile(dataFile);
+        appendOp.appendFile(df);
       }
-      appendFiles.commit();
+      appendOp.commit();
       if (!dryRun) {
-        transaction.commitTransaction();
+        tx.commitTransaction();
+      } else {
+        logger.warn("Table.Transaction commit skipped (--dry-run)");
       }
-    } finally {
-      if (inputIO != null) {
-        inputIO.close();
+    }
+  }
+
+  private static void setNameMapping(Table table, boolean dryRyn) {
+    // forces name-based resolution instead of position-based resolution
+    NameMapping mapping = MappingUtil.create(table.schema());
+    String mappingJson = NameMappingParser.toJson(mapping);
+    UpdateProperties updatePropertiesOp = table.updateProperties();
+    updatePropertiesOp.set(TableProperties.DEFAULT_NAME_MAPPING, mappingJson);
+    if (!dryRyn) {
+      updatePropertiesOp.commit();
+    } else {
+      logger.warn("Table.UpdateProperties commit skipped (--dry-run)");
+    }
+  }
+
+  private static long copy(Parquet.ReadBuilder rb, Parquet.WriteBuilder wb) throws IOException {
+    try (CloseableIterable<Record> parquetReader = rb.build()) {
+      // not using try-with-resources because we need to close() for writer.length()
+      FileAppender<Record> writer = null;
+      try {
+        writer = wb.build();
+        writer.addAll(parquetReader);
+      } finally {
+        if (writer != null) {
+          writer.close();
+        }
       }
+      return writer.length();
     }
   }
 
