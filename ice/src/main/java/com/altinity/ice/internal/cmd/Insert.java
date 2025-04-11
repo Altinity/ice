@@ -4,24 +4,40 @@ import com.altinity.ice.internal.crypto.Hash;
 import com.altinity.ice.internal.io.Input;
 import com.altinity.ice.internal.parquet.Metadata;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-import org.apache.iceberg.*;
+import org.apache.iceberg.AppendFiles;
+import org.apache.iceberg.ContentFile;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.exceptions.BadRequestException;
-import org.apache.iceberg.io.*;
-import org.apache.iceberg.mapping.MappingUtil;
+import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.io.FileAppender;
+import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.InputFile;
+import org.apache.iceberg.io.OutputFile;
+import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.mapping.NameMappingParser;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.parquet.ParquetSchemaUtil;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.types.TypeUtil;
+import org.apache.iceberg.types.Types;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.schema.MessageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +67,6 @@ public final class Insert {
     }
     Transaction tx = table.newTransaction();
     AppendFiles appendOp = tx.newAppend();
-    boolean tableNameMappingUpdated = false;
     Set<String> dataFilesSet = null;
     try (FileIO inputIO = Input.newIO(dataFiles[0], table);
         FileIO tableIO = table.io()) {
@@ -61,9 +76,12 @@ public final class Insert {
         InputFile inputFile = Input.newFile(file, catalog, inputIO == null ? tableIO : inputIO);
         ParquetMetadata metadata = Metadata.read(inputFile);
 
-        if (!table
-            .schema()
-            .sameSchema(ParquetSchemaUtil.convert(metadata.getFileMetaData().getSchema()))) {
+        Schema tableSchema = table.schema();
+
+        MessageType type = metadata.getFileMetaData().getSchema();
+        Schema fileSchema = ParquetSchemaUtil.convert(type); // nameMapping applied (when present)
+
+        if (!sameSchema(table, fileSchema)) {
           throw new BadRequestException(
               String.format("%s's schema doesn't match table's schema", file));
         }
@@ -90,15 +108,14 @@ public final class Insert {
           // s.transferTo(d); }}
           Parquet.ReadBuilder readBuilder =
               Parquet.read(inputFile)
-                  .createReaderFunc(
-                      fileSchema -> GenericParquetReaders.buildReader(table.schema(), fileSchema))
-                  .project(table.schema());
+                  .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
+                  .project(tableSchema); // TODO: ?
           // TODO: reuseContainers?
 
           Parquet.WriteBuilder writeBuilder =
               Parquet.write(outputFile)
                   .createWriterFunc(GenericParquetWriter::buildWriter)
-                  .schema(table.schema());
+                  .schema(tableSchema);
 
           // file size may have changed due to different compression, etc.
           dataFileSizeInBytes = copy(readBuilder, writeBuilder);
@@ -118,16 +135,6 @@ public final class Insert {
             throw new BadRequestException(
                 String.format("%s is already part of the table", dataFile));
           }
-          if (table.properties().get(TableProperties.DEFAULT_NAME_MAPPING) == null
-              && !tableNameMappingUpdated
-              && !ParquetSchemaUtil.hasIds(metadata.getFileMetaData().getSchema())) {
-            // attempts to updateProperties as part of tx result in
-            // java.lang.IllegalStateException: Cannot create new UpdateProperties: last operation
-            // has not committed
-            // TODO: move it out of here
-            setNameMapping(table, dryRun);
-            tableNameMappingUpdated = true;
-          }
           dataFileSizeInBytes = inputFile.getLength();
         }
         long recordCount =
@@ -144,6 +151,7 @@ public final class Insert {
       }
       appendOp.commit();
       if (!dryRun) {
+        // TODO: log
         tx.commitTransaction();
       } else {
         logger.warn("Table.Transaction commit skipped (--dry-run)");
@@ -151,17 +159,26 @@ public final class Insert {
     }
   }
 
-  private static void setNameMapping(Table table, boolean dryRyn) {
-    // forces name-based resolution instead of position-based resolution
-    NameMapping mapping = MappingUtil.create(table.schema());
-    String mappingJson = NameMappingParser.toJson(mapping);
-    UpdateProperties updatePropertiesOp = table.updateProperties();
-    updatePropertiesOp.set(TableProperties.DEFAULT_NAME_MAPPING, mappingJson);
-    if (!dryRyn) {
-      updatePropertiesOp.commit();
+  private static boolean sameSchema(Table table, Schema fileSchema) {
+    boolean sameSchema;
+    Schema tableSchema = table.schema();
+    String nameMapping = table.properties().get(TableProperties.DEFAULT_NAME_MAPPING);
+    if (nameMapping != null && !nameMapping.isEmpty()) {
+      NameMapping mapping = NameMappingParser.fromJson(nameMapping);
+      Map<Integer, String> tableSchemaIdToName = tableSchema.idToName();
+      var tableSchemaWithNameMappingApplied =
+          TypeUtil.assignIds(
+              Types.StructType.of(tableSchema.columns()),
+              oldId -> {
+                var fieldName = tableSchemaIdToName.get(oldId);
+                MappedField mappedField = mapping.find(fieldName);
+                return mappedField.id();
+              });
+      sameSchema = tableSchemaWithNameMappingApplied.asStructType().equals(fileSchema.asStruct());
     } else {
-      logger.warn("Table.UpdateProperties commit skipped (--dry-run)");
+      sameSchema = tableSchema.sameSchema(fileSchema);
     }
+    return sameSchema;
   }
 
   private static long copy(Parquet.ReadBuilder rb, Parquet.WriteBuilder wb) throws IOException {

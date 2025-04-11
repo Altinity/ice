@@ -3,11 +3,16 @@ package com.altinity.ice.internal.cmd;
 import com.altinity.ice.internal.io.Input;
 import com.altinity.ice.internal.parquet.Metadata;
 import java.io.IOException;
+import java.util.Map;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.io.InputFile;
+import org.apache.iceberg.mapping.MappingUtil;
+import org.apache.iceberg.mapping.NameMapping;
+import org.apache.iceberg.mapping.NameMappingParser;
 import org.apache.iceberg.parquet.ParquetSchemaUtil;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.parquet.schema.MessageType;
@@ -28,8 +33,15 @@ public final class CreateTable {
       MessageType type = Metadata.read(inputFile).getFileMetaData().getSchema();
       Schema fileSchema = ParquetSchemaUtil.convert(type);
       try {
+        Map<String, String> props = null;
+        if (!ParquetSchemaUtil.hasIds(type)) {
+          // force name-based resolution instead of position-based resolution
+          NameMapping mapping = MappingUtil.create(fileSchema);
+          String mappingJson = NameMappingParser.toJson(mapping);
+          props = Map.of(TableProperties.DEFAULT_NAME_MAPPING, mappingJson);
+        }
         // if we don't set location, it's automatically set to $warehouse/$namespace/$table
-        catalog.createTable(nsTable, fileSchema, PartitionSpec.unpartitioned(), location, null);
+        catalog.createTable(nsTable, fileSchema, PartitionSpec.unpartitioned(), location, props);
       } catch (AlreadyExistsException e) {
         if (ignoreAlreadyExists) {
           return;
