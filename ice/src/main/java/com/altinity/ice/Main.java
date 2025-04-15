@@ -3,10 +3,11 @@ package com.altinity.ice;
 import ch.qos.logback.classic.Level;
 import com.altinity.ice.internal.cmd.Check;
 import com.altinity.ice.internal.cmd.CreateTable;
+import com.altinity.ice.internal.cmd.DeleteTable;
 import com.altinity.ice.internal.cmd.Describe;
 import com.altinity.ice.internal.cmd.Insert;
 import com.altinity.ice.internal.config.Config;
-import java.io.*;
+import java.io.IOException;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
@@ -39,7 +40,7 @@ public final class Main {
 
   @CommandLine.Option(
       names = "--log-level",
-      defaultValue = "WARN",
+      defaultValue = "INFO",
       description = "Set the log level (e.g., DEBUG, INFO, WARN, ERROR)",
       scope = CommandLine.ScopeType.INHERIT)
   private String logLevel;
@@ -87,6 +88,10 @@ public final class Main {
               description = "Create table if not exists")
           boolean createTableIfNotExists,
       @CommandLine.Option(
+              names = {"--s3-no-sign-request"},
+              description = "Access input file(s) ")
+          boolean s3NoSignRequest,
+      @CommandLine.Option(
               arity = "1",
               required = true,
               names = "--schema-from-parquet",
@@ -95,7 +100,12 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
       CreateTable.run(
-          catalog, TableIdentifier.parse(name), schemaFile, location, createTableIfNotExists);
+          catalog,
+          TableIdentifier.parse(name),
+          schemaFile,
+          location,
+          createTableIfNotExists,
+          s3NoSignRequest);
     }
   }
 
@@ -119,15 +129,48 @@ public final class Main {
               names = "--no-copy",
               description = "Add files to catalog without copying them")
           boolean noCopy,
-      @CommandLine.Option(names = "--dry-run", description = "Skip transaction commit")
-          boolean dryRun // FIXME: no-commit
-      ) throws IOException {
+      @CommandLine.Option(
+              names = {"--s3-no-sign-request"},
+              description = "Access input file(s) ")
+          boolean s3NoSignRequest,
+      @CommandLine.Option(
+              names = "--s3-copy-object",
+              description =
+                  "Avoid download/upload by using https://docs.aws.amazon.com/AmazonS3/latest/API/API_CopyObject.html for copying S3 objects."
+                      + " Note that AWS does not support copying objects anonymously (i.e. you can't use this flag to copy objects from public buckets like https://registry.opendata.aws/aws-public-blockchain/).")
+          boolean s3CopyObject,
+      @CommandLine.Option(names = "--no-commit", description = "Skip transaction commit")
+          boolean noCommit)
+      throws IOException {
+    if (s3NoSignRequest && s3CopyObject) {
+      throw new UnsupportedOperationException(
+          "--s3-no-sign-request + --s3-copy-object is not supported by AWS (see --help for details)");
+    }
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
       TableIdentifier tableId = TableIdentifier.parse(name);
       if (createTableIfNotExists) {
-        CreateTable.run(catalog, tableId, dataFiles[0], null, true);
+        // TODO: newCreateTableTransaction
+        CreateTable.run(
+            catalog, tableId, dataFiles[0], null, createTableIfNotExists, s3NoSignRequest);
       }
-      Insert.run(catalog, tableId, dataFiles, noCopy, dryRun);
+      Insert.run(catalog, tableId, dataFiles, noCopy, noCommit, s3NoSignRequest, s3CopyObject);
+    }
+  }
+
+  @CommandLine.Command(name = "delete-table", description = "Delete table.")
+  void deleteTable(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"-p"},
+              description = "Ignore not found")
+          boolean ignoreNotFound)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog(this.configFile)) {
+      DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound);
     }
   }
 

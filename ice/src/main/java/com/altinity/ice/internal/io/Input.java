@@ -8,26 +8,22 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.rest.RESTCatalog;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.utils.Lazy;
 
 // TODO: refactor: this entire class is a trainwreck
 public final class Input {
 
   private Input() {}
 
-  public static FileIO newIO(String path, Table table) {
+  public static FileIO newIO(String path, Table table, Lazy<S3Client> s3ClientLazy) {
     FileIO io = null;
     if (path.startsWith("s3://") && (table == null || !path.startsWith(table.location()))) {
-      io = new S3FileIO();
-      // FIXME: this may not be what user wants
-      io.initialize(
-          Map.of(
-              "client.credentials-provider",
-              "software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider"));
+      io = new S3FileIO(s3ClientLazy::getValue);
     }
     return io;
   }

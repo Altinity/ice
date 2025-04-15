@@ -2,13 +2,16 @@ package com.altinity.ice.internal.cmd;
 
 import com.altinity.ice.internal.io.Input;
 import com.altinity.ice.internal.parquet.Metadata;
+import com.altinity.ice.internal.s3.S3;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.mapping.MappingUtil;
 import org.apache.iceberg.mapping.NameMapping;
@@ -16,6 +19,8 @@ import org.apache.iceberg.mapping.NameMappingParser;
 import org.apache.iceberg.parquet.ParquetSchemaUtil;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.parquet.schema.MessageType;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.utils.Lazy;
 
 public final class CreateTable {
 
@@ -26,9 +31,20 @@ public final class CreateTable {
       TableIdentifier nsTable,
       String schemaFile,
       String location,
-      boolean ignoreAlreadyExists)
+      boolean ignoreAlreadyExists,
+      boolean s3NoSignRequest)
       throws IOException {
-    try (var inputIO = Input.newIO(schemaFile, null)) {
+    Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
+
+    if (schemaFile.startsWith("s3://") && schemaFile.contains("*")) {
+      var b = S3.bucketPath(schemaFile);
+      List<String> files = S3.listWildcard(s3ClientLazy.getValue(), b.bucket(), b.path(), 1);
+      if (files.isEmpty()) {
+        throw new BadRequestException(String.format("No files matching \"%s\" found", schemaFile));
+      }
+      schemaFile = files.getFirst();
+    }
+    try (var inputIO = Input.newIO(schemaFile, null, s3ClientLazy)) {
       InputFile inputFile = Input.newFile(schemaFile, catalog, inputIO);
       MessageType type = Metadata.read(inputFile).getFileMetaData().getSchema();
       Schema fileSchema = ParquetSchemaUtil.convert(type);

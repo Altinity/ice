@@ -1,9 +1,15 @@
 package com.altinity.ice.internal.config;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.aws.s3.S3FileIOProperties;
@@ -40,11 +46,12 @@ public final class Config {
     }
 
     // Strip ${prefix} from env vars.
-    var prefix = String.format("%sCATALOG_%s", PREFIX, catalogName);
+
+    var prefix = String.format("%sCATALOG_%s_", PREFIX, catalogName.toUpperCase());
     p.putAll(
         new TreeMap<>(System.getenv())
             .entrySet().stream()
-                .filter(e -> e.getKey().startsWith(PREFIX))
+                .filter(e -> e.getKey().startsWith(prefix))
                 .collect(
                     Collectors.toMap(
                         e -> {
@@ -59,11 +66,18 @@ public final class Config {
                         },
                         Map.Entry::getValue)));
 
+    BiConsumer<String, String> put =
+        (k, v) -> {
+          logger.info("config: Activating {}={} default", k, v);
+          p.put(k, v);
+        };
+
     if (!p.containsKey("io-impl") && !p.getOrDefault("s3.endpoint", "").isEmpty()) {
-      p.put(CatalogProperties.FILE_IO_IMPL, org.apache.iceberg.aws.s3.S3FileIO.class.getName());
+      put.accept(
+          CatalogProperties.FILE_IO_IMPL, org.apache.iceberg.aws.s3.S3FileIO.class.getName());
     }
     if (p.getOrDefault("s3.endpoint", "").toLowerCase().startsWith("http://")) { // TODO: if set?
-      p.put(S3FileIOProperties.PATH_STYLE_ACCESS, "true");
+      put.accept(S3FileIOProperties.PATH_STYLE_ACCESS, "true");
     }
 
     return p;
