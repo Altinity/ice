@@ -3,10 +3,10 @@ package com.altinity.ice.internal.cmd;
 import com.altinity.ice.internal.crypto.Hash;
 import com.altinity.ice.internal.io.Input;
 import com.altinity.ice.internal.parquet.Metadata;
+import com.altinity.ice.internal.runtime.Stats;
 import com.altinity.ice.internal.s3.S3;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -97,17 +97,21 @@ public final class Insert {
       if (dataFilesExpanded.isEmpty()) {
         throw new BadRequestException("No matching files found");
       }
-      if (dataFilesExpanded.size() != new HashSet<>(dataFilesExpanded).size()) {
-        throw new BadRequestException("Input contains duplicates");
-      }
+      /*
+            if (dataFilesExpanded.size() != new HashSet<>(dataFilesExpanded).size()) {
+              throw new BadRequestException("Input contains duplicates");
+            }
+      */
 
       try (FileIO inputIO = Input.newIO(dataFilesExpanded.getFirst(), table, s3ClientLazy);
           FileIO tableIO = table.io()) {
 
         // TODO: parallel
-        var prefix = System.currentTimeMillis() + "-";
+        //        var prefix = System.currentTimeMillis() + "-";
         for (String file : dataFilesExpanded) {
-          logger.info("Processing {}", file);
+          logger.info("{}: processing", file);
+          logger.info("{}: jvm: {}", file, Stats.gather());
+          var prefix = System.currentTimeMillis() + "-";
 
           InputFile inputFile = Input.newFile(file, catalog, inputIO == null ? tableIO : inputIO);
           ParquetMetadata metadata = Metadata.read(inputFile);
@@ -141,7 +145,7 @@ public final class Insert {
                       table.location().replaceAll("/+$", ""), "data", prefix + name + ".parquet");
               S3.BucketPath src = S3.bucketPath(dataFile);
               S3.BucketPath dst = S3.bucketPath(dstDataFile);
-              logger.info("Copying (fast) {} to {}", dataFile, dstDataFile);
+              logger.info("{}: fast copying to {}", file, dstDataFile);
               CopyObjectRequest copyReq =
                   CopyObjectRequest.builder()
                       .sourceBucket(src.bucket())
@@ -180,7 +184,7 @@ public final class Insert {
                     .createWriterFunc(GenericParquetWriter::buildWriter)
                     .schema(tableSchema);
 
-            logger.info("Copying {} to {}", dataFile, dstDataFile);
+            logger.info("{}: copying to {}", file, dstDataFile);
             // file size may have changed due to different compression, etc.
             dataFileSizeInBytes = copy(readBuilder, writeBuilder);
             dataFile = dstDataFile;
@@ -203,7 +207,7 @@ public final class Insert {
             }
             dataFileSizeInBytes = inputFile.getLength();
           }
-          logger.info("Adding data file for {}", dataFile);
+          logger.info("{}: adding data file", file);
           long recordCount =
               metadata.getBlocks().stream().mapToLong(BlockMetaData::getRowCount).sum();
           DataFile df =
