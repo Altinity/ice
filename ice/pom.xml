@@ -28,6 +28,10 @@
       <version>${iceberg.version}</version>
       <exclusions>
         <exclusion>
+          <groupId>com.github.ben-manes.caffeine</groupId>
+          <artifactId>caffeine</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>com.fasterxml.jackson.core</groupId>
           <artifactId>jackson-core</artifactId>
         </exclusion>
@@ -75,6 +79,10 @@
       <version>${iceberg.version}</version>
       <exclusions>
         <exclusion>
+          <groupId>com.github.ben-manes.caffeine</groupId>
+          <artifactId>caffeine</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-api</artifactId>
         </exclusion>
@@ -84,22 +92,6 @@
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>s3</artifactId>
       <exclusions>
-        <!--
-                        <exclusion>
-                            <groupId>software.amazon.awssdk</groupId>
-                            <artifactId>*</artifactId>
-                        </exclusion>
-        -->
-        <!--
-                        <exclusion>
-                            <groupId>software.amazon.awssdk</groupId>
-                            <artifactId>netty-nio-client</artifactId>
-                        </exclusion>
-                        <exclusion>
-                            <groupId>software.amazon.awssdk</groupId>
-                            <artifactId>apache-client</artifactId>
-                        </exclusion>
-        -->
         <exclusion>
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-api</artifactId>
@@ -110,22 +102,6 @@
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>sts</artifactId>
       <exclusions>
-        <!--
-                        <exclusion>
-                            <groupId>software.amazon.awssdk</groupId>
-                            <artifactId>*</artifactId>
-                        </exclusion>
-        -->
-        <!--
-                        <exclusion>
-                            <groupId>software.amazon.awssdk</groupId>
-                            <artifactId>netty-nio-client</artifactId>
-                        </exclusion>
-                        <exclusion>
-                            <groupId>software.amazon.awssdk</groupId>
-                            <artifactId>apache-client</artifactId>
-                        </exclusion>
-        -->
         <exclusion>
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-api</artifactId>
@@ -137,12 +113,6 @@
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>apache-client</artifactId>
       <exclusions>
-        <!--
-                        <exclusion>
-                            <groupId>software.amazon.awssdk</groupId>
-                            <artifactId>*</artifactId>
-                        </exclusion>
-        -->
         <exclusion>
           <groupId>org.apache.httpcomponents</groupId>
           <artifactId>httpcore</artifactId>
@@ -406,6 +376,17 @@
       <artifactId>jackson-dataformat-yaml</artifactId>
       <version>2.18.2</version>
     </dependency>
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+      <version>3.2.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <version>7.9.0</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -471,6 +452,7 @@
         <artifactId>really-executable-jar-maven-plugin</artifactId>
         <version>2.1.1</version>
         <configuration>
+          <!--use `_JAVA_OPTIONS=-Xmx512m ice ...` to set at runtime-->
           <!--<flags>-Xmx512m</flags>-->
           <inputFile>target/ice-${project.version}-shaded.jar</inputFile>
           <programFile>ice-jar</programFile>
