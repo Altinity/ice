@@ -19,7 +19,7 @@ ARG VERSION
 COPY . .
 
 RUN ./mvnw -am -pl ice-rest-catalog versions:set -DnewVersion=${VERSION}
-RUN ./mvnw -pl ice-rest-catalog clean package -Dmaven.test.skip=true
+RUN ./mvnw -Pno-check -pl ice-rest-catalog clean package -Dmaven.test.skip=true
 
 FROM gcr.io/distroless/java21-debian12:${BASE_IMAGE_TAG}
 
