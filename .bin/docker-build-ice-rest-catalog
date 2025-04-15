@@ -17,7 +17,9 @@ for q in "" "debug-"; do
   docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=${base_image_prefix}amd64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$VERSION-amd64" -f ice-rest-catalog/Dockerfile .
   docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=${base_image_prefix}arm64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$VERSION-arm64" -f ice-rest-catalog/Dockerfile .
 done
-# TODO: :debug-with-ice
+
+docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=debug-amd64" --build-arg "VERSION=$VERSION" --build-arg "ICE_IMAGE_TAG=$VERSION-amd64" -t "$image_name:debug-with-ice-$VERSION-amd64" -f ice-rest-catalog/Dockerfile.with-ice .
+docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=debug-arm64" --build-arg "VERSION=$VERSION" --build-arg "ICE_IMAGE_TAG=$VERSION-arm64" -t "$image_name:debug-with-ice-$VERSION-arm64" -f ice-rest-catalog/Dockerfile.with-ice .
 
 push=false
 for arg in "$@"; do
@@ -31,7 +33,7 @@ if ! $push; then
   exit 0
 fi
 
-for q in "" "debug-"; do
+for q in "" "debug-" "debug-with-ice-"; do
   docker push "$image_name:$q$VERSION-amd64"
   docker push "$image_name:$q$VERSION-arm64"
   # `docker manifest` requires metadata from the registry, hence the `docker push`es above
@@ -43,3 +45,4 @@ done
 
 regctl image copy "$image_name:$VERSION" "$image_name:latest"
 regctl image copy "$image_name:debug-$VERSION" "$image_name:debug"
+regctl image copy "$image_name:debug-with-ice-$VERSION" "$image_name:debug-with-ice"
