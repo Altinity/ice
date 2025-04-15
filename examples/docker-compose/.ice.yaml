@@ -4,5 +4,4 @@ catalog:
     header.authorization: bearer foo
     s3.endpoint: http://localhost:8999
     client.region: mino
-    write.parquet.compression-codec: snappy
     ice.http.cache: var/cache/ice/http

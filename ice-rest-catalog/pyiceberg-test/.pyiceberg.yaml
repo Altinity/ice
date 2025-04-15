@@ -5,4 +5,3 @@ catalog:
     s3.endpoint: http://localhost:9000 # see ../minio.docker-compose.yaml
     # s3.access_key_id: miniouser
     # s3.secret_access_key: miniopassword
-    # TODO: test with write.parquet.compression-codec: snappy

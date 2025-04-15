@@ -7,6 +7,4 @@ catalog:
     # s3.access_key_id: miniouser
     # s3.secret_access_key: miniopassword
     client.region: mino
-    # TODO: test
-    write.parquet.compression-codec: snappy
     ice.http.cache: data/ice/http/cache

@@ -28,13 +28,10 @@ ice insert nyc.taxis -p \
   https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
 
 # warning: each parquet file below is ~500mb. this may take a while
-AWS_REGION=us-east-2 ice insert btc.transactions -p \
+AWS_REGION=us-east-2 ice insert btc.transactions -p --s3-no-sign-request \
   s3://aws-public-blockchain/v1.0/btc/transactions/\
 date=2025-01-01/part-00000-33e8d075-2099-409b-a806-68dd17217d39-c000.snappy.parquet \
-  s3://aws-public-blockchain/v1.0/btc/transactions/\
-date=2025-01-02/part-00000-8d6ab5af-1a45-4aa3-a345-109747904270-c000.snappy.parquet \
-  s3://aws-public-blockchain/v1.0/btc/transactions/\
-date=2025-01-03/part-00000-56a0c524-82b4-494c-9408-990cdc225dc2-c000.snappy.parquet
+  s3://aws-public-blockchain/v1.0/btc/transactions/date=2025-01-02/*.parquet
 
 # upload file to minio using local-mc, 
 # then add file to the catalog without making a copy
