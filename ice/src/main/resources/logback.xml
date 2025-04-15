@@ -1,6 +1,7 @@
 <configuration>
 
   <logger name="org.apache.iceberg.CatalogUtil" level="WARN"/>
+  <logger name="org.apache.hadoop.io.compress.CodecPool" level="WARN"/>
 
   <root level="INFO">
     <appender-ref ref="CONSOLE"/>
