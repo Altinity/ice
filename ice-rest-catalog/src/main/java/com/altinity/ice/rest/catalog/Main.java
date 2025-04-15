@@ -1,43 +1,32 @@
 package com.altinity.ice.rest.catalog;
 
+import com.altinity.ice.rest.catalog.internal.jetty.AuthorizationHandler;
+import com.altinity.ice.rest.catalog.internal.jetty.PlainErrorHandler;
+import com.altinity.ice.rest.catalog.internal.jetty.ServerConfig;
 import io.prometheus.metrics.exporter.servlet.jakarta.PrometheusMetricsServlet;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.*;
-import java.net.URI;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
-import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Catalog;
-import org.apache.iceberg.relocated.com.google.common.base.Strings;
-import org.apache.iceberg.relocated.com.google.common.io.Files;
 import org.apache.iceberg.rest.RESTCatalogAdapter;
 import org.apache.iceberg.rest.RESTCatalogAuthAdapter;
 import org.apache.iceberg.rest.RESTCatalogServlet;
 import org.apache.iceberg.util.PropertyUtil;
 import org.eclipse.jetty.http.MimeTypes;
-import org.eclipse.jetty.server.HttpConfiguration;
-import org.eclipse.jetty.server.HttpConnectionFactory;
-import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.handler.ErrorHandler;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
+import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
 import picocli.CommandLine;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
@@ -56,7 +45,6 @@ public final class Main implements Callable<Integer> {
     }
   }
 
-  private static final String PREFIX = "ICE_REST_CATALOG_";
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
   @CommandLine.Option(
@@ -66,77 +54,25 @@ public final class Main implements Callable<Integer> {
 
   private Main() {}
 
-  // https://py.iceberg.apache.org/configuration/#setting-configuration-values
-  private static Map<String, String> loadConfig(String configFile) throws IOException {
-    var p =
-        new HashMap<>(
-            Map.of(
-                CatalogProperties.CATALOG_IMPL,
-                org.apache.iceberg.jdbc.JdbcCatalog.class.getName(),
-                // org.apache.iceberg.jdbc.JdbcUtil.SCHEMA_VERSION_PROPERTY
-                "jdbc.schema-version",
-                "V1" // defaults to V0
-                ));
-    logger.info("config: Defaults set to {}", p);
-
-    boolean defaultConfigFile = Strings.isNullOrEmpty(configFile);
-    var file =
-        new File(!defaultConfigFile ? configFile : ".ice-rest-catalog.yaml"); // TODO: move out
-    try (InputStream in = new FileInputStream(file)) {
-      var yaml = new Yaml();
-      Map<String, String> config = yaml.load(new BufferedInputStream(in));
-      p.putAll(config);
-      logger.info("config: Loaded {} from {}", config.keySet(), file);
-    } catch (FileNotFoundException e) {
-      if (!defaultConfigFile) {
-        throw e;
-      }
-    }
-
-    // Strip ${prefix} from env vars.
-    p.putAll(
-        new TreeMap<>(System.getenv())
-            .entrySet().stream()
-                .filter(e -> e.getKey().startsWith(PREFIX))
-                .collect(
-                    Collectors.toMap(
-                        e -> {
-                          String k =
-                              e.getKey()
-                                  .replaceFirst(PREFIX, "")
-                                  .replaceAll("__", "-")
-                                  .replaceAll("_", ".")
-                                  .toLowerCase();
-                          logger.info("config: Overriding {} with ${}", k, e.getKey());
-                          return k;
-                        },
-                        Map.Entry::getValue)));
-
-    if (p.getOrDefault("uri", "").toLowerCase().startsWith("jdbc:sqlite:")) {
-      // https://github.com/databricks/iceberg-rest-image/issues/39
-      p.put(CatalogProperties.CLIENT_POOL_SIZE, "1");
-      var uri = URI.create(p.get("uri"));
-      String afterScheme = uri.getSchemeSpecificPart();
-      String sqliteFilePrefix = "sqlite:file:";
-      if (afterScheme.startsWith(sqliteFilePrefix)) {
-        var f = URI.create(afterScheme.substring(sqliteFilePrefix.length()));
-        if (f.getPath().contains(File.separator)) {
-          Files.createParentDirs(new File(f.getPath()));
-        }
-      }
-    }
-    if (!p.containsKey("io-impl")
-        && p.getOrDefault("warehouse", "").toLowerCase().startsWith("s3://")) {
-      p.put(CatalogProperties.FILE_IO_IMPL, org.apache.iceberg.aws.s3.S3FileIO.class.getName());
-    }
-    if (p.getOrDefault("s3.endpoint", "").toLowerCase().startsWith("http://")) { // TODO: if set?
-      p.put(S3FileIOProperties.PATH_STYLE_ACCESS, "true");
-    }
-
-    return p;
+  private static Server createServer(int port, Catalog catalog, Map<String, String> config) {
+    var s = createBaseServer(catalog, config, true);
+    ServerConnector connector = new ServerConnector(s);
+    connector.setPort(port);
+    s.addConnector(connector);
+    return s;
   }
 
-  private static Server createServer(int port, Catalog catalog, Map<String, String> config) {
+  private static Server createAdminServer(int port, Catalog catalog, Map<String, String> config) {
+    var s = createBaseServer(catalog, config, false);
+    ServerConnector connector = new ServerConnector(s);
+    connector.setHost("localhost");
+    connector.setPort(port);
+    s.addConnector(connector);
+    return s;
+  }
+
+  private static Server createBaseServer(
+      Catalog catalog, Map<String, String> config, boolean requireAuth) {
     var mux = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
     mux.insertHandler(new GzipHandler());
     // TODO: RequestLogHandler
@@ -144,38 +80,12 @@ public final class Main implements Callable<Integer> {
     // TODO: ShutdownHandler
 
     RESTCatalogAdapter restCatalogAdapter;
-
     var expectedToken = config.getOrDefault("ice.token", "");
     // TODO: force min length
-    if (!expectedToken.isEmpty()) {
-      mux.insertHandler(
-          new HandlerWrapper() {
-
-            @Override
-            public void handle(
-                String target,
-                Request baseRequest,
-                HttpServletRequest request,
-                HttpServletResponse response)
-                throws IOException, ServletException {
-              var auth = request.getHeader("authorization");
-              String prefix = "bearer ";
-              String token;
-              if (auth != null && auth.toLowerCase().startsWith(prefix)) {
-                token = auth.substring(prefix.length());
-                if (java.security.MessageDigest.isEqual(
-                    token.getBytes(), expectedToken.getBytes())) {
-                  super.handle(target, baseRequest, request, response);
-                  return;
-                }
-              } else {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
-                return;
-              }
-              response.sendError(HttpServletResponse.SC_FORBIDDEN);
-              // TODO: AsyncDelayHandler
-            }
-          });
+    if (!expectedToken.isEmpty() || !requireAuth) {
+      if (requireAuth) {
+        mux.insertHandler(new AuthorizationHandler(expectedToken));
+      }
       AwsCredentialsProvider credentialsProvider = null;
       // FIXME: may not always mean AWS
       if (config.getOrDefault("warehouse", "").startsWith("s3://")
@@ -191,7 +101,7 @@ public final class Main implements Callable<Integer> {
     var h = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter));
     mux.addServlet(h, "/*");
 
-    var s = new Server(port);
+    var s = new Server();
     overrideJettyDefaults(s);
     s.setHandler(mux);
     return s;
@@ -229,42 +139,17 @@ public final class Main implements Callable<Integer> {
   }
 
   private static void overrideJettyDefaults(Server s) {
-    Stream.of(s.getConnectors())
-        .flatMap(c -> c.getConnectionFactories().stream())
-        .filter(cf -> cf instanceof HttpConnectionFactory)
-        .forEach(
-            cf -> {
-              HttpConfiguration hc = ((HttpConnectionFactory) cf).getHttpConfiguration();
-              hc.setSendServerVersion(false);
-              hc.setSendDateHeader(false);
-            });
-    s.setErrorHandler(
-        new ErrorHandler() {
-
-          @Override
-          public void handle(
-              String target, Request baseRequest, HttpServletRequest req, HttpServletResponse resp)
-              throws IOException, ServletException {
-            resp.setStatus(resp.getStatus());
-            resp.setContentType(MimeTypes.Type.TEXT_PLAIN.asString());
-            resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            try (PrintWriter w = resp.getWriter()) {
-              w.write(baseRequest.getResponse().getReason());
-            } finally {
-              baseRequest.getHttpChannel().sendResponseAndComplete();
-              baseRequest.setHandled(true);
-            }
-          }
-        });
+    ServerConfig.setQuiet(s);
+    s.setErrorHandler(new PlainErrorHandler());
   }
 
   @Override
   public Integer call() throws Exception {
-    var config = loadConfig(configFile);
+    var config = com.altinity.ice.rest.catalog.internal.config.Config.load(configFile);
 
     var awsRegion = config.getOrDefault("ice.s3.region", "");
     if (!awsRegion.isEmpty()) {
-      System.setProperty("aws.region", awsRegion);
+      System.setProperty("aws.region", awsRegion); // FIXME
     }
 
     // TODO: use "addr" instead
@@ -272,13 +157,23 @@ public final class Main implements Callable<Integer> {
     ;
     int debugPort = PropertyUtil.propertyAsInt(config, "ice.rest.catalog.debug.port", 5001);
 
+    // TODO: ensure all http handler are hooked in
     JvmMetrics.builder().register();
 
     Catalog catalog = CatalogUtil.buildIcebergCatalog("rest_backend", config, null);
 
+    // TODO: replace with uds (jetty-unixdomain-server is all that is needed here but in ice you'll
+    // need to implement custom org.apache.iceberg.rest.RESTClient)
+    String adminPort = config.get("ice.admin.port");
+    if (adminPort != null && !adminPort.isEmpty()) {
+      Server adminServer = createAdminServer(Integer.parseInt(adminPort), catalog, config);
+      adminServer.start();
+      logger.info("Serving admin endpoint at http://localhost:{}/v1/{config,*}", adminPort);
+    }
+
     Server httpServer = createServer(port, catalog, config);
     httpServer.start();
-    logger.info("Serving http://0.0.0.0:{}", port);
+    logger.info("Serving http://0.0.0.0:{}/v1/{config,*}", port);
 
     // FIXME: exception here does not terminate the process
     createDebugServer(debugPort).start();
