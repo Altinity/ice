@@ -98,7 +98,8 @@ public final class Insert {
 
     Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
 
-    RetryLog retryLog = retryListFile != null && !retryListFile.isEmpty() ? new RetryLog(retryListFile) : null;
+    RetryLog retryLog =
+        retryListFile != null && !retryListFile.isEmpty() ? new RetryLog(retryListFile) : null;
     try {
       var filesExpanded =
           Arrays.stream(files)
