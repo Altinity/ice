@@ -1,7 +1,8 @@
 package com.altinity.ice.internal.cmd;
 
-import com.altinity.ice.internal.crypto.Hash;
+import com.altinity.ice.internal.iceberg.DataFileNamingStrategy;
 import com.altinity.ice.internal.io.Input;
+import com.altinity.ice.internal.io.RetryLog;
 import com.altinity.ice.internal.parquet.Metadata;
 import com.altinity.ice.internal.runtime.Stats;
 import com.altinity.ice.internal.s3.S3;
@@ -9,22 +10,21 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.iceberg.AppendFiles;
-import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
-import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileAppender;
@@ -58,13 +58,16 @@ public final class Insert {
   public static void run(
       RESTCatalog catalog,
       TableIdentifier nsTable,
-      String[] dataFiles,
-      boolean noCopy,
+      String[] files,
+      DataFileNamingStrategy.Name dataFileNamingStrategy,
+      boolean skipDuplicates,
       boolean noCommit,
+      boolean noCopy,
       boolean s3NoSignRequest,
-      boolean s3CopyObject)
+      boolean s3CopyObject,
+      String retryListFile)
       throws IOException {
-    if (dataFiles.length == 0) {
+    if (files.length == 0) {
       // no work to be done
       return;
     }
@@ -74,15 +77,31 @@ public final class Insert {
       throw new UnsupportedOperationException(
           "Adding files to tables without location set is not currently supported");
     }
-    Transaction tx = table.newTransaction();
-    AppendFiles appendOp = tx.newAppend();
-    Set<String> dataFilesSet = null;
+
+    Set<String> tableDataFiles;
+    try (var plan = table.newScan().planFiles()) {
+      tableDataFiles =
+          StreamSupport.stream(plan.spliterator(), false)
+              .map(f -> f.file().location())
+              .collect(Collectors.toSet());
+    }
+
+    String dstPath = DataFileNamingStrategy.defaultDataLocation(table);
+    DataFileNamingStrategy dstDataFileSource =
+        switch (dataFileNamingStrategy) {
+          case DEFAULT ->
+              new DataFileNamingStrategy.Default(dstPath, System.currentTimeMillis() + "-");
+          case INPUT_FILENAME -> new DataFileNamingStrategy.InputFilename(dstPath);
+        };
+
+    AppendFiles appendOp = table.newAppend();
 
     Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
 
+    RetryLog retryLog = retryListFile != null && !retryListFile.isEmpty() ? new RetryLog(retryListFile) : null;
     try {
-      var dataFilesExpanded =
-          Arrays.stream(dataFiles)
+      var filesExpanded =
+          Arrays.stream(files)
               .flatMap(
                   s -> {
                     if (s.startsWith("s3://") && s.contains("*")) {
@@ -94,138 +113,157 @@ public final class Insert {
                     return Stream.of(s);
                   })
               .toList();
-      if (dataFilesExpanded.isEmpty()) {
+      if (filesExpanded.isEmpty()) {
         throw new BadRequestException("No matching files found");
       }
       /*
-            if (dataFilesExpanded.size() != new HashSet<>(dataFilesExpanded).size()) {
+            if (filesExpanded.size() != new HashSet<>(filesExpanded).size()) {
               throw new BadRequestException("Input contains duplicates");
             }
       */
 
-      try (FileIO inputIO = Input.newIO(dataFilesExpanded.getFirst(), table, s3ClientLazy);
+      try (FileIO inputIO = Input.newIO(filesExpanded.getFirst(), table, s3ClientLazy);
           FileIO tableIO = table.io()) {
 
+        boolean atLeastOneFileAppended = false;
         // TODO: parallel
-        //        var prefix = System.currentTimeMillis() + "-";
-        for (String file : dataFilesExpanded) {
-          logger.info("{}: processing", file);
-          logger.info("{}: jvm: {}", file, Stats.gather());
-          var prefix = System.currentTimeMillis() + "-";
+        for (final String file : filesExpanded) {
+          DataFile df = null;
+          try {
+            logger.info("{}: processing", file);
+            logger.info("{}: jvm: {}", file, Stats.gather());
 
-          InputFile inputFile = Input.newFile(file, catalog, inputIO == null ? tableIO : inputIO);
-          ParquetMetadata metadata = Metadata.read(inputFile);
+            Function<String, Boolean> checkNotExists =
+                dataFile -> {
+                  if (tableDataFiles.contains(dataFile)) {
+                    if (skipDuplicates) {
+                      logger.info("{}: duplicate (skipping)", file);
+                      return true;
+                    }
+                    throw new AlreadyExistsException(
+                        String.format("%s is already referenced by the table", dataFile));
+                  }
+                  return false;
+                };
 
-          Schema tableSchema = table.schema();
+            InputFile inputFile = Input.newFile(file, catalog, inputIO == null ? tableIO : inputIO);
+            ParquetMetadata metadata = Metadata.read(inputFile);
 
-          MessageType type = metadata.getFileMetaData().getSchema();
-          Schema fileSchema = ParquetSchemaUtil.convert(type); // nameMapping applied (when present)
+            Schema tableSchema = table.schema();
 
-          if (!sameSchema(table, fileSchema)) {
-            throw new BadRequestException(
-                String.format("%s's schema doesn't match table's schema", file));
-          }
+            MessageType type = metadata.getFileMetaData().getSchema();
+            Schema fileSchema =
+                ParquetSchemaUtil.convert(type); // nameMapping applied (when present)
 
-          // assuming datafiles can be anywhere when table.location() is empty
-          var noCopyPossible = file.startsWith(table.location());
-          // TODO: check before uploading anything
-          if (noCopy && !noCopyPossible) {
-            throw new BadRequestException(
-                file + " cannot be added to catalog without copy"); // TODO: explain
-          }
-          long dataFileSizeInBytes;
-          var dataFile = replacePrefix(file, "s3a://", "s3://");
-          if (s3CopyObject) {
-            if (!noCopy && dataFile.startsWith("s3://") && table.location().startsWith("s3://")) {
-              // TODO: check s3.endpoint not startsWith http://
-              String name = Hash.sha256(file);
-              String dstDataFile =
-                  String.format(
-                      "%s/%s/%s",
-                      table.location().replaceAll("/+$", ""), "data", prefix + name + ".parquet");
-              S3.BucketPath src = S3.bucketPath(dataFile);
-              S3.BucketPath dst = S3.bucketPath(dstDataFile);
-              logger.info("{}: fast copying to {}", file, dstDataFile);
-              CopyObjectRequest copyReq =
-                  CopyObjectRequest.builder()
-                      .sourceBucket(src.bucket())
-                      .sourceKey(src.path())
-                      .destinationBucket(dst.bucket())
-                      .destinationKey(dst.path())
-                      .build();
-              s3ClientLazy.getValue().copyObject(copyReq);
-              dataFile = dstDataFile;
-              noCopy = true;
-            } else {
+            if (!sameSchema(table, fileSchema)) {
               throw new BadRequestException(
-                  "--s3-copy-object is only supported between s3:// buckets and only when --no-copy is unset");
+                  String.format("%s's schema doesn't match table's schema", file));
             }
-          }
-          if (!noCopy) {
-            String name = Hash.sha256(file);
-            // TODO: support custom format
-            String dstDataFile =
-                String.format(
-                    "%s/%s/%s",
-                    table.location().replaceAll("/+$", ""), "data", prefix + name + ".parquet");
-            OutputFile outputFile =
-                tableIO.newOutputFile(replacePrefix(dstDataFile, "s3://", "s3a://"));
-            // TODO: support transferTo below (note that compression, etc. might be different)
-            // try (var d = outputFile.create()) { try (var s = inputFile.newStream()) {
-            // s.transferTo(d); }}
-            Parquet.ReadBuilder readBuilder =
-                Parquet.read(inputFile)
-                    .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
-                    .project(tableSchema); // TODO: ?
-            // TODO: reuseContainers?
 
-            Parquet.WriteBuilder writeBuilder =
-                Parquet.write(outputFile)
-                    .createWriterFunc(GenericParquetWriter::buildWriter)
-                    .schema(tableSchema);
+            // assuming datafiles can be anywhere when table.location() is empty
+            var noCopyPossible = file.startsWith(table.location());
+            // TODO: check before uploading anything
+            if (noCopy && !noCopyPossible) {
+              throw new BadRequestException(
+                  file + " cannot be added to catalog without copy"); // TODO: explain
+            }
+            long dataFileSizeInBytes;
+            var dataFile = replacePrefix(file, "s3a://", "s3://");
+            if (s3CopyObject) {
+              if (!noCopy && dataFile.startsWith("s3://") && table.location().startsWith("s3://")) {
+                // TODO: check s3.endpoint not startsWith http://
+                String dstDataFile = dstDataFileSource.get(file);
+                S3.BucketPath src = S3.bucketPath(dataFile);
+                S3.BucketPath dst = S3.bucketPath(dstDataFile);
+                logger.info("{}: fast copying to {}", file, dstDataFile);
+                if (checkNotExists.apply(dstDataFile)) {
+                  continue;
+                }
 
-            logger.info("{}: copying to {}", file, dstDataFile);
-            // file size may have changed due to different compression, etc.
-            dataFileSizeInBytes = copy(readBuilder, writeBuilder);
-            dataFile = dstDataFile;
-          } else {
-            // TODO: refactor with lazy
-            if (dataFilesSet == null) {
-              Snapshot snapshot = table.currentSnapshot();
-              if (snapshot != null) {
-                dataFilesSet =
-                    StreamSupport.stream(snapshot.addedDataFiles(tableIO).spliterator(), false)
-                        .map(ContentFile::location)
-                        .collect(Collectors.toSet());
+                CopyObjectRequest copyReq =
+                    CopyObjectRequest.builder()
+                        .sourceBucket(src.bucket())
+                        .sourceKey(src.path())
+                        .destinationBucket(dst.bucket())
+                        .destinationKey(dst.path())
+                        .build();
+                s3ClientLazy.getValue().copyObject(copyReq);
+                dataFile = dstDataFile;
+                noCopy = true;
               } else {
-                dataFilesSet = Set.of();
+                throw new BadRequestException(
+                    "--s3-copy-object is only supported between s3:// buckets and only when --no-copy is unset");
               }
             }
-            if (dataFilesSet.contains(dataFile)) {
-              throw new BadRequestException(
-                  String.format("%s is already part of the table", dataFile));
+            if (noCopy) {
+              if (checkNotExists.apply(dataFile)) {
+                continue;
+              }
+              dataFileSizeInBytes = inputFile.getLength();
+            } else {
+              String dstDataFile = dstDataFileSource.get(file);
+              if (checkNotExists.apply(dstDataFile)) {
+                continue;
+              }
+
+              OutputFile outputFile =
+                  tableIO.newOutputFile(replacePrefix(dstDataFile, "s3://", "s3a://"));
+              // TODO: support transferTo below (note that compression, etc. might be different)
+              // try (var d = outputFile.create()) { try (var s = inputFile.newStream()) {
+              // s.transferTo(d); }}
+              Parquet.ReadBuilder readBuilder =
+                  Parquet.read(inputFile)
+                      .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
+                      .project(tableSchema); // TODO: ?
+              // TODO: reuseContainers?
+
+              Parquet.WriteBuilder writeBuilder =
+                  Parquet.write(outputFile)
+                      .overwrite(
+                          dataFileNamingStrategy == DataFileNamingStrategy.Name.INPUT_FILENAME)
+                      .createWriterFunc(GenericParquetWriter::buildWriter)
+                      .schema(tableSchema);
+
+              logger.info("{}: copying to {}", file, dstDataFile);
+              // file size may have changed due to different compression, etc.
+              dataFileSizeInBytes = copy(readBuilder, writeBuilder);
+              dataFile = dstDataFile;
             }
-            dataFileSizeInBytes = inputFile.getLength();
+            logger.info("{}: adding data file", file);
+            long recordCount =
+                metadata.getBlocks().stream().mapToLong(BlockMetaData::getRowCount).sum();
+            df =
+                new DataFiles.Builder(table.spec())
+                    .withPath(dataFile)
+                    .withFormat("PARQUET")
+                    .withRecordCount(recordCount)
+                    .withFileSizeInBytes(dataFileSizeInBytes)
+                    // TODO: metrics
+                    .build();
+          } catch (Exception e) { // FIXME
+            if (retryLog != null) {
+              logger.error("{}: error (adding to retry list and continuing)", file, e);
+              retryLog.add(file);
+              continue;
+            } else {
+              throw e;
+            }
           }
-          logger.info("{}: adding data file", file);
-          long recordCount =
-              metadata.getBlocks().stream().mapToLong(BlockMetaData::getRowCount).sum();
-          DataFile df =
-              new DataFiles.Builder(table.spec())
-                  .withPath(dataFile)
-                  .withFormat("PARQUET")
-                  .withRecordCount(recordCount)
-                  .withFileSizeInBytes(dataFileSizeInBytes)
-                  // TODO: metrics
-                  .build();
+          atLeastOneFileAppended = true;
           appendOp.appendFile(df);
         }
-        appendOp.commit();
         if (!noCommit) {
           // TODO: log
-          tx.commitTransaction();
+          if (atLeastOneFileAppended) {
+            appendOp.commit();
+          } else {
+            logger.warn("Table commit skipped (no files to append)");
+          }
+          if (retryLog != null) {
+            retryLog.commit();
+          }
         } else {
-          logger.warn("Table.Transaction commit skipped (--no-commit)");
+          logger.warn("Table commit skipped (--no-commit)");
         }
       }
     } finally {

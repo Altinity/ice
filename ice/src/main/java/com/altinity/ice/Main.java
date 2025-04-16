@@ -7,7 +7,11 @@ import com.altinity.ice.internal.cmd.DeleteTable;
 import com.altinity.ice.internal.cmd.Describe;
 import com.altinity.ice.internal.cmd.Insert;
 import com.altinity.ice.internal.config.Config;
+import com.altinity.ice.internal.iceberg.DataFileNamingStrategy;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
@@ -140,21 +144,64 @@ public final class Main {
                       + " Note that AWS does not support copying objects anonymously (i.e. you can't use this flag to copy objects from public buckets like https://registry.opendata.aws/aws-public-blockchain/).")
           boolean s3CopyObject,
       @CommandLine.Option(names = "--no-commit", description = "Skip transaction commit")
-          boolean noCommit)
+          boolean noCommit,
+      @CommandLine.Option(
+              names = "--data-file-naming-strategy",
+              description = "Supported: DEFAULT, INPUT_FILENAME",
+              defaultValue = "DEFAULT")
+          DataFileNamingStrategy.Name dataFileNamingStrategy,
+      @CommandLine.Option(names = "--skip-duplicates", description = "Skip duplicates")
+          boolean skipDuplicates,
+      @CommandLine.Option(
+              names = {"--retry-list"},
+              description =
+                  "/path/to/file where to save list of files to retry"
+                      + " (useful for retrying partially failed insert using `cat ice.retry | ice insert - --retry-list=ice.retry`)")
+          String retryList)
       throws IOException {
     if (s3NoSignRequest && s3CopyObject) {
       throw new UnsupportedOperationException(
           "--s3-no-sign-request + --s3-copy-object is not supported by AWS (see --help for details)");
     }
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
+      if (dataFiles.length == 1 && "-".equals(dataFiles[0])) {
+        dataFiles = readInput().toArray(new String[0]);
+        if (dataFiles.length == 0) {
+          logger.info("Nothing to insert (stdin empty)");
+          return;
+        }
+      }
       TableIdentifier tableId = TableIdentifier.parse(name);
       if (createTableIfNotExists) {
         // TODO: newCreateTableTransaction
         CreateTable.run(
             catalog, tableId, dataFiles[0], null, createTableIfNotExists, s3NoSignRequest);
       }
-      Insert.run(catalog, tableId, dataFiles, noCopy, noCommit, s3NoSignRequest, s3CopyObject);
+      Insert.run(
+          catalog,
+          tableId,
+          dataFiles,
+          dataFileNamingStrategy,
+          skipDuplicates,
+          noCommit,
+          noCopy,
+          s3NoSignRequest,
+          s3CopyObject,
+          retryList);
     }
+  }
+
+  private static List<String> readInput() {
+    List<String> r = new ArrayList<>();
+    try (Scanner scanner = new Scanner(System.in)) {
+      while (scanner.hasNextLine()) {
+        String line = scanner.nextLine();
+        if (!line.isBlank()) {
+          r.add(line);
+        }
+      }
+    }
+    return r;
   }
 
   @CommandLine.Command(name = "delete-table", description = "Delete table.")
