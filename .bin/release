@@ -17,6 +17,8 @@ trap _undo_mvn_version_set EXIT
 ./mvnw clean package -Dmaven.test.skip=true
 _undo_mvn_version_set
 
+export PATH="$(pwd)/.bin:$PATH"
+
 echo >&2 'Building ice Docker image'
 docker-build-ice
 echo >&2 'Building ice-rest-catalog Docker image'
