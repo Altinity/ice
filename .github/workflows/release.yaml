@@ -34,7 +34,7 @@ jobs:
           java-version: '21'
           distribution: 'graalvm'
           cache: maven
-      - run: .bin/release
+      - run: .bin/release --push
         env:
           GITHUB_TOKEN: ${{ github.token }}
           VERSION: ${{ github.event.inputs.VERSION }}
