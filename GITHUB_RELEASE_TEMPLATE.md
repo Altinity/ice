@@ -34,3 +34,4 @@ gh release download --repo altinity/ice REPLACE_WITH_TAG -p ice-rest-catalog-REP
 
 - `altinity/ice-rest-catalog:REPLACE_WITH_VER`
 - `altinity/ice-rest-catalog:debug-REPLACE_WITH_VER`
+- `altinity/ice-rest-catalog:debug-with-ice-REPLACE_WITH_VER`
