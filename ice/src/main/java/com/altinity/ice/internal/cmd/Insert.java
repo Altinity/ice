@@ -14,12 +14,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.apache.iceberg.AppendFiles;
-import org.apache.iceberg.DataFile;
-import org.apache.iceberg.DataFiles;
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.TableProperties;
+
+import org.apache.iceberg.*;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
@@ -36,6 +32,7 @@ import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.mapping.NameMappingParser;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.parquet.ParquetSchemaUtil;
+import org.apache.iceberg.parquet.ParquetUtil;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
@@ -233,12 +230,15 @@ public final class Insert {
             logger.info("{}: adding data file", file);
             long recordCount =
                 metadata.getBlocks().stream().mapToLong(BlockMetaData::getRowCount).sum();
+            MetricsConfig metricsConfig = MetricsConfig.forTable(table);
+            Metrics metrics = ParquetUtil.fileMetrics(inputFile, metricsConfig);
             df =
                 new DataFiles.Builder(table.spec())
                     .withPath(dataFile)
                     .withFormat("PARQUET")
                     .withRecordCount(recordCount)
                     .withFileSizeInBytes(dataFileSizeInBytes)
+                    .withMetrics(metrics)
                     // TODO: metrics
                     .build();
           } catch (Exception e) { // FIXME
