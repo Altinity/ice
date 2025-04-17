@@ -134,6 +134,16 @@ public final class Main {
               description = "Add files to catalog without copying them")
           boolean noCopy,
       @CommandLine.Option(
+              names = "--force-no-copy",
+              description =
+                  "Add files to catalog without copying them even if files are in different location(s) from table (implies --no-copy)")
+          boolean forceNoCopy,
+      @CommandLine.Option(
+              names = "--force-table-auth",
+              description =
+                  "Use table credentials to access input files (instead of credentials from execution environment)")
+          boolean forceTableAuth,
+      @CommandLine.Option(
               names = {"--s3-no-sign-request"},
               description = "Access input file(s) ")
           boolean s3NoSignRequest,
@@ -185,6 +195,8 @@ public final class Main {
           skipDuplicates,
           noCommit,
           noCopy,
+          forceNoCopy,
+          forceTableAuth,
           s3NoSignRequest,
           s3CopyObject,
           retryList);
