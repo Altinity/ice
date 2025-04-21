@@ -1,11 +1,18 @@
 package com.altinity.ice.rest.catalog.internal.maintenance;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.apache.iceberg.Table;
+import org.apache.iceberg.actions.Action;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.SupportsNamespaces;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.JobBuilder;
 import org.quartz.JobDetail;
@@ -172,6 +179,39 @@ public class QuartzMaintenanceScheduler {
         // - Compact small files
 
         // For now, just log that we're performing maintenance
+        // get the list of namespaces.
+        List<Namespace> namespaces;
+        if (catalog instanceof SupportsNamespaces) {
+          SupportsNamespaces nsCatalog = (SupportsNamespaces) catalog;
+          namespaces = nsCatalog.listNamespaces();
+          for (Namespace ns : namespaces) {
+            logger.debug("Namespace: " + ns);
+          }
+        } else {
+          logger.error("Catalog does not support namespace operations.");
+          return;
+        }        // Iterate through namespace
+
+        for (Namespace namespace : namespaces) {
+            // Get the table
+            List<TableIdentifier> tables = catalog.listTables(namespace);
+            for (TableIdentifier tableIdent : tables) {
+                long olderThanMillis = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30);
+                // Get the table
+                Table table = catalog.loadTable(tableIdent);
+                // Expire snapshots older than 30 days
+                table.expireSnapshots()
+                    .expireOlderThan(olderThanMillis)
+                    .commit();
+                // Remove Orphan Files
+
+                // Rewrite Manifests
+                table.rewriteManifests()
+                    .rewriteIf(manifest -> true)
+                    .commit();
+            }
+
+        }
         logger.info("Maintenance operations completed for catalog: {}", catalog.name());
       } else {
         logger.warn("No catalog available for maintenance operations");
