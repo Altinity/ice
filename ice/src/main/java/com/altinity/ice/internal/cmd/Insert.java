@@ -133,7 +133,7 @@ public final class Insert {
             RetryLog retryLog =
                 retryListFile != null && !retryListFile.isEmpty()
                     ? new RetryLog(retryListFile)
-                    : null ) {
+                    : null) {
           boolean atLeastOneFileAppended = false;
 
           // TODO: parallel

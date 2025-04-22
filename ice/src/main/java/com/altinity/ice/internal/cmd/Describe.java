@@ -3,16 +3,23 @@ package com.altinity.ice.internal.cmd;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.Table;
+import org.apache.iceberg.*;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.Types;
 
 public final class Describe {
 
@@ -102,6 +109,8 @@ public final class Describe {
           }
           sb.append("\t\t\t\tlocation: " + snapshot.manifestListLocation() + "\n");
         }
+
+        printTableMetrics(table, sb);
       }
       if (!tableMatched) {
         sb.append(" []\n");
@@ -115,6 +124,89 @@ public final class Describe {
       r = convertYamlToJson(r);
     }
     System.out.println(r);
+  }
+
+  /**
+   * Print table metrics
+   *
+   * @param table
+   */
+  private static void printTableMetrics(Table table, StringBuilder buffer) throws IOException {
+    TableScan scan = table.newScan().includeColumnStats();
+    CloseableIterable<FileScanTask> tasks = scan.planFiles();
+
+    for (FileScanTask task : tasks) {
+      DataFile dataFile = task.file();
+      buffer.append("\tMetrics:\n");
+      buffer.append("\t  File: " + dataFile.path() + "\n");
+      buffer.append("\t  Record Count: " + dataFile.recordCount() + "\n");
+
+      Map<Integer, Long> valueCounts = dataFile.valueCounts();
+      Map<Integer, Long> nullCounts = dataFile.nullValueCounts();
+      Map<Integer, ByteBuffer> lowerBounds = dataFile.lowerBounds();
+      Map<Integer, ByteBuffer> upperBounds = dataFile.upperBounds();
+
+      for (Types.NestedField field : table.schema().columns()) {
+        int id = field.fieldId();
+        buffer.append("\n\t  Column: " + field.name() + "\n");
+        buffer.append("\t    valueCount  = " + valueCounts.get(id) + "\n");
+        buffer.append("\t    nullCount   = " + nullCounts.get(id) + "\n");
+
+        ByteBuffer lower = lowerBounds.get(id);
+        ByteBuffer upper = upperBounds.get(id);
+
+        String lowerStr =
+            lower != null ? (String) convertByteBufferToNumber(lower, field.type()) : "null";
+        String upperStr =
+            upper != null ? (String) convertByteBufferToNumber(upper, field.type()) : "null";
+
+        buffer.append("\t    lowerBound  = " + lowerStr + "\n");
+        buffer.append("\t    upperBound  = " + upperStr + "\n");
+      }
+    }
+
+    tasks.close();
+  }
+
+  public static Object convertByteBufferToNumber(ByteBuffer buffer, Type type) {
+    ByteBuffer copy = buffer.duplicate(); // Don't mutate original
+
+    if (type.isPrimitiveType()) {
+      switch (type.asPrimitiveType().typeId()) {
+        case INTEGER:
+          return copy.getInt();
+        case LONG:
+          return copy.getLong();
+        case FLOAT:
+          return copy.getFloat();
+        case DOUBLE:
+          return copy.getDouble();
+        case BOOLEAN:
+          return copy.get() != 0;
+        case DATE:
+          return copy.getInt(); // Often encoded as int days since epoch
+        case TIME:
+          return copy.getLong(); // microseconds since midnight
+        case TIMESTAMP:
+          return copy.getLong(); // microseconds since epoch
+        case STRING:
+          byte[] strBytes = new byte[copy.remaining()];
+          copy.get(strBytes);
+          return new String(strBytes, StandardCharsets.UTF_8);
+        case FIXED:
+        case BINARY:
+          byte[] binBytes = new byte[copy.remaining()];
+          copy.get(binBytes);
+          return binBytes;
+        case DECIMAL:
+          // Example assumes precision/scale = 10,2; adjust for your schema
+          BigInteger unscaled = new BigInteger(copy.array());
+          return new BigDecimal(unscaled, 2);
+        default:
+          return "Unsupported type: " + type;
+      }
+    }
+    return "Non-primitive type: " + type;
   }
 
   private static String convertYamlToJson(String yaml) throws IOException {
