@@ -18,6 +18,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
@@ -156,9 +157,9 @@ public final class Describe {
         ByteBuffer upper = upperBounds.get(id);
 
         String lowerStr =
-            lower != null ? (String) convertByteBufferToNumber(lower, field.type()) : "null";
+            lower != null ? Conversions.fromByteBuffer(field.type(), lower).toString() : "null";
         String upperStr =
-            upper != null ? (String) convertByteBufferToNumber(upper, field.type()) : "null";
+            upper != null ? Conversions.fromByteBuffer(field.type(), upper).toString() : "null";
 
         buffer.append("\t    lowerBound  = " + lowerStr + "\n");
         buffer.append("\t    upperBound  = " + upperStr + "\n");
