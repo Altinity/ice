@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+export VERSION=0.0.0-latest-master+$(git rev-parse --short HEAD)
+export IMAGE_TAG="latest-master"
+export SKIP_VERIFY=1
+
+export PATH="$(pwd)/.bin:$PATH"
+
+echo >&2 'Pushing ice Docker image'
+docker-build-ice --push
+echo >&2 'Pushing ice-rest-catalog Docker image'
+docker-build-ice-rest-catalog --push

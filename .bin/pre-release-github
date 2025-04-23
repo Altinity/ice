@@ -2,7 +2,10 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+test -n "$GITHUB_TOKEN" || (echo 'GITHUB_TOKEN env variable must be set' >&2; exit 1)
+
 VERSION=0.0.0-latest-master+$(git rev-parse --short HEAD)
+VERSION_TAG="latest-master"
 
 _undo_mvn_version_set() {
   ./mvnw versions:revert
@@ -12,8 +15,6 @@ trap _undo_mvn_version_set EXIT
 
 ./mvnw clean package -Dmaven.test.skip=true
 _undo_mvn_version_set
-
-VERSION_TAG="latest-master"
 
 # TODO: go install github.com/aktau/github-release@v0.10.0
 github-release delete --user altinity --repo ice --tag "$VERSION_TAG" || true

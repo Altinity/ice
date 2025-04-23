@@ -3,8 +3,11 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 test -n "$VERSION" || (echo "VERSION env variable must be set" >&2; exit 1)
+IMAGE_TAG="${IMAGE_TAG:-$VERSION}"
 
-./mvnw -pl ice validate # fail-fast
+if [[ "${SKIP_VERIFY:-}" != "1" ]]; then
+  ./mvnw -pl ice validate # fail-fast
+fi
 
 image_name=altinity/ice
 
@@ -14,8 +17,8 @@ for q in "" "debug-"; do
   if [[ "$q" == "" ]]; then
     base_image_prefix="latest-"
   fi
-  docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=${base_image_prefix}amd64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$VERSION-amd64" -f ice/Dockerfile .
-  docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=${base_image_prefix}arm64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$VERSION-arm64" -f ice/Dockerfile .
+  docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=${base_image_prefix}amd64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$IMAGE_TAG-amd64" -f ice/Dockerfile .
+  docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=${base_image_prefix}arm64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$IMAGE_TAG-arm64" -f ice/Dockerfile .
 done
 
 push=false
@@ -31,14 +34,14 @@ if ! $push; then
 fi
 
 for q in "" "debug-"; do
-  docker push "$image_name:$q$VERSION-amd64"
-  docker push "$image_name:$q$VERSION-arm64"
+  docker push "$image_name:$q$IMAGE_TAG-amd64"
+  docker push "$image_name:$q$IMAGE_TAG-arm64"
   # `docker manifest` requires metadata from the registry, hence the `docker push`es above
-  docker manifest create "$image_name:$q$VERSION" \
-    --amend "$image_name:$q$VERSION-amd64" \
-    --amend "$image_name:$q$VERSION-arm64"
-  docker manifest push "$image_name:$q$VERSION"
+  docker manifest create "$image_name:$q$IMAGE_TAG" \
+    --amend "$image_name:$q$IMAGE_TAG-amd64" \
+    --amend "$image_name:$q$IMAGE_TAG-arm64"
+  docker manifest push "$image_name:$q$IMAGE_TAG"
 done
 
-regctl image copy "$image_name:$VERSION" "$image_name:latest"
-regctl image copy "$image_name:debug-$VERSION" "$image_name:debug"
+regctl image copy "$image_name:$IMAGE_TAG" "$image_name:latest"
+regctl image copy "$image_name:debug-$IMAGE_TAG" "$image_name:debug"

@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 test -n "$VERSION" || (echo 'VERSION env variable must be set' >&2; exit 1)
+test -n "$GITHUB_TOKEN" || (echo 'GITHUB_TOKEN env variable must be set' >&2; exit 1)
 
 ./mvnw clean verify
 
