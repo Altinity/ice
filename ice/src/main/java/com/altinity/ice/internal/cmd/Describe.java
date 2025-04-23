@@ -141,23 +141,32 @@ public final class Describe {
       Map<Integer, ByteBuffer> lowerBounds = dataFile.lowerBounds();
       Map<Integer, ByteBuffer> upperBounds = dataFile.upperBounds();
 
+      if (valueCounts == null && nullCounts == null && lowerBounds == null && upperBounds == null) {
+        continue;
+      }
+
       buffer.append("\t\t\t  columns:\n");
       for (Types.NestedField field : table.schema().columns()) {
         int id = field.fieldId();
         buffer.append("\t\t\t    " + field.name() + ":\n");
-        buffer.append("\t\t\t      value_count: " + valueCounts.get(id) + "\n");
-        buffer.append("\t\t\t      null_count: " + nullCounts.get(id) + "\n");
-
-        ByteBuffer lower = lowerBounds.get(id);
-        ByteBuffer upper = upperBounds.get(id);
-
-        String lowerStr =
-            lower != null ? Conversions.fromByteBuffer(field.type(), lower).toString() : "null";
-        String upperStr =
-            upper != null ? Conversions.fromByteBuffer(field.type(), upper).toString() : "null";
-
-        buffer.append("\t\t\t      lower_bound: " + lowerStr + "\n");
-        buffer.append("\t\t\t      upper_bound: " + upperStr + "\n");
+        if (valueCounts != null) {
+          buffer.append("\t\t\t      value_count: " + valueCounts.get(id) + "\n");
+        }
+        if (nullCounts != null) {
+          buffer.append("\t\t\t      null_count: " + nullCounts.get(id) + "\n");
+        }
+        if (lowerBounds != null) {
+          ByteBuffer lower = lowerBounds.get(id);
+          String lowerStr =
+              lower != null ? Conversions.fromByteBuffer(field.type(), lower).toString() : "null";
+          buffer.append("\t\t\t      lower_bound: " + lowerStr + "\n");
+        }
+        if (upperBounds != null) {
+          ByteBuffer upper = upperBounds.get(id);
+          String upperStr =
+              upper != null ? Conversions.fromByteBuffer(field.type(), upper).toString() : "null";
+          buffer.append("\t\t\t      upper_bound: " + upperStr + "\n");
+        }
       }
     }
 
