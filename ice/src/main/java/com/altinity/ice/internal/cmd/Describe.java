@@ -126,11 +126,6 @@ public final class Describe {
     System.out.println(r);
   }
 
-  /**
-   * Print table metrics
-   *
-   * @param table
-   */
   private static void printTableMetrics(Table table, StringBuilder buffer) throws IOException {
     TableScan scan = table.newScan().includeColumnStats();
     CloseableIterable<FileScanTask> tasks = scan.planFiles();
