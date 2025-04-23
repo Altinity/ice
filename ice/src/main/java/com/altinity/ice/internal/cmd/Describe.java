@@ -3,23 +3,28 @@ package com.altinity.ice.internal.cmd;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.Table;
+import org.apache.iceberg.*;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.types.Conversions;
+import org.apache.iceberg.types.Types;
 
 public final class Describe {
 
   private Describe() {}
 
   // TODO: refactor: the use of StringBuilder below is absolutely criminal
-  public static void run(RESTCatalog catalog, String target, boolean json) throws IOException {
+  public static void run(RESTCatalog catalog, String target, boolean json, boolean includeMetrics)
+      throws IOException {
     String targetNamespace = null;
     String targetTable = null;
     if (target != null && !target.isEmpty()) {
@@ -102,6 +107,10 @@ public final class Describe {
           }
           sb.append("\t\t\t\tlocation: " + snapshot.manifestListLocation() + "\n");
         }
+
+        if (includeMetrics) {
+          printTableMetrics(table, sb);
+        }
       }
       if (!tableMatched) {
         sb.append(" []\n");
@@ -115,6 +124,49 @@ public final class Describe {
       r = convertYamlToJson(r);
     }
     System.out.println(r);
+  }
+
+  /**
+   * Print table metrics
+   *
+   * @param table
+   */
+  private static void printTableMetrics(Table table, StringBuilder buffer) throws IOException {
+    TableScan scan = table.newScan().includeColumnStats();
+    CloseableIterable<FileScanTask> tasks = scan.planFiles();
+
+    for (FileScanTask task : tasks) {
+      DataFile dataFile = task.file();
+      buffer.append("\t\t\tmetrics:\n");
+      buffer.append("\t\t\t  file: " + dataFile.path() + "\n");
+      buffer.append("\t\t\t  record_count: " + dataFile.recordCount() + "\n");
+
+      Map<Integer, Long> valueCounts = dataFile.valueCounts();
+      Map<Integer, Long> nullCounts = dataFile.nullValueCounts();
+      Map<Integer, ByteBuffer> lowerBounds = dataFile.lowerBounds();
+      Map<Integer, ByteBuffer> upperBounds = dataFile.upperBounds();
+
+      buffer.append("\t\t\t  columns:\n");
+      for (Types.NestedField field : table.schema().columns()) {
+        int id = field.fieldId();
+        buffer.append("\t\t\t    " + field.name() + ":\n");
+        buffer.append("\t\t\t      value_count: " + valueCounts.get(id) + "\n");
+        buffer.append("\t\t\t      null_count: " + nullCounts.get(id) + "\n");
+
+        ByteBuffer lower = lowerBounds.get(id);
+        ByteBuffer upper = upperBounds.get(id);
+
+        String lowerStr =
+            lower != null ? Conversions.fromByteBuffer(field.type(), lower).toString() : "null";
+        String upperStr =
+            upper != null ? Conversions.fromByteBuffer(field.type(), upper).toString() : "null";
+
+        buffer.append("\t\t\t      lower_bound: " + lowerStr + "\n");
+        buffer.append("\t\t\t      upper_bound: " + upperStr + "\n");
+      }
+    }
+
+    tasks.close();
   }
 
   private static String convertYamlToJson(String yaml) throws IOException {

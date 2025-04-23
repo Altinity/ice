@@ -19,10 +19,12 @@ local-mc mb --ignore-existing local/bucket1
 
 # start Iceberg REST Catalog server
 ice-rest-catalog
+ or using the jar file.
+/ice/examples/scratch$ java -jar ../../ice-rest-catalog/target/ice-rest-catalog-jar-with-dependencies.jar  &
+
 
 # insert data into catalog
-ice insert flowers.iris -p \
-  file://iris.parquet
+ice 
 
 ice insert nyc.taxis -p \
   https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
