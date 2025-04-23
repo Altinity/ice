@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+// TODO: remove: don't reinvent the wheel
 public final class Hash {
 
   private Hash() {}

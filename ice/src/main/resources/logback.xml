@@ -17,7 +17,7 @@
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <target>System.err</target>
     <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
-      <layout class="com.altinity.ice.internal.log.ColorAwarePatternLayout">
+      <layout class="com.altinity.ice.internal.logback.ColorAwarePatternLayout">
         <!-- FIXME: stacktrace filtering has perf implications -->
         <pattern>%gray(%d{yyyy-MM-dd HH:mm:ss} [%.11thread]) %highlight(%-4level) %gray(%logger{27} >) %msg%n%rEx{full,
           picocli,

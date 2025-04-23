@@ -1,4 +1,4 @@
-package com.altinity.ice.internal.s3;
+package com.altinity.ice.internal.aws;
 
 import static org.testng.Assert.assertEquals;
 

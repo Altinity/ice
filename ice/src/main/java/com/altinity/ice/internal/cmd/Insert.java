@@ -1,11 +1,11 @@
 package com.altinity.ice.internal.cmd;
 
+import com.altinity.ice.internal.aws.S3;
 import com.altinity.ice.internal.iceberg.DataFileNamingStrategy;
 import com.altinity.ice.internal.io.Input;
 import com.altinity.ice.internal.io.RetryLog;
+import com.altinity.ice.internal.jvm.Stats;
 import com.altinity.ice.internal.parquet.Metadata;
-import com.altinity.ice.internal.runtime.Stats;
-import com.altinity.ice.internal.s3.S3;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;

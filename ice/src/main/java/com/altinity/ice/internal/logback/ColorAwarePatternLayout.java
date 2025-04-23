@@ -1,4 +1,4 @@
-package com.altinity.ice.internal.log;
+package com.altinity.ice.internal.logback;
 
 import ch.qos.logback.classic.PatternLayout;
 import ch.qos.logback.core.pattern.CompositeConverter;
@@ -6,7 +6,8 @@ import picocli.CommandLine;
 
 /**
  * A Logback Pattern Layout that uses Picocli ANSI color heuristic to apply ANSI color only on the
- * terminal which supports it.
+ * terminals which support it. Code was taken from <a
+ * href="https://stackoverflow.com/a/68633212">stackoverflow.com/a/68633212</a>.
  */
 public class ColorAwarePatternLayout extends PatternLayout {
   static {

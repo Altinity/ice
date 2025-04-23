@@ -6,5 +6,5 @@ catalog:
     s3.endpoint: http://localhost:9000
     # s3.access_key_id: miniouser
     # s3.secret_access_key: miniopassword
-    client.region: mino
+    client.region: minio
     ice.http.cache: data/ice/http/cache

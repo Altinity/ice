@@ -77,7 +77,7 @@ configs:
       s3.endpoint: http://minio:8999
       s3.access-key-id: "miniouser"
       s3.secret-access-key: "miniopassword"
-      ice.token: foo
       ice.s3.region: minio
+      ice.token: foo
 volumes:
   minio:
