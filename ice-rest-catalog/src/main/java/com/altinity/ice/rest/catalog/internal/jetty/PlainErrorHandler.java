@@ -22,7 +22,6 @@ public class PlainErrorHandler extends org.eclipse.jetty.server.handler.ErrorHan
       w.write(baseRequest.getResponse().getReason());
     } finally {
       baseRequest.getHttpChannel().sendResponseAndComplete();
-      baseRequest.setHandled(true);
     }
   }
 }

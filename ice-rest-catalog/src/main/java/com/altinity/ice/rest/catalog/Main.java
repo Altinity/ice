@@ -1,8 +1,17 @@
 package com.altinity.ice.rest.catalog;
 
-import com.altinity.ice.rest.catalog.internal.jetty.AuthorizationHandler;
+import com.altinity.ice.rest.catalog.internal.auth.Session;
+import com.altinity.ice.rest.catalog.internal.auth.Token;
+import com.altinity.ice.rest.catalog.internal.aws.CredentialsProvider;
+import com.altinity.ice.rest.catalog.internal.config.Config;
 import com.altinity.ice.rest.catalog.internal.jetty.PlainErrorHandler;
 import com.altinity.ice.rest.catalog.internal.jetty.ServerConfig;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAdapter;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAuthorizationHandler;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogHandler;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableAWCredentials;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableConfig;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogServlet;
 import io.prometheus.metrics.exporter.servlet.jakarta.PrometheusMetricsServlet;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import jakarta.servlet.http.HttpServlet;
@@ -11,13 +20,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 import org.apache.iceberg.CatalogUtil;
+import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Catalog;
-import org.apache.iceberg.rest.RESTCatalogAdapter;
-import org.apache.iceberg.rest.RESTCatalogAuthAdapter;
-import org.apache.iceberg.rest.RESTCatalogServlet;
 import org.apache.iceberg.util.PropertyUtil;
 import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.server.Server;
@@ -28,8 +39,11 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 
 @CommandLine.Command(
     name = "ice-rest-catalog",
@@ -79,23 +93,27 @@ public final class Main implements Callable<Integer> {
     // TODO: StatisticsHandler
     // TODO: ShutdownHandler
 
-    RESTCatalogAdapter restCatalogAdapter;
-    var expectedToken = config.getOrDefault("ice.token", "");
-    // TODO: force min length
-    if (!expectedToken.isEmpty() || !requireAuth) {
-      if (requireAuth) {
-        mux.insertHandler(new AuthorizationHandler(expectedToken));
+    RESTCatalogHandler restCatalogAdapter;
+    if (requireAuth) {
+      Token[] tokens = parseAccessTokens(config);
+
+      mux.insertHandler(createAuthorizationHandler(tokens, config));
+
+      // Fail-fast.
+      Map<String, AwsCredentialsProvider> awsCredentialsProviders =
+          createAwsCredentialsProviders(tokens, config);
+
+      restCatalogAdapter = new RESTCatalogAdapter(catalog);
+      if (config.containsKey(Config.OPTION_TABLE_CONFIG)) {
+        restCatalogAdapter = new RESTCatalogMiddlewareTableConfig(restCatalogAdapter, config);
       }
-      AwsCredentialsProvider credentialsProvider = null;
-      // FIXME: may not always mean AWS
-      if (config.getOrDefault("warehouse", "").startsWith("s3://")
-          && config.getOrDefault("s3.access-key-id", "").isEmpty()) {
-        logger.info("Using software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider");
-        credentialsProvider = DefaultCredentialsProvider.create();
-      }
-      restCatalogAdapter = new RESTCatalogAuthAdapter(catalog, config, credentialsProvider);
+      restCatalogAdapter =
+          new RESTCatalogMiddlewareTableAWCredentials(restCatalogAdapter, awsCredentialsProviders);
     } else {
       restCatalogAdapter = new RESTCatalogAdapter(catalog);
+      if (config.containsKey(Config.OPTION_TABLE_CONFIG)) {
+        restCatalogAdapter = new RESTCatalogMiddlewareTableConfig(restCatalogAdapter, config);
+      }
     }
 
     var h = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter));
@@ -105,6 +123,101 @@ public final class Main implements Callable<Integer> {
     overrideJettyDefaults(s);
     s.setHandler(mux);
     return s;
+  }
+
+  private static Map<String, AwsCredentialsProvider> createAwsCredentialsProviders(
+      Token[] tokens, Map<String, String> config) {
+    AwsCredentialsProvider awsCredentialsProvider;
+    if (config.containsKey(S3FileIOProperties.ACCESS_KEY_ID)) {
+      if (config.containsKey(S3FileIOProperties.SESSION_TOKEN)) {
+        awsCredentialsProvider =
+            StaticCredentialsProvider.create(
+                AwsSessionCredentials.create(
+                    config.get(S3FileIOProperties.ACCESS_KEY_ID),
+                    config.get(S3FileIOProperties.SECRET_ACCESS_KEY),
+                    config.get(S3FileIOProperties.SESSION_TOKEN)));
+      } else {
+        awsCredentialsProvider =
+            StaticCredentialsProvider.create(
+                AwsBasicCredentials.create(
+                    config.get(S3FileIOProperties.ACCESS_KEY_ID),
+                    config.get(S3FileIOProperties.SECRET_ACCESS_KEY)));
+      }
+    } else {
+      awsCredentialsProvider = DefaultCredentialsProvider.create();
+    }
+    Map<String, AwsCredentialsProvider> awsCredentialsProviders = new HashMap<>();
+    for (Token token : tokens) {
+      var roleArn = token.params().getOrDefault(Token.TOKEN_PARAM_AWS_ASSUME_ROLE_ARN, "");
+      awsCredentialsProviders.put(
+          token.resourceName(),
+          roleArn.isEmpty()
+              ? awsCredentialsProvider
+              : CredentialsProvider.assumeRule(
+                  awsCredentialsProvider, roleArn, "ice-rest-catalog/" + token.id()));
+    }
+    if ("true".equals(config.get(Config.OPTION_ANONYMOUS_ACCESS))) {
+      var token =
+          Token.parse(
+              "anonymous::"
+                  + Token.TOKEN_PARAM_READ_ONLY
+                  + "&"
+                  + config.getOrDefault(Config.OPTION_ANONYMOUS_ACCESS_CONFIG, ""));
+      var roleArn = token.params().getOrDefault(Token.TOKEN_PARAM_AWS_ASSUME_ROLE_ARN, "");
+      awsCredentialsProviders.put(
+          token.id(),
+          roleArn.isEmpty()
+              ? awsCredentialsProvider
+              : CredentialsProvider.assumeRule(
+                  awsCredentialsProvider, roleArn, "ice-rest-catalog/" + token.id()));
+      logger.info("Enabled anonymous access (config: {})", token.params());
+    }
+    return awsCredentialsProviders;
+  }
+
+  private static Token[] parseAccessTokens(Map<String, String> config) {
+    var token = config.getOrDefault(Config.OPTION_TOKEN, "");
+    if (token.contains(",")) {
+      throw new IllegalArgumentException("invalid config: token cannot contain ,");
+    }
+    var tokens = config.getOrDefault(Config.OPTION_TOKENS, "");
+    if (!token.isEmpty()) {
+      tokens = token + "," + tokens;
+    }
+    Token[] r = Arrays.stream(tokens.split(",")).map(Token::parse).toArray(Token[]::new);
+    Set<String> set = Arrays.stream(r).map(Token::id).collect(Collectors.toSet());
+    if (set.contains("anonymous")) {
+      throw new IllegalArgumentException("invalid config: token alias \"anonymous\" is reserved");
+    }
+    if (set.size() != r.length) {
+      throw new IllegalArgumentException(
+          "invalid config: multiple tokens with the same alias (name) found");
+    }
+    for (Token t : r) {
+      logger.info("Enabled access via token named \"{}\" (config: {})", t.id(), t.params());
+    }
+    return r;
+  }
+
+  private static RESTCatalogAuthorizationHandler createAuthorizationHandler(
+      Token[] tokens, Map<String, String> config) {
+    Session anonymousSession = null;
+    if ("true".equals(config.get(Config.OPTION_ANONYMOUS_ACCESS))) {
+      var t =
+          Token.parse(
+              "anonymous::"
+                  + Token.TOKEN_PARAM_READ_ONLY
+                  + "&"
+                  + config.getOrDefault(Config.OPTION_ANONYMOUS_ACCESS_CONFIG, ""));
+      anonymousSession = new Session(t.id(), t.params());
+    }
+    if (tokens.length == 0 && anonymousSession == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "invalid config: either set %s=true or provide tokens via %s or %s",
+              Config.OPTION_ANONYMOUS_ACCESS, Config.OPTION_TOKEN, Config.OPTION_TOKENS));
+    }
+    return new RESTCatalogAuthorizationHandler(tokens, anonymousSession);
   }
 
   private static Server createDebugServer(int port) {
@@ -147,15 +260,16 @@ public final class Main implements Callable<Integer> {
   public Integer call() throws Exception {
     var config = com.altinity.ice.rest.catalog.internal.config.Config.load(configFile);
 
-    var awsRegion = config.getOrDefault("ice.s3.region", "");
+    // FIXME: remove
+    var awsRegion = config.getOrDefault(Config.OPTION_S3_REGION, "");
     if (!awsRegion.isEmpty()) {
-      System.setProperty("aws.region", awsRegion); // FIXME
+      System.setProperty("aws.region", awsRegion);
     }
 
     // TODO: use "addr" instead
-    int port = PropertyUtil.propertyAsInt(config, "ice.rest.catalog.port", 5000);
+    int port = PropertyUtil.propertyAsInt(config, Config.OPTION_REST_CATALOG_PORT, 5000);
     ;
-    int debugPort = PropertyUtil.propertyAsInt(config, "ice.rest.catalog.debug.port", 5001);
+    int debugPort = PropertyUtil.propertyAsInt(config, Config.OPTION_REST_CATALOG_DEBUG_PORT, 5001);
 
     // TODO: ensure all http handler are hooked in
     JvmMetrics.builder().register();
@@ -164,7 +278,7 @@ public final class Main implements Callable<Integer> {
 
     // TODO: replace with uds (jetty-unixdomain-server is all that is needed here but in ice you'll
     // need to implement custom org.apache.iceberg.rest.RESTClient)
-    String adminPort = config.get("ice.admin.port");
+    String adminPort = config.get(Config.OPTION_ADMIN_PORT);
     if (adminPort != null && !adminPort.isEmpty()) {
       Server adminServer = createAdminServer(Integer.parseInt(adminPort), catalog, config);
       adminServer.start();

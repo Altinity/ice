@@ -7,6 +7,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -27,6 +30,19 @@ public final class Config {
 
   private Config() {}
 
+  public static final String OPTION_S3_REGION = "ice.s3.region"; // TODO: rename to ic2.aws.region
+  public static final String OPTION_REST_CATALOG_PORT = "ice.rest.catalog.port";
+  public static final String OPTION_REST_CATALOG_DEBUG_PORT = "ice.rest.catalog.debug.port";
+  public static final String OPTION_ADMIN_PORT = "ice.admin.port";
+  public static final String OPTION_TABLE_CONFIG = "ice.table.config"; // format: k1=v1&k2=v2,...
+  public static final String OPTION_TOKEN = "ice.token";
+  public static final String OPTION_TOKENS =
+      "ice.tokens"; // format: $alias:$token:aws_role_arn=...&...,$alias:...
+  public static final String OPTION_ANONYMOUS_ACCESS = "ice.anonymous.access";
+  public static final String OPTION_ANONYMOUS_ACCESS_CONFIG =
+      "ice.anonymous.access.config"; // format: param=value&...
+
+  // TODO: return Config, not Map
   // https://py.iceberg.apache.org/configuration/#setting-configuration-values
   public static Map<String, String> load(String configFile) throws IOException {
     var p =
@@ -102,5 +118,19 @@ public final class Config {
     }
 
     return p;
+  }
+
+  public static Map<String, String> parseQuery(String query) {
+    return Arrays.stream(query.split("&"))
+        .map(param -> param.split("=", 2))
+        .filter(x -> !x[0].isEmpty())
+        .collect(
+            Collectors.groupingBy(
+                pair -> URLDecoder.decode(pair[0], StandardCharsets.UTF_8),
+                Collectors.mapping(
+                    pair ->
+                        pair.length > 1 ? URLDecoder.decode(pair[1], StandardCharsets.UTF_8) : "",
+                    Collectors.joining(",") // Collectors.toList()
+                    )));
   }
 }
