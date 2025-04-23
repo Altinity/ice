@@ -1,5 +1,7 @@
 package com.altinity.ice.internal.cmd;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
@@ -43,81 +45,65 @@ public final class Describe {
     // FIXME: there is no need to list nss/tables when target is given
     var sb = new StringBuilder();
     List<Namespace> namespaces = catalog.listNamespaces();
-    sb.append("default:");
-    boolean nsMatched = false;
     for (Namespace namespace : namespaces) {
       if (targetNamespace != null && !targetNamespace.equals(namespace.toString())) {
         continue;
       }
-      if (!nsMatched) {
-        sb.append("\n");
-        nsMatched = true;
-      }
-      sb.append("- " + namespace + ":");
       List<TableIdentifier> tables = catalog.listTables(namespace);
-      boolean tableMatched = false;
       for (TableIdentifier tableId : tables) {
         if (targetTable != null && !targetTable.equals(tableId.name())) {
           continue;
         }
-        if (!tableMatched) {
-          sb.append("\n");
-          tableMatched = true;
-        }
-        sb.append("\t- " + tableId.name() + ":\n");
+        sb.append("---\n");
+        sb.append("kind: Table\n");
+        sb.append("metadata:\n");
+        sb.append("\tid: " + tableId + "\n");
         Table table = catalog.loadTable(tableId);
+        sb.append("data:\n");
+        sb.append("\tschema_raw: |-\n" + prefixEachLine(table.schema().toString(), "\t\t") + "\n");
         sb.append(
-            "\t\t\tschema_raw: |-\n"
-                + prefixEachLine(table.schema().toString(), "\t\t\t\t")
-                + "\n");
+            "\tpartition_spec_raw: |-\n" + prefixEachLine(table.spec().toString(), "\t\t") + "\n");
         sb.append(
-            "\t\t\tpartition_spec_raw: |-\n"
-                + prefixEachLine(table.spec().toString(), "\t\t\t\t")
-                + "\n");
-        sb.append(
-            "\t\t\tsort_order_raw: |-\n"
-                + prefixEachLine(table.sortOrder().toString(), "\t\t\t\t")
-                + "\n");
-        sb.append("\t\t\tproperties: \n");
+            "\tsort_order_raw: |-\n" + prefixEachLine(table.sortOrder().toString(), "\t\t") + "\n");
+        sb.append("\tproperties: \n");
         for (var property : table.properties().entrySet()) {
-          sb.append("\t\t\t\t" + property.getKey() + ": \"" + property.getValue() + "\"\n");
+          var v = property.getValue();
+          if (v.contains("\n")) {
+            sb.append("\t\t" + property.getKey() + ": |-\n" + prefixEachLine(v, "\t\t\t") + "\n");
+          } else {
+            sb.append("\t\t" + property.getKey() + ": \"" + v + "\"\n");
+          }
         }
-        sb.append("\t\t\tlocation: " + table.location() + "\n");
-        sb.append("\t\t\tcurrent_snapshot: \n");
+        sb.append("\tlocation: " + table.location() + "\n");
+        sb.append("\tcurrent_snapshot: \n");
         Snapshot snapshot = table.currentSnapshot();
         if (snapshot != null) {
-          sb.append("\t\t\t\tsequence_number: " + snapshot.sequenceNumber() + "\n");
-          sb.append("\t\t\t\tid: " + snapshot.snapshotId() + "\n");
-          sb.append("\t\t\t\tparent_id: " + snapshot.parentId() + "\n");
-          sb.append("\t\t\t\ttimestamp: " + snapshot.timestampMillis() + "\n");
+          sb.append("\t\tsequence_number: " + snapshot.sequenceNumber() + "\n");
+          sb.append("\t\tid: " + snapshot.snapshotId() + "\n");
+          sb.append("\t\tparent_id: " + snapshot.parentId() + "\n");
+          sb.append("\t\ttimestamp: " + snapshot.timestampMillis() + "\n");
           sb.append(
-              "\t\t\t\ttimestamp_iso: \""
+              "\t\ttimestamp_iso: \""
                   + Instant.ofEpochMilli(snapshot.timestampMillis()).toString()
                   + "\"\n");
           sb.append(
-              "\t\t\t\ttimestamp_iso_local: \""
+              "\t\ttimestamp_iso_local: \""
                   + Instant.ofEpochMilli(snapshot.timestampMillis())
                       .atZone(ZoneId.systemDefault())
                       .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
                   + "\"\n");
-          sb.append("\t\t\t\toperation: " + snapshot.operation() + "\n");
-          sb.append("\t\t\t\tsummary:\n");
+          sb.append("\t\toperation: " + snapshot.operation() + "\n");
+          sb.append("\t\tsummary:\n");
           for (var property : snapshot.summary().entrySet()) {
-            sb.append("\t\t\t\t\t" + property.getKey() + ": \"" + property.getValue() + "\"\n");
+            sb.append("\t\t\t" + property.getKey() + ": \"" + property.getValue() + "\"\n");
           }
-          sb.append("\t\t\t\tlocation: " + snapshot.manifestListLocation() + "\n");
+          sb.append("\t\tlocation: " + snapshot.manifestListLocation() + "\n");
         }
 
         if (includeMetrics) {
           printTableMetrics(table, sb);
         }
       }
-      if (!tableMatched) {
-        sb.append(" []\n");
-      }
-    }
-    if (!nsMatched) {
-      sb.append(" []\n");
     }
     String r = sb.toString().replace("\t", "  ");
     if (json) {
@@ -132,9 +118,9 @@ public final class Describe {
 
     for (FileScanTask task : tasks) {
       DataFile dataFile = task.file();
-      buffer.append("\t\t\tmetrics:\n");
-      buffer.append("\t\t\t  file: " + dataFile.path() + "\n");
-      buffer.append("\t\t\t  record_count: " + dataFile.recordCount() + "\n");
+      buffer.append("\tmetrics:\n");
+      buffer.append("\t\tfile: " + dataFile.path() + "\n");
+      buffer.append("\t\trecord_count: " + dataFile.recordCount() + "\n");
 
       Map<Integer, Long> valueCounts = dataFile.valueCounts();
       Map<Integer, Long> nullCounts = dataFile.nullValueCounts();
@@ -145,27 +131,27 @@ public final class Describe {
         continue;
       }
 
-      buffer.append("\t\t\t  columns:\n");
+      buffer.append("\t\tcolumns:\n");
       for (Types.NestedField field : table.schema().columns()) {
         int id = field.fieldId();
-        buffer.append("\t\t\t    " + field.name() + ":\n");
+        buffer.append("\t\t\t" + field.name() + ":\n");
         if (valueCounts != null) {
-          buffer.append("\t\t\t      value_count: " + valueCounts.get(id) + "\n");
+          buffer.append("\t\t\t\tvalue_count: " + valueCounts.get(id) + "\n");
         }
         if (nullCounts != null) {
-          buffer.append("\t\t\t      null_count: " + nullCounts.get(id) + "\n");
+          buffer.append("\t\t\t\tnull_count: " + nullCounts.get(id) + "\n");
         }
         if (lowerBounds != null) {
           ByteBuffer lower = lowerBounds.get(id);
           String lowerStr =
               lower != null ? Conversions.fromByteBuffer(field.type(), lower).toString() : "null";
-          buffer.append("\t\t\t      lower_bound: " + lowerStr + "\n");
+          buffer.append("\t\t\t\tlower_bound: " + lowerStr + "\n");
         }
         if (upperBounds != null) {
           ByteBuffer upper = upperBounds.get(id);
           String upperStr =
               upper != null ? Conversions.fromByteBuffer(field.type(), upper).toString() : "null";
-          buffer.append("\t\t\t      upper_bound: " + upperStr + "\n");
+          buffer.append("\t\t\t\tupper_bound: " + upperStr + "\n");
         }
       }
     }
@@ -174,10 +160,20 @@ public final class Describe {
   }
 
   private static String convertYamlToJson(String yaml) throws IOException {
-    ObjectMapper yamlReader = new ObjectMapper(new YAMLFactory());
-    Object obj = yamlReader.readValue(yaml, Object.class);
+    YAMLFactory yamlFactory = new YAMLFactory();
+    ObjectMapper yamlReader = new ObjectMapper(yamlFactory);
     ObjectMapper jsonWriter = new ObjectMapper();
-    return jsonWriter.writeValueAsString(obj);
+    StringBuilder result = new StringBuilder();
+    try (JsonParser parser = yamlFactory.createParser(yaml)) {
+      while (!parser.isClosed()) {
+        JsonNode node = yamlReader.readTree(parser);
+        if (node != null) {
+          String json = jsonWriter.writeValueAsString(node);
+          result.append(json).append("\n");
+        }
+      }
+    }
+    return result.toString().trim();
   }
 
   private static String prefixEachLine(String v, String prefix) {
