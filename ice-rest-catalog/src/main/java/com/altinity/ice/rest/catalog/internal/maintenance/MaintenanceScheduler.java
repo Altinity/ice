@@ -1,67 +1,79 @@
 package com.altinity.ice.rest.catalog.internal.maintenance;
 
-import java.util.HashMap;
+import com.altinity.ice.rest.catalog.internal.config.Config;
+import com.github.shyiko.skedule.Schedule;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.SupportsNamespaces;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class MaintenanceScheduler {
   private static final Logger logger = LoggerFactory.getLogger(MaintenanceScheduler.class);
+  private static final int DEFAULT_EXPIRATION_DAYS = 30;
 
-  private final ScheduledExecutorService scheduler;
+  private final Catalog catalog;
   private final AtomicBoolean isMaintenanceMode = new AtomicBoolean(false);
-  private long maintenanceInterval = 24; // Default 24 hours
-  private TimeUnit maintenanceTimeUnit = TimeUnit.HOURS;
+  private final ScheduledExecutorService executor;
+  private final Map<String, String> config;
+  private ScheduledFuture<?> currentTask;
+  private Schedule schedule;
 
-  public MaintenanceScheduler() {
-    this.scheduler = Executors.newSingleThreadScheduledExecutor();
+  public MaintenanceScheduler(Catalog catalog, Map<String, String> config) {
+    this.catalog = catalog;
+    this.config = config;
+    this.executor = new ScheduledThreadPoolExecutor(1);
+    ((ScheduledThreadPoolExecutor) executor).setRemoveOnCancelPolicy(true);
+    // Default schedule: every day at midnight
+    this.schedule = Schedule.at(LocalTime.MIDNIGHT).everyDay();
   }
 
   public void startScheduledMaintenance() {
-    logger.info(
-        "Starting scheduled maintenance with interval: {} {}",
-        maintenanceInterval,
-        maintenanceTimeUnit);
-    scheduler.scheduleAtFixedRate(
-        this::performMaintenance, maintenanceInterval, maintenanceInterval, maintenanceTimeUnit);
+    scheduleNextMaintenance();
   }
 
   public void stopScheduledMaintenance() {
-    logger.info("Stopping scheduled maintenance");
-    scheduler.shutdown();
-    try {
-      if (!scheduler.awaitTermination(60, TimeUnit.SECONDS)) {
-        scheduler.shutdownNow();
-      }
-    } catch (InterruptedException e) {
-      scheduler.shutdownNow();
-      Thread.currentThread().interrupt();
+    if (currentTask != null) {
+      currentTask.cancel(false);
     }
+    executor.shutdown();
   }
 
-  public void setMaintenanceSchedule(long interval, TimeUnit timeUnit) {
-    this.maintenanceInterval = interval;
-    this.maintenanceTimeUnit = timeUnit;
-    logger.info("Maintenance schedule updated to: {} {}", interval, timeUnit);
+  private void scheduleNextMaintenance() {
+    if (currentTask != null) {
+      currentTask.cancel(false);
+    }
 
-    // Restart the scheduler with new settings
-    stopScheduledMaintenance();
-    startScheduledMaintenance();
+    ZonedDateTime now = ZonedDateTime.now();
+    ZonedDateTime next = schedule.next(now);
+
+    long delay = next.toEpochSecond() - now.toEpochSecond();
+    currentTask =
+        executor.schedule(
+            () -> {
+              performMaintenance();
+              scheduleNextMaintenance(); // Schedule next run
+            },
+            delay,
+            TimeUnit.SECONDS);
+
+    logger.info("Next maintenance scheduled for: {}", next);
   }
 
-  public Map<String, Object> getMaintenanceSchedule() {
-    Map<String, Object> schedule = new HashMap<>();
-    schedule.put("interval", maintenanceInterval);
-    schedule.put("timeUnit", maintenanceTimeUnit.name());
-    return schedule;
-  }
-
-  public boolean isInMaintenanceMode() {
-    return isMaintenanceMode.get();
+  public void setMaintenanceSchedule(String scheduleExpression) {
+    this.schedule = Schedule.parse(scheduleExpression);
+    scheduleNextMaintenance();
   }
 
   public void setMaintenanceMode(boolean enabled) {
@@ -69,7 +81,7 @@ public class MaintenanceScheduler {
     logger.info("Maintenance mode {}", enabled ? "enabled" : "disabled");
   }
 
-  private void performMaintenance() {
+  public void performMaintenance() {
     if (isMaintenanceMode.get()) {
       logger.info("Skipping maintenance task as system is already in maintenance mode");
       return;
@@ -79,8 +91,48 @@ public class MaintenanceScheduler {
       logger.info("Starting scheduled maintenance task");
       setMaintenanceMode(true);
 
-      // Perform maintenance tasks here
-      // For example: cleanup old files, optimize tables, etc.
+      if (catalog != null) {
+        logger.info("Performing maintenance on catalog: {}", catalog.name());
+        List<Namespace> namespaces;
+        if (catalog instanceof SupportsNamespaces) {
+          SupportsNamespaces nsCatalog = (SupportsNamespaces) catalog;
+          namespaces = nsCatalog.listNamespaces();
+          for (Namespace ns : namespaces) {
+            logger.debug("Namespace: " + ns);
+          }
+        } else {
+          logger.error("Catalog does not support namespace operations.");
+          return;
+        }
+
+        for (Namespace namespace : namespaces) {
+          List<TableIdentifier> tables = catalog.listTables(namespace);
+          for (TableIdentifier tableIdent : tables) {
+            int expirationDays = DEFAULT_EXPIRATION_DAYS;
+            String configuredDays = config.get(Config.OPTION_SNAPSHOT_EXPIRATION_DAYS);
+            if (configuredDays != null) {
+              try {
+                expirationDays = Integer.parseInt(configuredDays);
+                logger.debug("Using configured snapshot expiration days: {}", expirationDays);
+              } catch (NumberFormatException e) {
+                logger.warn(
+                    "Invalid value for {}: {}. Using default of {} days",
+                    Config.OPTION_SNAPSHOT_EXPIRATION_DAYS,
+                    configuredDays,
+                    DEFAULT_EXPIRATION_DAYS);
+              }
+            }
+            long olderThanMillis =
+                System.currentTimeMillis() - TimeUnit.DAYS.toMillis(expirationDays);
+            Table table = catalog.loadTable(tableIdent);
+            table.expireSnapshots().expireOlderThan(olderThanMillis).commit();
+            table.rewriteManifests().rewriteIf(manifest -> true).commit();
+          }
+        }
+        logger.info("Maintenance operations completed for catalog: {}", catalog.name());
+      } else {
+        logger.warn("No catalog available for maintenance operations");
+      }
 
       logger.info("Scheduled maintenance task completed successfully");
     } catch (Exception e) {

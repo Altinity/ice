@@ -6,7 +6,7 @@ import com.altinity.ice.rest.catalog.internal.aws.CredentialsProvider;
 import com.altinity.ice.rest.catalog.internal.config.Config;
 import com.altinity.ice.rest.catalog.internal.jetty.PlainErrorHandler;
 import com.altinity.ice.rest.catalog.internal.jetty.ServerConfig;
-import com.altinity.ice.rest.catalog.internal.maintenance.QuartzMaintenanceScheduler;
+import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceScheduler;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAdapter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAuthorizationHandler;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogHandler;
@@ -24,10 +24,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.aws.s3.S3FileIOProperties;
@@ -39,7 +37,6 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.quartz.SchedulerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -71,19 +68,11 @@ public final class Main implements Callable<Integer> {
   String configFile;
 
   @CommandLine.Option(
-      names = {"--maintenance-interval"},
-      description = "Maintenance interval in hours (default: 24)")
-  static Long maintenanceInterval;
-
-  @CommandLine.Option(
-      names = {"--maintenance-time-unit"},
-      description = "Maintenance time unit (HOURS, DAYS, MINUTES) (default: HOURS)")
-  static String maintenanceTimeUnit;
-
-  @CommandLine.Option(
-      names = {"--maintenance-cron"},
-      description = "Maintenance cron expression (overrides interval and time-unit)")
-  static String maintenanceCron;
+      names = "--maintenance-interval",
+      description =
+          "Maintenance interval in human-friendly format (e.g. 'every day', 'every monday 09:00')",
+      defaultValue = "every day 00:00")
+  private String maintenanceInterval;
 
   private Main() {}
 
@@ -319,55 +308,14 @@ public final class Main implements Callable<Integer> {
     return 0;
   }
 
-  private static void initializeMaintenanceScheduler(Catalog catalog, Map<String, String> config) {
+  private void initializeMaintenanceScheduler(Catalog catalog, Map<String, String> config) {
     try {
-      // Create Quartz properties if needed
-      Properties quartzProperties = new Properties();
-      // Add any custom Quartz properties from config
-      for (Map.Entry<String, String> entry : config.entrySet()) {
-        if (entry.getKey().startsWith("ice.quartz.")) {
-          String quartzKey = entry.getKey().substring("ice.quartz.".length());
-          quartzProperties.setProperty(quartzKey, entry.getValue());
-        }
-      }
-
-      // Create the scheduler
-      QuartzMaintenanceScheduler scheduler =
-          new QuartzMaintenanceScheduler(catalog, quartzProperties);
-
-      // Configure the schedule
-      if (maintenanceCron != null && !maintenanceCron.isEmpty()) {
-        // Use cron expression if provided
-        scheduler.setMaintenanceSchedule(maintenanceCron);
-        logger.info("Maintenance schedule set to cron expression: {}", maintenanceCron);
-      } else {
-        // Use interval and time unit
-        Long interval =
-            maintenanceInterval != null
-                ? maintenanceInterval
-                : PropertyUtil.propertyAsLong(config, "ice.maintenance.interval", 24L);
-
-        String timeUnitStr =
-            maintenanceTimeUnit != null
-                ? maintenanceTimeUnit
-                : config.getOrDefault("ice.maintenance.time-unit", "HOURS");
-
-        try {
-          TimeUnit timeUnit = TimeUnit.valueOf(timeUnitStr.toUpperCase());
-          scheduler.setMaintenanceSchedule(interval, timeUnit);
-          logger.info("Maintenance schedule set to: {} {}", interval, timeUnit);
-        } catch (IllegalArgumentException e) {
-          logger.warn("Invalid maintenance time unit: {}. Using default: HOURS", timeUnitStr);
-          scheduler.setMaintenanceSchedule(interval, TimeUnit.HOURS);
-        }
-      }
-
-      // Start the scheduler
+      MaintenanceScheduler scheduler = new MaintenanceScheduler(catalog, config);
+      scheduler.setMaintenanceSchedule(maintenanceInterval);
       scheduler.startScheduledMaintenance();
-      logger.info("Maintenance scheduler started");
-
-    } catch (SchedulerException e) {
+    } catch (Exception e) {
       logger.error("Failed to initialize maintenance scheduler", e);
+      throw new RuntimeException(e);
     }
   }
 

@@ -17,7 +17,6 @@
     <jakarta.version>6.1.0</jakarta.version>
     <prometheus.version>1.3.6</prometheus.version>
     <sqlite.version>3.46.1.0</sqlite.version>
-    <quartz.version>2.5.0</quartz.version>
   </properties>
 
   <dependencies>
@@ -232,34 +231,17 @@
       <artifactId>jackson-annotations</artifactId>
       <version>2.18.2</version>
     </dependency>
-    <!-- Add Quartz dependencies -->
-    <dependency>
-      <groupId>org.quartz-scheduler</groupId>
-      <artifactId>quartz</artifactId>
-      <version>${quartz.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-api</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.quartz-scheduler</groupId>
-      <artifactId>quartz-jobs</artifactId>
-      <version>${quartz.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-api</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <version>7.9.0</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.shyiko.skedule</groupId>
+      <artifactId>skedule</artifactId>
+      <version>0.4.0</version>
+      <classifier>kalvanized</classifier>
     </dependency>
   </dependencies>
 
