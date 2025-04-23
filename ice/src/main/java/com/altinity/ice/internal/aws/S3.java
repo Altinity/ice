@@ -1,4 +1,4 @@
-package com.altinity.ice.internal.s3;
+package com.altinity.ice.internal.aws;
 
 import java.util.ArrayList;
 import java.util.List;

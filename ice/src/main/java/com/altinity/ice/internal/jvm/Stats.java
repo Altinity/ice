@@ -1,4 +1,4 @@
-package com.altinity.ice.internal.runtime;
+package com.altinity.ice.internal.jvm;
 
 import com.sun.management.UnixOperatingSystemMXBean;
 import java.lang.management.GarbageCollectorMXBean;

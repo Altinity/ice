@@ -12,10 +12,10 @@ That's it.
 
 ```shell
 uri: "jdbc:sqlite:file:data/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500"
-warehouse: "s3://bucket1/"
-s3.endpoint: "http://localhost:9000/"
+warehouse: "s3://bucket1"
+s3.endpoint: "http://localhost:9000"
 s3.access-key-id: "miniouser"
 s3.secret-access-key: "miniopassword"
-ice.token: foo
 ice.s3.region: minio
+ice.token: foo
 ```

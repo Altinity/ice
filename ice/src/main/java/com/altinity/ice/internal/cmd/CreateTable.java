@@ -1,8 +1,8 @@
 package com.altinity.ice.internal.cmd;
 
+import com.altinity.ice.internal.aws.S3;
 import com.altinity.ice.internal.io.Input;
 import com.altinity.ice.internal.parquet.Metadata;
-import com.altinity.ice.internal.s3.S3;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
