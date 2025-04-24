@@ -104,7 +104,12 @@ public final class Main {
               required = true,
               names = "--schema-from-parquet",
               description = "/path/to/file.parquet")
-          String schemaFile)
+          String schemaFile,
+      @CommandLine.Option(
+              names = {"--partition-by"},
+              description = "Comma-separated list of columns to partition by",
+              split = ",")
+          List<String> partitionColumns)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
       CreateTable.run(
@@ -113,7 +118,8 @@ public final class Main {
           schemaFile,
           location,
           createTableIfNotExists,
-          s3NoSignRequest);
+          s3NoSignRequest,
+          partitionColumns);
     }
   }
 
@@ -189,7 +195,7 @@ public final class Main {
       if (createTableIfNotExists) {
         // TODO: newCreateTableTransaction
         CreateTable.run(
-            catalog, tableId, dataFiles[0], null, createTableIfNotExists, s3NoSignRequest);
+            catalog, tableId, dataFiles[0], null, createTableIfNotExists, s3NoSignRequest, null);
       }
       Insert.run(
           catalog,
