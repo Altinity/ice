@@ -27,7 +27,7 @@ public class MaintenanceScheduler {
   private final ScheduledExecutorService executor;
   private final Schedule schedule;
   private final Object taskLock = new Object();
-  
+
   private ScheduledFuture<?> currentTask;
   private volatile int expirationDays;
   private final String configuredDays;
