@@ -1,14 +1,15 @@
 package com.altinity.ice.internal.cmd;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.altinity.ice.internal.model.TableMetadata;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -21,16 +22,13 @@ import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Types;
 
 public final class Describe {
-
   private Describe() {}
 
-  // TODO: refactor: the use of StringBuilder below is absolutely criminal
   public static void run(RESTCatalog catalog, String target, boolean json, boolean includeMetrics)
       throws IOException {
     String targetNamespace = null;
     String targetTable = null;
     if (target != null && !target.isEmpty()) {
-      // TODO: support catalog.ns.table
       var s = target.split("[.]", 2);
       switch (s.length) {
         case 2:
@@ -42,138 +40,145 @@ public final class Describe {
           break;
       }
     }
-    // FIXME: there is no need to list nss/tables when target is given
-    var sb = new StringBuilder();
+
+    List<TableMetadata> tables = new ArrayList<>();
     List<Namespace> namespaces = catalog.listNamespaces();
+
     for (Namespace namespace : namespaces) {
       if (targetNamespace != null && !targetNamespace.equals(namespace.toString())) {
         continue;
       }
-      List<TableIdentifier> tables = catalog.listTables(namespace);
-      for (TableIdentifier tableId : tables) {
+
+      List<TableIdentifier> tableIds = catalog.listTables(namespace);
+      for (TableIdentifier tableId : tableIds) {
         if (targetTable != null && !targetTable.equals(tableId.name())) {
           continue;
         }
-        sb.append("---\n");
-        sb.append("kind: Table\n");
-        sb.append("metadata:\n");
-        sb.append("\tid: " + tableId + "\n");
+
         Table table = catalog.loadTable(tableId);
-        sb.append("data:\n");
-        sb.append("\tschema_raw: |-\n" + prefixEachLine(table.schema().toString(), "\t\t") + "\n");
-        sb.append(
-            "\tpartition_spec_raw: |-\n" + prefixEachLine(table.spec().toString(), "\t\t") + "\n");
-        sb.append(
-            "\tsort_order_raw: |-\n" + prefixEachLine(table.sortOrder().toString(), "\t\t") + "\n");
-        sb.append("\tproperties: \n");
-        for (var property : table.properties().entrySet()) {
-          var v = property.getValue();
-          if (v.contains("\n")) {
-            sb.append("\t\t" + property.getKey() + ": |-\n" + prefixEachLine(v, "\t\t\t") + "\n");
-          } else {
-            sb.append("\t\t" + property.getKey() + ": \"" + v + "\"\n");
-          }
-        }
-        sb.append("\tlocation: " + table.location() + "\n");
-        sb.append("\tcurrent_snapshot: \n");
+        TableMetadata tableMetadata = new TableMetadata();
+
+        // Set metadata
+        TableMetadata.Metadata metadata = new TableMetadata.Metadata();
+        metadata.setId(tableId.toString());
+        tableMetadata.setMetadata(metadata);
+
+        // Set data
+        TableMetadata.TableData data = new TableMetadata.TableData();
+        data.setSchema_raw(table.schema().toString());
+        data.setPartition_spec_raw(table.spec().toString());
+        data.setSort_order_raw(table.sortOrder().toString());
+        data.setProperties(table.properties());
+        data.setLocation(table.location());
+
+        // Set current snapshot
         Snapshot snapshot = table.currentSnapshot();
         if (snapshot != null) {
-          sb.append("\t\tsequence_number: " + snapshot.sequenceNumber() + "\n");
-          sb.append("\t\tid: " + snapshot.snapshotId() + "\n");
-          sb.append("\t\tparent_id: " + snapshot.parentId() + "\n");
-          sb.append("\t\ttimestamp: " + snapshot.timestampMillis() + "\n");
-          sb.append(
-              "\t\ttimestamp_iso: \""
-                  + Instant.ofEpochMilli(snapshot.timestampMillis()).toString()
-                  + "\"\n");
-          sb.append(
-              "\t\ttimestamp_iso_local: \""
-                  + Instant.ofEpochMilli(snapshot.timestampMillis())
-                      .atZone(ZoneId.systemDefault())
-                      .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-                  + "\"\n");
-          sb.append("\t\toperation: " + snapshot.operation() + "\n");
-          sb.append("\t\tsummary:\n");
-          for (var property : snapshot.summary().entrySet()) {
-            sb.append("\t\t\t" + property.getKey() + ": \"" + property.getValue() + "\"\n");
-          }
-          sb.append("\t\tlocation: " + snapshot.manifestListLocation() + "\n");
+          TableMetadata.SnapshotInfo snapshotInfo = new TableMetadata.SnapshotInfo();
+          snapshotInfo.setSequence_number(snapshot.sequenceNumber());
+          snapshotInfo.setId(snapshot.snapshotId());
+          snapshotInfo.setParent_id(snapshot.parentId());
+          snapshotInfo.setTimestamp(snapshot.timestampMillis());
+          snapshotInfo.setTimestamp_iso(
+              Instant.ofEpochMilli(snapshot.timestampMillis()).toString());
+          snapshotInfo.setTimestamp_iso_local(
+              Instant.ofEpochMilli(snapshot.timestampMillis())
+                  .atZone(ZoneId.systemDefault())
+                  .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+          snapshotInfo.setOperation(snapshot.operation());
+          snapshotInfo.setSummary(snapshot.summary());
+          snapshotInfo.setLocation(snapshot.manifestListLocation());
+          data.setCurrent_snapshot(snapshotInfo);
         }
 
         if (includeMetrics) {
-          printTableMetrics(table, sb);
+          data.setMetrics(getTableMetrics(table));
         }
+
+        tableMetadata.setData(data);
+        tables.add(tableMetadata);
       }
     }
-    String r = sb.toString().replace("\t", "  ");
+
+    ObjectMapper mapper;
     if (json) {
-      r = convertYamlToJson(r);
+      mapper = new ObjectMapper();
+    } else {
+      YAMLFactory yamlFactory =
+          new YAMLFactory()
+              .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+              .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+              .enable(YAMLGenerator.Feature.INDENT_ARRAYS);
+      mapper = new ObjectMapper(yamlFactory);
     }
-    System.out.println(r);
+
+    StringBuilder output = new StringBuilder();
+    for (TableMetadata table : tables) {
+      if (!json) {
+        output.append("---\n");
+      }
+      output.append(mapper.writeValueAsString(table));
+      if (!json) {
+        output.append("\n");
+      }
+    }
+    System.out.print(output.toString());
   }
 
-  private static void printTableMetrics(Table table, StringBuilder buffer) throws IOException {
+  private static List<TableMetadata.MetricsInfo> getTableMetrics(Table table) throws IOException {
+    List<TableMetadata.MetricsInfo> metrics = new ArrayList<>();
     TableScan scan = table.newScan().includeColumnStats();
-    CloseableIterable<FileScanTask> tasks = scan.planFiles();
 
-    for (FileScanTask task : tasks) {
-      DataFile dataFile = task.file();
-      buffer.append("\tmetrics:\n");
-      buffer.append("\t\tfile: " + dataFile.path() + "\n");
-      buffer.append("\t\trecord_count: " + dataFile.recordCount() + "\n");
+    try (CloseableIterable<FileScanTask> tasks = scan.planFiles()) {
+      for (FileScanTask task : tasks) {
+        DataFile dataFile = task.file();
+        TableMetadata.MetricsInfo metricsInfo = new TableMetadata.MetricsInfo();
+        metricsInfo.setFile(dataFile.path().toString());
+        metricsInfo.setRecord_count(dataFile.recordCount());
+        metricsInfo.setColumns(new ArrayList<>());
 
-      Map<Integer, Long> valueCounts = dataFile.valueCounts();
-      Map<Integer, Long> nullCounts = dataFile.nullValueCounts();
-      Map<Integer, ByteBuffer> lowerBounds = dataFile.lowerBounds();
-      Map<Integer, ByteBuffer> upperBounds = dataFile.upperBounds();
+        Map<Integer, Long> valueCounts = dataFile.valueCounts();
+        Map<Integer, Long> nullCounts = dataFile.nullValueCounts();
+        Map<Integer, ByteBuffer> lowerBounds = dataFile.lowerBounds();
+        Map<Integer, ByteBuffer> upperBounds = dataFile.upperBounds();
 
-      if (valueCounts == null && nullCounts == null && lowerBounds == null && upperBounds == null) {
-        continue;
-      }
-
-      buffer.append("\t\tcolumns:\n");
-      for (Types.NestedField field : table.schema().columns()) {
-        int id = field.fieldId();
-        buffer.append("\t\t\t" + field.name() + ":\n");
-        if (valueCounts != null) {
-          buffer.append("\t\t\t\tvalue_count: " + valueCounts.get(id) + "\n");
+        if (valueCounts == null
+            && nullCounts == null
+            && lowerBounds == null
+            && upperBounds == null) {
+          continue;
         }
-        if (nullCounts != null) {
-          buffer.append("\t\t\t\tnull_count: " + nullCounts.get(id) + "\n");
-        }
-        if (lowerBounds != null) {
-          ByteBuffer lower = lowerBounds.get(id);
-          String lowerStr =
-              lower != null ? Conversions.fromByteBuffer(field.type(), lower).toString() : "null";
-          buffer.append("\t\t\t\tlower_bound: " + lowerStr + "\n");
-        }
-        if (upperBounds != null) {
-          ByteBuffer upper = upperBounds.get(id);
-          String upperStr =
-              upper != null ? Conversions.fromByteBuffer(field.type(), upper).toString() : "null";
-          buffer.append("\t\t\t\tupper_bound: " + upperStr + "\n");
-        }
-      }
-    }
 
-    tasks.close();
-  }
+        for (Types.NestedField field : table.schema().columns()) {
+          int id = field.fieldId();
+          TableMetadata.ColumnMetrics columnMetrics = new TableMetadata.ColumnMetrics();
+          columnMetrics.setName(field.name());
 
-  private static String convertYamlToJson(String yaml) throws IOException {
-    YAMLFactory yamlFactory = new YAMLFactory();
-    ObjectMapper yamlReader = new ObjectMapper(yamlFactory);
-    ObjectMapper jsonWriter = new ObjectMapper();
-    StringBuilder result = new StringBuilder();
-    try (JsonParser parser = yamlFactory.createParser(yaml)) {
-      while (!parser.isClosed()) {
-        JsonNode node = yamlReader.readTree(parser);
-        if (node != null) {
-          String json = jsonWriter.writeValueAsString(node);
-          result.append(json).append("\n");
+          if (valueCounts != null) {
+            columnMetrics.setValue_count(valueCounts.get(id));
+          }
+          if (nullCounts != null) {
+            columnMetrics.setNull_count(nullCounts.get(id));
+          }
+          if (lowerBounds != null) {
+            ByteBuffer lower = lowerBounds.get(id);
+            columnMetrics.setLower_bound(
+                lower != null ? Conversions.fromByteBuffer(field.type(), lower).toString() : null);
+          }
+          if (upperBounds != null) {
+            ByteBuffer upper = upperBounds.get(id);
+            columnMetrics.setUpper_bound(
+                upper != null ? Conversions.fromByteBuffer(field.type(), upper).toString() : null);
+          }
+
+          metricsInfo.getColumns().add(columnMetrics);
         }
+
+        metrics.add(metricsInfo);
       }
     }
-    return result.toString().trim();
+
+    return metrics;
   }
 
   private static String prefixEachLine(String v, String prefix) {
