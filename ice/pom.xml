@@ -14,7 +14,6 @@
 
   <properties>
     <native.maven.plugin.version>0.9.28</native.maven.plugin.version>
-    <lombok.version>1.18.30</lombok.version>
   </properties>
 
   <dependencies>
@@ -388,13 +387,6 @@
       <version>7.9.0</version>
       <scope>test</scope>
     </dependency>
-    <!-- Lombok -->
-    <dependency>
-      <groupId>org.projectlombok</groupId>
-      <artifactId>lombok</artifactId>
-      <version>${lombok.version}</version>
-      <scope>provided</scope>
-    </dependency>
   </dependencies>
 
   <build>
@@ -411,11 +403,6 @@
               <groupId>info.picocli</groupId>
               <artifactId>picocli-codegen</artifactId>
               <version>4.7.6</version>
-            </path>
-            <path>
-              <groupId>org.projectlombok</groupId>
-              <artifactId>lombok</artifactId>
-              <version>${lombok.version}</version>
             </path>
           </annotationProcessorPaths>
         </configuration>
