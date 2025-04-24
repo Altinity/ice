@@ -70,8 +70,7 @@ public final class Main implements Callable<Integer> {
   @CommandLine.Option(
       names = "--maintenance-interval",
       description =
-          "Maintenance interval in human-friendly format (e.g. 'every day', 'every monday 09:00')",
-      defaultValue = "every day 00:00")
+          "Maintenance interval in human-friendly format (e.g. 'every day', 'every monday 09:00'). Leave empty to disable maintenance.")
   private String maintenanceInterval;
 
   private Main() {}
@@ -309,10 +308,16 @@ public final class Main implements Callable<Integer> {
   }
 
   private void initializeMaintenanceScheduler(Catalog catalog, Map<String, String> config) {
+    if (maintenanceInterval == null || maintenanceInterval.trim().isEmpty()) {
+      logger.info("Maintenance scheduler is disabled (no maintenance interval specified)");
+      return;
+    }
+
     try {
-      MaintenanceScheduler scheduler = new MaintenanceScheduler(catalog, config);
-      scheduler.setMaintenanceSchedule(maintenanceInterval);
+      MaintenanceScheduler scheduler =
+          new MaintenanceScheduler(catalog, config, maintenanceInterval);
       scheduler.startScheduledMaintenance();
+      logger.info("Maintenance scheduler initialized with interval: {}", maintenanceInterval);
     } catch (Exception e) {
       logger.error("Failed to initialize maintenance scheduler", e);
       throw new RuntimeException(e);
