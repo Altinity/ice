@@ -59,13 +59,13 @@ public final class CreateTable {
         }
 
         // Create partition spec based on provided partition columns
-        PartitionSpec.Builder partitionSpecBuilder = PartitionSpec.builderFor(fileSchema);
+        final PartitionSpec.Builder partitionSpecBuilder = PartitionSpec.builderFor(fileSchema);
         if (partitionColumns != null && !partitionColumns.isEmpty()) {
           for (String column : partitionColumns) {
             partitionSpecBuilder.identity(column);
           }
         }
-        PartitionSpec partitionSpec = partitionSpecBuilder.build();
+        final PartitionSpec partitionSpec = partitionSpecBuilder.build();
 
         // if we don't set location, it's automatically set to $warehouse/$namespace/$table
         catalog.createTable(nsTable, fileSchema, partitionSpec, location, props);
