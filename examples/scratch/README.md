@@ -36,6 +36,9 @@ date=2025-01-01/part-00000-33e8d075-2099-409b-a806-68dd17217d39-c000.snappy.parq
 # upload file to minio using local-mc, 
 # then add file to the catalog without making a copy
 ice create-table flowers.iris_no_copy --schema-from-parquet=file://iris.parquet
+# create table with partitioning columns
+ice create-table flowers.irs_no_copy_partition --schema-from-parquet=file://iris.parquet --partition-by=variety,petal.width
+
 local-mc cp iris.parquet local/bucket1/flowers/iris_no_copy/
 ice insert flowers.iris_no_copy --no-copy s3://bucket1/flowers/iris_no_copy/iris.parquet
 
