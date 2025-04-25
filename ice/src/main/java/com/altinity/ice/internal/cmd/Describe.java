@@ -56,46 +56,61 @@ public final class Describe {
         }
 
         Table table = catalog.loadTable(tableId);
-        TableMetadata tableMetadata = new TableMetadata();
-
-        // Set metadata
-        TableMetadata.Metadata metadata = new TableMetadata.Metadata();
-        metadata.setId(tableId.toString());
-        tableMetadata.setMetadata(metadata);
+        TableMetadata tableMetadata =
+            new TableMetadata("Table", new TableMetadata.Metadata(tableId.toString()), null);
 
         // Set data
-        TableMetadata.TableData data = new TableMetadata.TableData();
-        data.setSchema_raw(table.schema().toString());
-        data.setPartition_spec_raw(table.spec().toString());
-        data.setSort_order_raw(table.sortOrder().toString());
-        data.setProperties(table.properties());
-        data.setLocation(table.location());
+        TableMetadata.TableData data =
+            new TableMetadata.TableData(
+                table.schema().toString(),
+                table.spec().toString(),
+                table.sortOrder().toString(),
+                table.properties(),
+                table.location(),
+                null,
+                null);
 
         // Set current snapshot
         Snapshot snapshot = table.currentSnapshot();
         if (snapshot != null) {
-          TableMetadata.SnapshotInfo snapshotInfo = new TableMetadata.SnapshotInfo();
-          snapshotInfo.setSequence_number(snapshot.sequenceNumber());
-          snapshotInfo.setId(snapshot.snapshotId());
-          snapshotInfo.setParent_id(snapshot.parentId());
-          snapshotInfo.setTimestamp(snapshot.timestampMillis());
-          snapshotInfo.setTimestamp_iso(
-              Instant.ofEpochMilli(snapshot.timestampMillis()).toString());
-          snapshotInfo.setTimestamp_iso_local(
-              Instant.ofEpochMilli(snapshot.timestampMillis())
-                  .atZone(ZoneId.systemDefault())
-                  .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
-          snapshotInfo.setOperation(snapshot.operation());
-          snapshotInfo.setSummary(snapshot.summary());
-          snapshotInfo.setLocation(snapshot.manifestListLocation());
-          data.setCurrent_snapshot(snapshotInfo);
+          TableMetadata.SnapshotInfo snapshotInfo =
+              new TableMetadata.SnapshotInfo(
+                  snapshot.sequenceNumber(),
+                  snapshot.snapshotId(),
+                  snapshot.parentId(),
+                  snapshot.timestampMillis(),
+                  Instant.ofEpochMilli(snapshot.timestampMillis()).toString(),
+                  Instant.ofEpochMilli(snapshot.timestampMillis())
+                      .atZone(ZoneId.systemDefault())
+                      .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+                  snapshot.operation(),
+                  snapshot.summary(),
+                  snapshot.manifestListLocation());
+          data =
+              new TableMetadata.TableData(
+                  data.schema_raw(),
+                  data.partition_spec_raw(),
+                  data.sort_order_raw(),
+                  data.properties(),
+                  data.location(),
+                  snapshotInfo,
+                  data.metrics());
         }
 
         if (includeMetrics) {
-          data.setMetrics(getTableMetrics(table));
+          List<TableMetadata.MetricsInfo> metrics = getTableMetrics(table);
+          data =
+              new TableMetadata.TableData(
+                  data.schema_raw(),
+                  data.partition_spec_raw(),
+                  data.sort_order_raw(),
+                  data.properties(),
+                  data.location(),
+                  data.current_snapshot(),
+                  metrics);
         }
 
-        tableMetadata.setData(data);
+        tableMetadata = new TableMetadata(tableMetadata.kind(), tableMetadata.metadata(), data);
         tables.add(tableMetadata);
       }
     }
@@ -132,10 +147,7 @@ public final class Describe {
     try (CloseableIterable<FileScanTask> tasks = scan.planFiles()) {
       for (FileScanTask task : tasks) {
         DataFile dataFile = task.file();
-        TableMetadata.MetricsInfo metricsInfo = new TableMetadata.MetricsInfo();
-        metricsInfo.setFile(dataFile.path().toString());
-        metricsInfo.setRecord_count(dataFile.recordCount());
-        metricsInfo.setColumns(new ArrayList<>());
+        List<TableMetadata.ColumnMetrics> columns = new ArrayList<>();
 
         Map<Integer, Long> valueCounts = dataFile.valueCounts();
         Map<Integer, Long> nullCounts = dataFile.nullValueCounts();
@@ -151,30 +163,30 @@ public final class Describe {
 
         for (Types.NestedField field : table.schema().columns()) {
           int id = field.fieldId();
-          TableMetadata.ColumnMetrics columnMetrics = new TableMetadata.ColumnMetrics();
-          columnMetrics.setName(field.name());
+          String name = field.name();
+          Long valueCount = valueCounts != null ? valueCounts.get(id) : null;
+          Long nullCount = nullCounts != null ? nullCounts.get(id) : null;
+          String lowerBound = null;
+          String upperBound = null;
 
-          if (valueCounts != null) {
-            columnMetrics.setValue_count(valueCounts.get(id));
-          }
-          if (nullCounts != null) {
-            columnMetrics.setNull_count(nullCounts.get(id));
-          }
           if (lowerBounds != null) {
             ByteBuffer lower = lowerBounds.get(id);
-            columnMetrics.setLower_bound(
-                lower != null ? Conversions.fromByteBuffer(field.type(), lower).toString() : null);
+            lowerBound =
+                lower != null ? Conversions.fromByteBuffer(field.type(), lower).toString() : null;
           }
           if (upperBounds != null) {
             ByteBuffer upper = upperBounds.get(id);
-            columnMetrics.setUpper_bound(
-                upper != null ? Conversions.fromByteBuffer(field.type(), upper).toString() : null);
+            upperBound =
+                upper != null ? Conversions.fromByteBuffer(field.type(), upper).toString() : null;
           }
 
-          metricsInfo.getColumns().add(columnMetrics);
+          columns.add(
+              new TableMetadata.ColumnMetrics(name, valueCount, nullCount, lowerBound, upperBound));
         }
 
-        metrics.add(metricsInfo);
+        metrics.add(
+            new TableMetadata.MetricsInfo(
+                dataFile.path().toString(), dataFile.recordCount(), columns));
       }
     }
 
