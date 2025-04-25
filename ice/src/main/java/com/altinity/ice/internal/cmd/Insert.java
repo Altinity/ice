@@ -9,6 +9,7 @@ import com.altinity.ice.internal.parquet.Metadata;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -53,7 +54,6 @@ public final class Insert {
 
   private Insert() {}
 
-  // TODO: refactor
   public static void run(
       RESTCatalog catalog,
       TableIdentifier nsTable,
@@ -66,7 +66,9 @@ public final class Insert {
       boolean forceTableAuth,
       boolean s3NoSignRequest,
       boolean s3CopyObject,
-      String retryListFile)
+      String retryListFile,
+      List<String> partitionColumns,
+      List<String> sortColumns)
       throws IOException {
     if (files.length == 0) {
       // no work to be done
@@ -76,6 +78,31 @@ public final class Insert {
       noCopy = true;
     }
     Table table = catalog.loadTable(nsTable);
+
+    // Update partition spec if provided
+    if (partitionColumns != null && !partitionColumns.isEmpty()) {
+      var updateSpec = table.updateSpec();
+      for (String column : partitionColumns) {
+        updateSpec.addField(column);
+      }
+      updateSpec.commit();
+    }
+
+    // Update sort order if provided
+    if (sortColumns != null && !sortColumns.isEmpty()) {
+      table
+          .updateProperties()
+          .set(
+              TableProperties.WRITE_DISTRIBUTION_MODE,
+              TableProperties.WRITE_DISTRIBUTION_MODE_RANGE)
+          .commit();
+      var updatedSortOrder = table.replaceSortOrder();
+      for (String column : sortColumns) {
+        updatedSortOrder.asc(column);
+      }
+      updatedSortOrder.commit();
+    }
+
     try (FileIO tableIO = table.io()) {
       final Supplier<S3Client> s3ClientSupplier;
       if (forceTableAuth) {

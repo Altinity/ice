@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
@@ -33,7 +34,8 @@ public final class CreateTable {
       String location,
       boolean ignoreAlreadyExists,
       boolean s3NoSignRequest,
-      List<String> partitionColumns)
+      List<String> partitionColumns,
+      List<String> sortColumns)
       throws IOException {
     Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
 
@@ -67,8 +69,32 @@ public final class CreateTable {
         }
         final PartitionSpec partitionSpec = partitionSpecBuilder.build();
 
+        // Create sort order based on provided sort columns (z-order)
+        SortOrder sortOrder = null;
+        if (sortColumns != null && !sortColumns.isEmpty()) {
+          SortOrder.Builder sortOrderBuilder = SortOrder.builderFor(fileSchema);
+          for (String column : sortColumns) {
+            sortOrderBuilder.asc(column);
+          }
+          sortOrder = sortOrderBuilder.build();
+        }
+
         // if we don't set location, it's automatically set to $warehouse/$namespace/$table
-        catalog.createTable(nsTable, fileSchema, partitionSpec, location, props);
+        var table = catalog.createTable(nsTable, fileSchema, partitionSpec, location, props);
+        // Apply the sort order to the table
+        if (sortOrder != null) {
+          table
+              .updateProperties()
+              .set(
+                  TableProperties.WRITE_DISTRIBUTION_MODE,
+                  TableProperties.WRITE_DISTRIBUTION_MODE_RANGE)
+              .commit();
+          var updatedSortOrder = table.replaceSortOrder();
+          for (String column : sortColumns) {
+            updatedSortOrder.asc(column);
+          }
+          updatedSortOrder.commit();
+        }
       } catch (AlreadyExistsException e) {
         if (ignoreAlreadyExists) {
           return;

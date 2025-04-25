@@ -109,7 +109,12 @@ public final class Main {
               names = {"--partition-by"},
               description = "Comma-separated list of columns to partition by",
               split = ",")
-          List<String> partitionColumns)
+          List<String> partitionColumns,
+      @CommandLine.Option(
+              names = {"--sort-by"},
+              description = "Comma-separated list of columns to sort by",
+              split = ",")
+          List<String> sortColumns)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
       CreateTable.run(
@@ -119,7 +124,8 @@ public final class Main {
           location,
           createTableIfNotExists,
           s3NoSignRequest,
-          partitionColumns);
+          partitionColumns,
+          sortColumns);
     }
   }
 
@@ -177,7 +183,17 @@ public final class Main {
               description =
                   "/path/to/file where to save list of files to retry"
                       + " (useful for retrying partially failed insert using `cat ice.retry | ice insert - --retry-list=ice.retry`)")
-          String retryList)
+          String retryList,
+      @CommandLine.Option(
+              names = {"--partition-by"},
+              description = "Comma-separated list of columns to partition by",
+              split = ",")
+          List<String> partitionColumns,
+      @CommandLine.Option(
+              names = {"--sort-by"},
+              description = "Comma-separated list of columns to sort by",
+              split = ",")
+          List<String> sortColumns)
       throws IOException {
     if (s3NoSignRequest && s3CopyObject) {
       throw new UnsupportedOperationException(
@@ -195,7 +211,14 @@ public final class Main {
       if (createTableIfNotExists) {
         // TODO: newCreateTableTransaction
         CreateTable.run(
-            catalog, tableId, dataFiles[0], null, createTableIfNotExists, s3NoSignRequest, null);
+            catalog,
+            tableId,
+            dataFiles[0],
+            null,
+            createTableIfNotExists,
+            s3NoSignRequest,
+            partitionColumns,
+            sortColumns);
       }
       Insert.run(
           catalog,
@@ -209,7 +232,9 @@ public final class Main {
           forceTableAuth,
           s3NoSignRequest,
           s3CopyObject,
-          retryList);
+          retryList,
+          partitionColumns,
+          sortColumns);
     }
   }
 
