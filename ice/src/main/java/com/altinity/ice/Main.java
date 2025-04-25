@@ -69,14 +69,10 @@ public final class Main {
       @CommandLine.Option(
               names = {"--json"},
               description = "Output JSON instead of YAML")
-          boolean json,
-      @CommandLine.Option(
-              names = {"--include-metrics"},
-              description = "Include table metrics in the output")
-          boolean includeMetrics)
+          boolean json)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
-      Describe.run(catalog, target, json, includeMetrics);
+      Describe.run(catalog, target, json);
     }
   }
 

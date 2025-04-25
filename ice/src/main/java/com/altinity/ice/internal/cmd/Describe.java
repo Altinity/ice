@@ -25,8 +25,7 @@ public final class Describe {
   private Describe() {}
 
   // TODO: refactor: the use of StringBuilder below is absolutely criminal
-  public static void run(RESTCatalog catalog, String target, boolean json, boolean includeMetrics)
-      throws IOException {
+  public static void run(RESTCatalog catalog, String target, boolean json) throws IOException {
     String targetNamespace = null;
     String targetTable = null;
     if (target != null && !target.isEmpty()) {
@@ -100,9 +99,7 @@ public final class Describe {
           sb.append("\t\tlocation: " + snapshot.manifestListLocation() + "\n");
         }
 
-        if (includeMetrics) {
-          printTableMetrics(table, sb);
-        }
+        printTableMetrics(table, sb);
       }
     }
     String r = sb.toString().replace("\t", "  ");
