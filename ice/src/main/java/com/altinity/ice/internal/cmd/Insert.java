@@ -7,10 +7,15 @@ import com.altinity.ice.internal.io.RetryLog;
 import com.altinity.ice.internal.jvm.Stats;
 import com.altinity.ice.internal.parquet.Metadata;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -66,7 +71,8 @@ public final class Insert {
       boolean forceTableAuth,
       boolean s3NoSignRequest,
       boolean s3CopyObject,
-      String retryListFile)
+      String retryListFile,
+      int threadCount)
       throws IOException {
     if (files.length == 0) {
       // no work to be done
@@ -81,6 +87,7 @@ public final class Insert {
             .forceTableAuth(forceTableAuth)
             .s3NoSignRequest(s3NoSignRequest)
             .s3CopyObject(s3CopyObject)
+            .threadCount(threadCount)
             .build();
 
     final InsertOptions finalOptions =
@@ -146,37 +153,55 @@ public final class Insert {
                     : null) {
           boolean atLeastOneFileAppended = false;
 
-          // TODO: parallel
-          for (final String file : filesExpanded) {
-            DataFile df;
-            try {
-              df =
-                  processFile(
-                      table,
-                      catalog,
-                      tableIO,
-                      inputIO,
-                      tableDataFiles,
-                      finalOptions,
-                      s3ClientLazy,
-                      dstDataFileSource,
-                      tableSchema,
-                      dataFileNamingStrategy,
-                      file);
-              if (df == null) {
-                continue;
-              }
-            } catch (Exception e) { // FIXME
-              if (retryLog != null) {
-                logger.error("{}: error (adding to retry list and continuing)", file, e);
-                retryLog.add(file);
-                continue;
-              } else {
-                throw e;
+          int numThreads = Math.min(finalOptions.threadCount(), filesExpanded.size());
+          try (ExecutorService executor = Executors.newFixedThreadPool(numThreads)) {
+            var futures = new ArrayList<Future<DataFile>>();
+            for (final String file : filesExpanded) {
+              futures.add(
+                  executor.submit(
+                      () -> {
+                        try {
+                          return processFile(
+                              table,
+                              catalog,
+                              tableIO,
+                              inputIO,
+                              tableDataFiles,
+                              finalOptions,
+                              s3ClientLazy,
+                              dstDataFileSource,
+                              tableSchema,
+                              dataFileNamingStrategy,
+                              file);
+                        } catch (Exception e) {
+                          if (retryLog != null) {
+                            logger.error(
+                                "{}: error (adding to retry list and continuing)", file, e);
+                            retryLog.add(file);
+                            return null;
+                          } else {
+                            throw e;
+                          }
+                        }
+                      }));
+            }
+
+            for (var future : futures) {
+              try {
+                DataFile df = future.get();
+                if (df != null) {
+                  atLeastOneFileAppended = true;
+                  appendOp.appendFile(df);
+                }
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while processing files", e);
+              } catch (ExecutionException e) {
+                if (retryLog == null) {
+                  throw new IOException("Error processing files", e.getCause());
+                }
               }
             }
-            atLeastOneFileAppended = true;
-            appendOp.appendFile(df);
           }
 
           if (!finalOptions.noCommit()) {

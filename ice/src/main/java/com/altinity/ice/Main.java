@@ -171,7 +171,12 @@ public final class Main {
               description =
                   "/path/to/file where to save list of files to retry"
                       + " (useful for retrying partially failed insert using `cat ice.retry | ice insert - --retry-list=ice.retry`)")
-          String retryList)
+          String retryList,
+      @CommandLine.Option(
+              names = {"--thread-count"},
+              description = "Number of threads to use for inserting data",
+              defaultValue = "-1")
+          int threadCount)
       throws IOException {
     if (s3NoSignRequest && s3CopyObject) {
       throw new UnsupportedOperationException(
@@ -203,7 +208,8 @@ public final class Main {
           forceTableAuth,
           s3NoSignRequest,
           s3CopyObject,
-          retryList);
+          retryList,
+          threadCount == -1 ? Runtime.getRuntime().availableProcessors() : threadCount);
     }
   }
 
