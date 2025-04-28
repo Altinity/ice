@@ -29,8 +29,7 @@ public class MaintenanceScheduler {
   private final Object taskLock = new Object();
 
   private ScheduledFuture<?> currentTask;
-  private volatile int expirationDays;
-  private final String configuredDays;
+  private final Integer snapshotExpirationDays;
 
   public MaintenanceScheduler(
       Catalog catalog, Map<String, String> config, String maintenanceInterval) {
@@ -38,8 +37,12 @@ public class MaintenanceScheduler {
     this.executor = new ScheduledThreadPoolExecutor(1);
     ((ScheduledThreadPoolExecutor) executor).setRemoveOnCancelPolicy(true);
     this.schedule = Schedule.parse(maintenanceInterval);
-    this.expirationDays = DEFAULT_EXPIRATION_DAYS;
-    this.configuredDays = config.get(Config.OPTION_SNAPSHOT_EXPIRATION_DAYS);
+    if (config.containsKey(Config.OPTION_SNAPSHOT_EXPIRATION_DAYS)) {
+      this.snapshotExpirationDays =
+          Integer.parseInt(config.get(Config.OPTION_SNAPSHOT_EXPIRATION_DAYS));
+    } else {
+      this.snapshotExpirationDays = DEFAULT_EXPIRATION_DAYS;
+    }
   }
 
   public void startScheduledMaintenance() {
@@ -105,21 +108,8 @@ public class MaintenanceScheduler {
         for (Namespace namespace : namespaces) {
           List<TableIdentifier> tables = catalog.listTables(namespace);
           for (TableIdentifier tableIdent : tables) {
-
-            if (configuredDays != null) {
-              try {
-                expirationDays = Integer.parseInt(configuredDays);
-                logger.debug("Using configured snapshot expiration days: {}", expirationDays);
-              } catch (NumberFormatException e) {
-                logger.warn(
-                    "Invalid value for {}: {}. Using default of {} days",
-                    Config.OPTION_SNAPSHOT_EXPIRATION_DAYS,
-                    configuredDays,
-                    DEFAULT_EXPIRATION_DAYS);
-              }
-            }
             long olderThanMillis =
-                System.currentTimeMillis() - TimeUnit.DAYS.toMillis(expirationDays);
+                System.currentTimeMillis() - TimeUnit.DAYS.toMillis(snapshotExpirationDays);
             Table table = catalog.loadTable(tableIdent);
 
             // Check if table has any snapshots before performing maintenance
