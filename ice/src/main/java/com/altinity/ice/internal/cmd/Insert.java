@@ -154,7 +154,8 @@ public final class Insert {
           boolean atLeastOneFileAppended = false;
 
           int numThreads = Math.min(finalOptions.threadCount(), filesExpanded.size());
-          try (ExecutorService executor = Executors.newFixedThreadPool(numThreads)) {
+          ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+          try {
             var futures = new ArrayList<Future<DataFile>>();
             for (final String file : filesExpanded) {
               futures.add(
@@ -201,6 +202,13 @@ public final class Insert {
                   throw new IOException("Error processing files", e.getCause());
                 }
               }
+            }
+          } finally {
+            // Cancel any remaining tasks since we won't commit the transaction
+            if (finalOptions.noCommit() || !atLeastOneFileAppended) {
+              executor.shutdownNow();
+            } else {
+              executor.shutdown();
             }
           }
 

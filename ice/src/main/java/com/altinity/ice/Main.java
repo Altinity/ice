@@ -209,7 +209,7 @@ public final class Main {
           s3NoSignRequest,
           s3CopyObject,
           retryList,
-          threadCount == -1 ? Runtime.getRuntime().availableProcessors() : threadCount);
+          threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
     }
   }
 

@@ -1,33 +1,14 @@
 package com.altinity.ice.internal.cmd;
 
-public final class InsertOptions {
-  private final boolean skipDuplicates;
-  private final boolean noCommit;
-  private final boolean noCopy;
-  private final boolean forceNoCopy;
-  private final boolean forceTableAuth;
-  private final boolean s3NoSignRequest;
-  private final boolean s3CopyObject;
-  private final int threadCount;
-
-  private InsertOptions(
-      boolean skipDuplicates,
-      boolean noCommit,
-      boolean noCopy,
-      boolean forceNoCopy,
-      boolean forceTableAuth,
-      boolean s3NoSignRequest,
-      boolean s3CopyObject,
-      int threadCount) {
-    this.skipDuplicates = skipDuplicates;
-    this.noCommit = noCommit;
-    this.noCopy = noCopy;
-    this.forceNoCopy = forceNoCopy;
-    this.forceTableAuth = forceTableAuth;
-    this.s3NoSignRequest = s3NoSignRequest;
-    this.s3CopyObject = s3CopyObject;
-    this.threadCount = threadCount;
-  }
+public record InsertOptions(
+    boolean skipDuplicates,
+    boolean noCommit,
+    boolean noCopy,
+    boolean forceNoCopy,
+    boolean forceTableAuth,
+    boolean s3NoSignRequest,
+    boolean s3CopyObject,
+    int threadCount) {
 
   public static Builder builder() {
     return new Builder();
