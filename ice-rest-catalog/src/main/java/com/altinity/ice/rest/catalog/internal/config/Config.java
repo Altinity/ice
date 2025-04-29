@@ -41,6 +41,8 @@ public final class Config {
   public static final String OPTION_ANONYMOUS_ACCESS = "ice.anonymous.access";
   public static final String OPTION_ANONYMOUS_ACCESS_CONFIG =
       "ice.anonymous.access.config"; // format: param=value&...
+  public static final String OPTION_SNAPSHOT_EXPIRATION_DAYS =
+      "ice.maintenance.snapshot.expiration.days";
 
   // TODO: return Config, not Map
   // https://py.iceberg.apache.org/configuration/#setting-configuration-values

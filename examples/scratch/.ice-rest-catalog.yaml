@@ -5,3 +5,4 @@ s3.access-key-id: "miniouser"
 s3.secret-access-key: "miniopassword"
 ice.s3.region: minio
 ice.token: foo
+ice.maintenance.snapshot.expiration.days: 20
