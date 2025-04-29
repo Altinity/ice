@@ -454,6 +454,7 @@
         <configuration>
           <!--use `_JAVA_OPTIONS=-Xmx512m ice ...` to set at runtime-->
           <!--<flags>-Xmx512m</flags>-->
+          <flags>-XX:MaxRAMPercentage=75.0</flags>
           <inputFile>target/ice-${project.version}-shaded.jar</inputFile>
           <programFile>ice-jar</programFile>
         </configuration>

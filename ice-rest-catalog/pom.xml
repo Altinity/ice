@@ -275,6 +275,7 @@
         <artifactId>really-executable-jar-maven-plugin</artifactId>
         <version>2.1.1</version>
         <configuration>
+          <flags>-XX:MaxRAMPercentage=75.0</flags>
           <!--<flags>-Xmx512m</flags>-->
           <inputFile>target/ice-rest-catalog-jar-with-dependencies.jar</inputFile>
           <programFile>ice-rest-catalog-jar</programFile>
