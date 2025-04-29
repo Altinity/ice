@@ -12,10 +12,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -73,7 +70,7 @@ public final class Insert {
       boolean s3CopyObject,
       String retryListFile,
       int threadCount)
-      throws IOException {
+      throws IOException, InterruptedException {
     if (files.length == 0) {
       // no work to be done
       return;
@@ -204,12 +201,8 @@ public final class Insert {
               }
             }
           } finally {
-            // Cancel any remaining tasks since we won't commit the transaction
-            if (finalOptions.noCommit() || !atLeastOneFileAppended) {
-              executor.shutdownNow();
-            } else {
-              executor.shutdown();
-            }
+            executor.awaitTermination(1, TimeUnit.MINUTES);
+            executor.shutdownNow();
           }
 
           if (!finalOptions.noCommit()) {

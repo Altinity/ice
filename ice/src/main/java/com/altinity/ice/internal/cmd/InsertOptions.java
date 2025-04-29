@@ -14,38 +14,6 @@ public record InsertOptions(
     return new Builder();
   }
 
-  public boolean skipDuplicates() {
-    return skipDuplicates;
-  }
-
-  public boolean noCommit() {
-    return noCommit;
-  }
-
-  public boolean noCopy() {
-    return noCopy;
-  }
-
-  public boolean forceNoCopy() {
-    return forceNoCopy;
-  }
-
-  public boolean forceTableAuth() {
-    return forceTableAuth;
-  }
-
-  public boolean s3NoSignRequest() {
-    return s3NoSignRequest;
-  }
-
-  public boolean s3CopyObject() {
-    return s3CopyObject;
-  }
-
-  public int threadCount() {
-    return threadCount;
-  }
-
   public Builder toBuilder() {
     return builder()
         .skipDuplicates(skipDuplicates)

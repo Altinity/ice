@@ -177,7 +177,7 @@ public final class Main {
               description = "Number of threads to use for inserting data",
               defaultValue = "-1")
           int threadCount)
-      throws IOException {
+      throws IOException, InterruptedException {
     if (s3NoSignRequest && s3CopyObject) {
       throw new UnsupportedOperationException(
           "--s3-no-sign-request + --s3-copy-object is not supported by AWS (see --help for details)");
