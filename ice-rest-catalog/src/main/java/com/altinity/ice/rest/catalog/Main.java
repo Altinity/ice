@@ -325,6 +325,7 @@ public final class Main implements Callable<Integer> {
   }
 
   public static void main(String[] args) throws Exception {
+    Thread.sleep(10000);
     int exitCode = new CommandLine(new Main()).execute(args);
     System.exit(exitCode);
   }

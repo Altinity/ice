@@ -11,6 +11,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.actions.Action;
+import org.apache.iceberg.actions.DeleteOrphanFiles;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
@@ -120,6 +122,16 @@ public class MaintenanceScheduler {
 
             table.rewriteManifests().rewriteIf(manifest -> true).commit();
             table.expireSnapshots().expireOlderThan(olderThanMillis).commit();
+
+            DeleteOrphanFiles.Result result =
+                Action.forTable(table)
+                    .removeOrphanFiles()
+                    .olderThan(
+                        System.currentTimeMillis()
+                            - TimeUnit.DAYS.toMillis(
+                                snapshotExpirationDays)) // only consider files older than 24 hours
+                    .execute();
+            logger.info("Orphan Table {} removed older than {}", tableIdent, result);
           }
         }
         logger.info("Maintenance operations completed for catalog: {}", catalog.name());

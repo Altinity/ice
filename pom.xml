@@ -14,7 +14,7 @@
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
     <!-- versions -->
-    <iceberg.version>1.8.1</iceberg.version>
+    <iceberg.version>1.4.3</iceberg.version>
     <hadoop.version>3.4.1</hadoop.version>
     <parquet.version>1.15.1</parquet.version>
     <aws.java.sdk.version>2.31.13</aws.java.sdk.version>
