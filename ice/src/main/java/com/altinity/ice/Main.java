@@ -69,14 +69,10 @@ public final class Main {
       @CommandLine.Option(
               names = {"--json"},
               description = "Output JSON instead of YAML")
-          boolean json,
-      @CommandLine.Option(
-              names = {"--include-metrics"},
-              description = "Include table metrics in the output")
-          boolean includeMetrics)
+          boolean json)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
-      Describe.run(catalog, target, json, includeMetrics);
+      Describe.run(catalog, target, json);
     }
   }
 
@@ -193,8 +189,13 @@ public final class Main {
               names = {"--sort-by"},
               description = "Comma-separated list of columns to sort by",
               split = ",")
-          List<String> sortColumns)
-      throws IOException {
+          List<String> sortColumns,
+      @CommandLine.Option(
+              names = {"--thread-count"},
+              description = "Number of threads to use for inserting data",
+              defaultValue = "-1")
+          int threadCount)
+      throws IOException, InterruptedException {
     if (s3NoSignRequest && s3CopyObject) {
       throw new UnsupportedOperationException(
           "--s3-no-sign-request + --s3-copy-object is not supported by AWS (see --help for details)");
@@ -234,7 +235,8 @@ public final class Main {
           s3CopyObject,
           retryList,
           partitionColumns,
-          sortColumns);
+          sortColumns,
+          threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
     }
   }
 

@@ -6,6 +6,7 @@ import com.altinity.ice.rest.catalog.internal.aws.CredentialsProvider;
 import com.altinity.ice.rest.catalog.internal.config.Config;
 import com.altinity.ice.rest.catalog.internal.jetty.PlainErrorHandler;
 import com.altinity.ice.rest.catalog.internal.jetty.ServerConfig;
+import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceScheduler;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAdapter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAuthorizationHandler;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogHandler;
@@ -65,6 +66,12 @@ public final class Main implements Callable<Integer> {
       names = {"-c", "--config"},
       description = "/path/to/config.yaml ($CWD/.ice-rest-catalog.yaml by default)")
   String configFile;
+
+  @CommandLine.Option(
+      names = "--maintenance-interval",
+      description =
+          "Maintenance interval in human-friendly format (e.g. 'every day', 'every monday 09:00'). Leave empty to disable maintenance.")
+  private String maintenanceInterval;
 
   private Main() {}
 
@@ -276,6 +283,9 @@ public final class Main implements Callable<Integer> {
 
     Catalog catalog = CatalogUtil.buildIcebergCatalog("rest_backend", config, null);
 
+    // Initialize and start the maintenance scheduler
+    initializeMaintenanceScheduler(catalog, config);
+
     // TODO: replace with uds (jetty-unixdomain-server is all that is needed here but in ice you'll
     // need to implement custom org.apache.iceberg.rest.RESTClient)
     String adminPort = config.get(Config.OPTION_ADMIN_PORT);
@@ -295,6 +305,23 @@ public final class Main implements Callable<Integer> {
 
     httpServer.join();
     return 0;
+  }
+
+  private void initializeMaintenanceScheduler(Catalog catalog, Map<String, String> config) {
+    if (maintenanceInterval == null || maintenanceInterval.trim().isEmpty()) {
+      logger.info("Maintenance scheduler is disabled (no maintenance interval specified)");
+      return;
+    }
+
+    try {
+      MaintenanceScheduler scheduler =
+          new MaintenanceScheduler(catalog, config, maintenanceInterval);
+      scheduler.startScheduledMaintenance();
+      logger.info("Maintenance scheduler initialized with interval: {}", maintenanceInterval);
+    } catch (Exception e) {
+      logger.error("Failed to initialize maintenance scheduler", e);
+      throw new RuntimeException(e);
+    }
   }
 
   public static void main(String[] args) throws Exception {
