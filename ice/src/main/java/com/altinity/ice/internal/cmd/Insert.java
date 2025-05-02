@@ -7,13 +7,9 @@ import com.altinity.ice.internal.io.RetryLog;
 import com.altinity.ice.internal.jvm.Stats;
 import com.altinity.ice.internal.parquet.Metadata;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -22,16 +18,13 @@ import java.util.stream.StreamSupport;
 import org.apache.iceberg.*;
 import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.data.GenericAppenderFactory;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
-import org.apache.iceberg.io.CloseableIterable;
-import org.apache.iceberg.io.FileAppender;
-import org.apache.iceberg.io.FileIO;
-import org.apache.iceberg.io.InputFile;
-import org.apache.iceberg.io.OutputFile;
+import org.apache.iceberg.io.*;
 import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.mapping.NameMappingParser;
@@ -78,6 +71,7 @@ public final class Insert {
       // no work to be done
       return;
     }
+
     InsertOptions options =
         InsertOptions.builder()
             .skipDuplicates(skipDuplicates)
@@ -176,29 +170,38 @@ public final class Insert {
                 retryListFile != null && !retryListFile.isEmpty()
                     ? new RetryLog(retryListFile)
                     : null) {
-          boolean atLeastOneFileAppended = false;
+          AtomicBoolean atLeastOneFileAppended = new AtomicBoolean(false);
 
           int numThreads = Math.min(finalOptions.threadCount(), filesExpanded.size());
           ExecutorService executor = Executors.newFixedThreadPool(numThreads);
           try {
-            var futures = new ArrayList<Future<DataFile>>();
+            var futures = new ArrayList<Future<List<DataFile>>>();
             for (final String file : filesExpanded) {
               futures.add(
                   executor.submit(
                       () -> {
                         try {
-                          return processFile(
-                              table,
-                              catalog,
-                              tableIO,
-                              inputIO,
-                              tableDataFiles,
-                              finalOptions,
-                              s3ClientLazy,
-                              dstDataFileSource,
-                              tableSchema,
-                              dataFileNamingStrategy,
-                              file);
+                          List<DataFile> dataFiles =
+                              processFile(
+                                  table,
+                                  catalog,
+                                  tableIO,
+                                  inputIO,
+                                  tableDataFiles,
+                                  finalOptions,
+                                  s3ClientLazy,
+                                  dstDataFileSource,
+                                  tableSchema,
+                                  dataFileNamingStrategy,
+                                  file,
+                                  partitionColumns);
+                          if (dataFiles != null) {
+                            for (DataFile df : dataFiles) {
+                              atLeastOneFileAppended.set(true);
+                              appendOp.appendFile(df);
+                            }
+                          }
+                          return dataFiles;
                         } catch (Exception e) {
                           if (retryLog != null) {
                             logger.error(
@@ -214,10 +217,12 @@ public final class Insert {
 
             for (var future : futures) {
               try {
-                DataFile df = future.get();
-                if (df != null) {
-                  atLeastOneFileAppended = true;
-                  appendOp.appendFile(df);
+                List<DataFile> dataFiles = future.get();
+                if (dataFiles != null) {
+                  for (DataFile df : dataFiles) {
+                    atLeastOneFileAppended.set(true);
+                    appendOp.appendFile(df);
+                  }
                 }
               } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -235,7 +240,7 @@ public final class Insert {
 
           if (!finalOptions.noCommit()) {
             // TODO: log
-            if (atLeastOneFileAppended) {
+            if (atLeastOneFileAppended.get()) {
               appendOp.commit();
             } else {
               logger.warn("Table commit skipped (no files to append)");
@@ -255,7 +260,7 @@ public final class Insert {
     }
   }
 
-  private static DataFile processFile(
+  private static List<DataFile> processFile(
       Table table,
       RESTCatalog catalog,
       FileIO tableIO,
@@ -266,7 +271,8 @@ public final class Insert {
       DataFileNamingStrategy dstDataFileSource,
       Schema tableSchema,
       DataFileNamingStrategy.Name dataFileNamingStrategy,
-      String file)
+      String file,
+      List<String> partitionColumns)
       throws IOException {
     logger.info("{}: processing", file);
     logger.info("{}: jvm: {}", file, Stats.gather());
@@ -327,6 +333,12 @@ public final class Insert {
       s3ClientLazy.getValue().copyObject(copyReq);
       dataFileSizeInBytes = inputFile.getLength();
       dataFile = dstDataFile;
+    } else if (partitionColumns != null && !partitionColumns.isEmpty()) {
+      String dstDataFile = dstDataFileSource.get(file);
+      if (checkNotExists.apply(dstDataFile)) {
+        return null;
+      }
+      return copyParquetWithPartition(file, dstDataFile, tableSchema, table, inputFile);
     } else {
       String dstDataFile = dstDataFileSource.get(file);
       if (checkNotExists.apply(dstDataFile)) {
@@ -355,13 +367,84 @@ public final class Insert {
     long recordCount = metadata.getBlocks().stream().mapToLong(BlockMetaData::getRowCount).sum();
     MetricsConfig metricsConfig = MetricsConfig.forTable(table);
     Metrics metrics = ParquetUtil.fileMetrics(inputFile, metricsConfig);
-    return new DataFiles.Builder(table.spec())
-        .withPath(dataFile)
-        .withFormat("PARQUET")
-        .withRecordCount(recordCount)
-        .withFileSizeInBytes(dataFileSizeInBytes)
-        .withMetrics(metrics)
-        .build();
+    DataFile dataFileObj =
+        new DataFiles.Builder(table.spec())
+            .withPath(dataFile)
+            .withFormat("PARQUET")
+            .withRecordCount(recordCount)
+            .withFileSizeInBytes(dataFileSizeInBytes)
+            .withMetrics(metrics)
+            .build();
+    return Collections.singletonList(dataFileObj);
+  }
+
+  private static List<DataFile> copyParquetWithPartition(
+      String file, String dstDataFile, Schema tableSchema, Table table, InputFile inputFile)
+      throws IOException {
+
+    logger.info("{}: copying to partitions under {}", file, dstDataFile);
+
+    // Partition writer setup
+    OutputFileFactory fileFactory =
+        OutputFileFactory.builderFor(table, 1, 0).format(FileFormat.PARQUET).build();
+
+    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(tableSchema, table.spec());
+
+    PartitionKey partitionKey = new PartitionKey(table.spec(), tableSchema);
+    Map<PartitionKey, FileAppender<Record>> openAppenders = new HashMap<>();
+    Map<PartitionKey, OutputFile> writtenFiles = new HashMap<>();
+
+    Parquet.ReadBuilder readBuilder =
+        Parquet.read(inputFile)
+            .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
+            .project(tableSchema)
+            .reuseContainers();
+    Map<PartitionKey, Long> recordCounts = new HashMap<>();
+
+    try (CloseableIterable<Record> records = readBuilder.build()) {
+      for (Record record : records) {
+        partitionKey.partition(record);
+        PartitionKey keyCopy = partitionKey.copy();
+
+        FileAppender<Record> appender = openAppenders.get(keyCopy);
+        if (appender == null) {
+          OutputFile outFile = fileFactory.newOutputFile(keyCopy).encryptingOutputFile();
+          appender = appenderFactory.newAppender(outFile, FileFormat.PARQUET);
+          openAppenders.put(keyCopy, appender);
+          writtenFiles.put(keyCopy, outFile);
+          recordCounts.put(keyCopy, 0L);
+        }
+
+        appender.add(record);
+        recordCounts.put(keyCopy, recordCounts.get(keyCopy) + 1);
+      }
+    }
+
+    List<DataFile> dataFiles = new ArrayList<>();
+
+    for (Map.Entry<PartitionKey, FileAppender<Record>> entry : openAppenders.entrySet()) {
+      PartitionKey partKey = entry.getKey();
+      FileAppender<Record> appender = entry.getValue();
+      appender.close();
+
+      OutputFile outFile = writtenFiles.get(partKey);
+      InputFile inFile = outFile.toInputFile();
+
+      MetricsConfig metricsConfig = MetricsConfig.forTable(table);
+      Metrics metrics = ParquetUtil.fileMetrics(inFile, metricsConfig);
+
+      dataFiles.add(
+          DataFiles.builder(table.spec())
+              .withPath(outFile.location())
+              .withFileSizeInBytes(inFile.getLength())
+              .withPartition(partKey)
+              .withFormat(FileFormat.PARQUET)
+              .withRecordCount(recordCounts.get(partKey))
+              .withMetrics(metrics)
+              .build());
+    }
+
+    return dataFiles;
   }
 
   private static boolean sameSchema(Table table, Schema fileSchema) {

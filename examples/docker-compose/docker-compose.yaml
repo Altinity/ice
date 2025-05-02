@@ -68,7 +68,8 @@ configs:
           SETTINGS catalog_type = 'rest',
             auth_header = 'Authorization: Bearer foo',
             storage_endpoint = 'http://minio:8999',
-            warehouse = 's3://bucket1/';
+            warehouse = 's3://bucket1/',
+            sort_order = 'id';
       "
   ice-rest-catalog-yaml:
     content: |
