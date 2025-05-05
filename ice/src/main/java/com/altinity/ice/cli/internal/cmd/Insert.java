@@ -14,6 +14,7 @@ import com.altinity.ice.cli.internal.iceberg.parquet.Metadata;
 import com.altinity.ice.cli.internal.jvm.Stats;
 import com.altinity.ice.cli.internal.retry.RetryLog;
 import com.altinity.ice.cli.internal.s3.S3;
+import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
@@ -23,8 +24,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-
-import com.altinity.ice.internal.strings.Strings;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.iceberg.*;
 import org.apache.iceberg.aws.s3.S3FileIO;
@@ -371,13 +370,18 @@ public final class Insert {
         return null;
       }
       return copyParquetWithPartition(
-          file, Strings.replacePrefix(dstDataFile, "s3://", "s3a://"), tableSchema, table, inputFile);
+          file,
+          Strings.replacePrefix(dstDataFile, "s3://", "s3a://"),
+          tableSchema,
+          table,
+          inputFile);
     } else {
       String dstDataFile = dstDataFileSource.get(file);
       if (checkNotExists.apply(dstDataFile)) {
         return null;
       }
-      OutputFile outputFile = tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
+      OutputFile outputFile =
+          tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
       // TODO: support transferTo below (note that compression, etc. might be different)
       // try (var d = outputFile.create()) { try (var s = inputFile.newStream()) {
       // s.transferTo(d); }}
@@ -446,8 +450,7 @@ public final class Insert {
     List<DataFile> dataFiles = new ArrayList<>();
 
     // Create a comparator based on table.sortOrder()
-    RecordSortComparator comparator =
-        new RecordSortComparator(table.sortOrder(), tableSchema);
+    RecordSortComparator comparator = new RecordSortComparator(table.sortOrder(), tableSchema);
 
     // Write sorted records for each partition
     for (Map.Entry<PartitionKey, List<Record>> entry : partitionedRecords.entrySet()) {

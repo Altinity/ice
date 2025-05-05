@@ -28,6 +28,10 @@
       <version>${iceberg.version}</version>
       <exclusions>
         <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-lang3</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>org.apache.parquet</groupId>
           <artifactId>parquet-avro</artifactId>
         </exclusion>
