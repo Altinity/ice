@@ -1,85 +1,45 @@
+/*
+ * Copyright (c) 2025 Altinity Inc and/or its affiliates. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ */
 package com.altinity.ice.internal.config;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
-import org.apache.iceberg.CatalogProperties;
-import org.apache.iceberg.aws.s3.S3FileIOProperties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 
 public final class Config {
 
-  private static final String PREFIX = "ICE_";
-  private static final Logger logger = LoggerFactory.getLogger(Config.class);
-
   private Config() {}
 
-  // TODO: map<String, map<String, String>>
-  // https://py.iceberg.apache.org/configuration/#setting-configuration-values
-  public static Map<String, String> load(String catalogName, String configFile) throws IOException {
-    var p = new HashMap<String, String>();
-    logger.info("config: Defaults set to {}", p);
-
-    boolean defaultConfigFile = configFile == null || configFile.isEmpty();
-    var file = new File(!defaultConfigFile ? configFile : ".ice.yaml"); // TODO: move out
-    try (InputStream in = new FileInputStream(file)) {
-      var yaml = new Yaml();
-      Map<String, Map<String, Map<String, String>>> config = yaml.load(new BufferedInputStream(in));
-      Map<String, String> m =
-          config.getOrDefault("catalog", Map.of()).getOrDefault(catalogName, Map.of());
-      p.putAll(m);
-      logger.info("config: Loaded {} from {}", m.keySet(), file);
-    } catch (FileNotFoundException e) {
-      if (!defaultConfigFile) {
+  public static <T> T load(String configFile, boolean configFileRequired, TypeReference<T> type)
+      throws IOException {
+    String v = "{}";
+    try {
+      v = Files.readString(Path.of(configFile));
+    } catch (NoSuchFileException e) {
+      if (configFileRequired) {
         throw e;
       }
     }
-
-    // Strip ${prefix} from env vars.
-
-    var prefix = String.format("%sCATALOG_%s_", PREFIX, catalogName.toUpperCase());
-    p.putAll(
-        new TreeMap<>(System.getenv())
-            .entrySet().stream()
-                .filter(e -> e.getKey().startsWith(prefix))
-                .collect(
-                    Collectors.toMap(
-                        e -> {
-                          String k =
-                              e.getKey()
-                                  .replaceFirst(prefix, "")
-                                  .replaceAll("__", "-")
-                                  .replaceAll("_", ".")
-                                  .toLowerCase();
-                          logger.info("config: Overriding {} with ${}", k, e.getKey());
-                          return k;
-                        },
-                        Map.Entry::getValue)));
-
-    BiConsumer<String, String> put =
-        (k, v) -> {
-          logger.info("config: Activating {}={} default", k, v);
-          p.put(k, v);
-        };
-
-    if (!p.containsKey("io-impl") && !p.getOrDefault("s3.endpoint", "").isEmpty()) {
-      put.accept(
-          CatalogProperties.FILE_IO_IMPL, org.apache.iceberg.aws.s3.S3FileIO.class.getName());
+    ObjectMapper om = new ObjectMapper(new YAMLFactory());
+    om.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+    // TODO: support env var interpolation
+    try {
+      return om.readValue(v, type);
+    } catch (UnrecognizedPropertyException e) {
+      throw new InvalidConfigException(e.getMessage());
     }
-    if (p.getOrDefault("s3.endpoint", "").toLowerCase().startsWith("http://")) { // TODO: if set?
-      put.accept(S3FileIOProperties.PATH_STYLE_ACCESS, "true");
-    }
-
-    return p;
   }
 }

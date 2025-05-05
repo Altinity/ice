@@ -25,4 +25,5 @@ FROM gcr.io/distroless/java21-debian12:${BASE_IMAGE_TAG}
 
 COPY --from=build /app/ice/target/ice-jar /usr/local/bin/ice
 
+# using java -jar instead of executing jar directly as there is not shell in non-"debug" version of distroless
 ENTRYPOINT ["java", "-jar", "/usr/local/bin/ice"]

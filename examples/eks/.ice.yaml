@@ -1,5 +1,3 @@
-catalog:
-  default:
-    uri: http://localhost:5000
-    header.authorization: bearer foo
-    ice.http.cache: var/cache/ice/http
+uri: http://localhost:5000
+bearerToken: foo
+httpCacheDir: var/cache/ice/http

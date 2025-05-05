@@ -1,9 +1,20 @@
+/*
+ * Copyright (c) 2025 Altinity Inc and/or its affiliates. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ */
 package com.altinity.ice.rest.catalog;
 
+import com.altinity.ice.internal.picocli.VersionProvider;
+import com.altinity.ice.internal.strings.Strings;
 import com.altinity.ice.rest.catalog.internal.auth.Session;
-import com.altinity.ice.rest.catalog.internal.auth.Token;
 import com.altinity.ice.rest.catalog.internal.aws.CredentialsProvider;
 import com.altinity.ice.rest.catalog.internal.config.Config;
+import com.altinity.ice.rest.catalog.internal.etcd.EtcdCatalog;
 import com.altinity.ice.rest.catalog.internal.jetty.PlainErrorHandler;
 import com.altinity.ice.rest.catalog.internal.jetty.ServerConfig;
 import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceScheduler;
@@ -13,6 +24,8 @@ import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogHandler;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableAWCredentials;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableConfig;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogServlet;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.net.HostAndPort;
 import io.prometheus.metrics.exporter.servlet.jakarta.PrometheusMetricsServlet;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import jakarta.servlet.http.HttpServlet;
@@ -21,16 +34,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Catalog;
-import org.apache.iceberg.util.PropertyUtil;
+import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -39,6 +51,7 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 import picocli.CommandLine;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -51,14 +64,9 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
     description = "Iceberg REST Catalog.",
     mixinStandardHelpOptions = true,
     scope = CommandLine.ScopeType.INHERIT,
-    versionProvider = Main.VersionProvider.class)
+    versionProvider = VersionProvider.class,
+    subcommands = com.altinity.ice.cli.Main.class)
 public final class Main implements Callable<Integer> {
-
-  static class VersionProvider implements CommandLine.IVersionProvider {
-    public String[] getVersion() {
-      return new String[] {Main.class.getPackage().getImplementationVersion()};
-    }
-  }
 
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
@@ -67,33 +75,37 @@ public final class Main implements Callable<Integer> {
       description = "/path/to/config.yaml ($CWD/.ice-rest-catalog.yaml by default)")
   String configFile;
 
-  @CommandLine.Option(
-      names = "--maintenance-interval",
-      description =
-          "Maintenance interval in human-friendly format (e.g. 'every day', 'every monday 09:00'). Leave empty to disable maintenance.")
-  private String maintenanceInterval;
+  public String configFile() {
+    if (Strings.isNullOrEmpty(configFile)) {
+      return System.getenv("ICE_REST_CATALOG_CONFIG");
+    }
+    return configFile;
+  }
 
   private Main() {}
 
-  private static Server createServer(int port, Catalog catalog, Map<String, String> config) {
-    var s = createBaseServer(catalog, config, true);
+  private static Server createServer(
+      String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
+    var s = createBaseServer(catalog, config, icebergConfig, true);
     ServerConnector connector = new ServerConnector(s);
+    connector.setHost(host);
     connector.setPort(port);
     s.addConnector(connector);
     return s;
   }
 
-  private static Server createAdminServer(int port, Catalog catalog, Map<String, String> config) {
-    var s = createBaseServer(catalog, config, false);
+  private static Server createAdminServer(
+      String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
+    var s = createBaseServer(catalog, config, icebergConfig, false);
     ServerConnector connector = new ServerConnector(s);
-    connector.setHost("localhost");
+    connector.setHost(host);
     connector.setPort(port);
     s.addConnector(connector);
     return s;
   }
 
   private static Server createBaseServer(
-      Catalog catalog, Map<String, String> config, boolean requireAuth) {
+      Catalog catalog, Config config, Map<String, String> icebergConfig, boolean requireAuth) {
     var mux = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
     mux.insertHandler(new GzipHandler());
     // TODO: RequestLogHandler
@@ -102,24 +114,39 @@ public final class Main implements Callable<Integer> {
 
     RESTCatalogHandler restCatalogAdapter;
     if (requireAuth) {
-      Token[] tokens = parseAccessTokens(config);
-
-      mux.insertHandler(createAuthorizationHandler(tokens, config));
-
-      // Fail-fast.
-      Map<String, AwsCredentialsProvider> awsCredentialsProviders =
-          createAwsCredentialsProviders(tokens, config);
+      mux.insertHandler(createAuthorizationHandler(config.bearerTokens(), config));
 
       restCatalogAdapter = new RESTCatalogAdapter(catalog);
-      if (config.containsKey(Config.OPTION_TABLE_CONFIG)) {
-        restCatalogAdapter = new RESTCatalogMiddlewareTableConfig(restCatalogAdapter, config);
+      var loadTableConfig = config.toIcebergLoadTableConfig();
+      if (!loadTableConfig.isEmpty()) {
+        restCatalogAdapter =
+            new RESTCatalogMiddlewareTableConfig(restCatalogAdapter, loadTableConfig);
       }
-      restCatalogAdapter =
-          new RESTCatalogMiddlewareTableAWCredentials(restCatalogAdapter, awsCredentialsProviders);
+
+      if (icebergConfig
+          .getOrDefault(CatalogProperties.WAREHOUSE_LOCATION, "")
+          .startsWith("s3://")) {
+        Map<String, AwsCredentialsProvider> awsCredentialsProviders =
+            createAwsCredentialsProviders(config.bearerTokens(), config, icebergConfig);
+        restCatalogAdapter =
+            new RESTCatalogMiddlewareTableAWCredentials(
+                restCatalogAdapter, awsCredentialsProviders::get);
+      }
     } else {
       restCatalogAdapter = new RESTCatalogAdapter(catalog);
-      if (config.containsKey(Config.OPTION_TABLE_CONFIG)) {
-        restCatalogAdapter = new RESTCatalogMiddlewareTableConfig(restCatalogAdapter, config);
+      var loadTableConfig = config.toIcebergLoadTableConfig();
+      if (!loadTableConfig.isEmpty()) {
+        restCatalogAdapter =
+            new RESTCatalogMiddlewareTableConfig(restCatalogAdapter, loadTableConfig);
+      }
+
+      if (icebergConfig
+          .getOrDefault(CatalogProperties.WAREHOUSE_LOCATION, "")
+          .startsWith("s3://")) {
+        DefaultCredentialsProvider awsCredentialsProvider = DefaultCredentialsProvider.create();
+        restCatalogAdapter =
+            new RESTCatalogMiddlewareTableAWCredentials(
+                restCatalogAdapter, uid -> awsCredentialsProvider);
       }
     }
 
@@ -133,101 +160,67 @@ public final class Main implements Callable<Integer> {
   }
 
   private static Map<String, AwsCredentialsProvider> createAwsCredentialsProviders(
-      Token[] tokens, Map<String, String> config) {
+      Config.Token[] tokens, Config config, Map<String, String> icebergConfig) {
     AwsCredentialsProvider awsCredentialsProvider;
-    if (config.containsKey(S3FileIOProperties.ACCESS_KEY_ID)) {
-      if (config.containsKey(S3FileIOProperties.SESSION_TOKEN)) {
+    if (icebergConfig.containsKey(S3FileIOProperties.ACCESS_KEY_ID)) {
+      if (icebergConfig.containsKey(S3FileIOProperties.SESSION_TOKEN)) {
         awsCredentialsProvider =
             StaticCredentialsProvider.create(
                 AwsSessionCredentials.create(
-                    config.get(S3FileIOProperties.ACCESS_KEY_ID),
-                    config.get(S3FileIOProperties.SECRET_ACCESS_KEY),
-                    config.get(S3FileIOProperties.SESSION_TOKEN)));
+                    icebergConfig.get(S3FileIOProperties.ACCESS_KEY_ID),
+                    icebergConfig.get(S3FileIOProperties.SECRET_ACCESS_KEY),
+                    icebergConfig.get(S3FileIOProperties.SESSION_TOKEN)));
       } else {
         awsCredentialsProvider =
             StaticCredentialsProvider.create(
                 AwsBasicCredentials.create(
-                    config.get(S3FileIOProperties.ACCESS_KEY_ID),
-                    config.get(S3FileIOProperties.SECRET_ACCESS_KEY)));
+                    icebergConfig.get(S3FileIOProperties.ACCESS_KEY_ID),
+                    icebergConfig.get(S3FileIOProperties.SECRET_ACCESS_KEY)));
       }
     } else {
       awsCredentialsProvider = DefaultCredentialsProvider.create();
     }
     Map<String, AwsCredentialsProvider> awsCredentialsProviders = new HashMap<>();
-    for (Token token : tokens) {
-      var roleArn = token.params().getOrDefault(Token.TOKEN_PARAM_AWS_ASSUME_ROLE_ARN, "");
+    for (Config.Token token : tokens) {
       awsCredentialsProviders.put(
           token.resourceName(),
-          roleArn.isEmpty()
+          !token.accessConfig().hasAWSAssumeRoleARN()
               ? awsCredentialsProvider
               : CredentialsProvider.assumeRule(
-                  awsCredentialsProvider, roleArn, "ice-rest-catalog/" + token.id()));
+                  awsCredentialsProvider,
+                  token.accessConfig().awsAssumeRoleARN(),
+                  "ice-rest-catalog." + token.name()));
     }
-    if ("true".equals(config.get(Config.OPTION_ANONYMOUS_ACCESS))) {
-      var token =
-          Token.parse(
-              "anonymous::"
-                  + Token.TOKEN_PARAM_READ_ONLY
-                  + "&"
-                  + config.getOrDefault(Config.OPTION_ANONYMOUS_ACCESS_CONFIG, ""));
-      var roleArn = token.params().getOrDefault(Token.TOKEN_PARAM_AWS_ASSUME_ROLE_ARN, "");
+    if (config.anonymousAccess().enabled()) {
+      var token = new Config.Token("anonymous", "", config.anonymousAccess().accessConfig());
       awsCredentialsProviders.put(
-          token.id(),
-          roleArn.isEmpty()
+          token.resourceName(),
+          !token.accessConfig().hasAWSAssumeRoleARN()
               ? awsCredentialsProvider
               : CredentialsProvider.assumeRule(
-                  awsCredentialsProvider, roleArn, "ice-rest-catalog/" + token.id()));
-      logger.info("Enabled anonymous access (config: {})", token.params());
+                  awsCredentialsProvider,
+                  token.accessConfig().awsAssumeRoleARN(),
+                  "ice-rest-catalog." + token.name()));
     }
     return awsCredentialsProviders;
   }
 
-  private static Token[] parseAccessTokens(Map<String, String> config) {
-    var token = config.getOrDefault(Config.OPTION_TOKEN, "");
-    if (token.contains(",")) {
-      throw new IllegalArgumentException("invalid config: token cannot contain ,");
-    }
-    var tokens = config.getOrDefault(Config.OPTION_TOKENS, "");
-    if (!token.isEmpty()) {
-      tokens = token + "," + tokens;
-    }
-    Token[] r = Arrays.stream(tokens.split(",")).map(Token::parse).toArray(Token[]::new);
-    Set<String> set = Arrays.stream(r).map(Token::id).collect(Collectors.toSet());
-    if (set.contains("anonymous")) {
-      throw new IllegalArgumentException("invalid config: token alias \"anonymous\" is reserved");
-    }
-    if (set.size() != r.length) {
-      throw new IllegalArgumentException(
-          "invalid config: multiple tokens with the same alias (name) found");
-    }
-    for (Token t : r) {
-      logger.info("Enabled access via token named \"{}\" (config: {})", t.id(), t.params());
-    }
-    return r;
-  }
-
   private static RESTCatalogAuthorizationHandler createAuthorizationHandler(
-      Token[] tokens, Map<String, String> config) {
+      Config.Token[] tokens, Config config) {
     Session anonymousSession = null;
-    if ("true".equals(config.get(Config.OPTION_ANONYMOUS_ACCESS))) {
-      var t =
-          Token.parse(
-              "anonymous::"
-                  + Token.TOKEN_PARAM_READ_ONLY
-                  + "&"
-                  + config.getOrDefault(Config.OPTION_ANONYMOUS_ACCESS_CONFIG, ""));
-      anonymousSession = new Session(t.id(), t.params());
+    if (config.anonymousAccess().enabled()) {
+      var t = new Config.Token("anonymous", "", config.anonymousAccess().accessConfig());
+      Config.AccessConfig o = t.accessConfig();
+      anonymousSession = new Session(t.resourceName(), o.readOnly(), o.awsAssumeRoleARN());
     }
     if (tokens.length == 0 && anonymousSession == null) {
       throw new IllegalArgumentException(
-          String.format(
-              "invalid config: either set %s=true or provide tokens via %s or %s",
-              Config.OPTION_ANONYMOUS_ACCESS, Config.OPTION_TOKEN, Config.OPTION_TOKENS));
+          "invalid config: either set anonymousAccess.enabled to true or provide tokens via bearerTokens");
     }
     return new RESTCatalogAuthorizationHandler(tokens, anonymousSession);
   }
 
-  private static Server createDebugServer(int port) {
+  private static Server createDebugServer(String host, int port) {
     var mux = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
     mux.insertHandler(new GzipHandler());
 
@@ -252,9 +245,15 @@ public final class Main implements Callable<Integer> {
     mux.addServlet(h, "/livez");
     mux.addServlet(h, "/readyz");
 
-    var s = new Server(port);
+    var s = new Server();
     overrideJettyDefaults(s);
     s.setHandler(mux);
+
+    ServerConnector connector = new ServerConnector(s);
+    connector.setHost(host);
+    connector.setPort(port);
+    s.addConnector(connector);
+
     return s;
   }
 
@@ -265,67 +264,136 @@ public final class Main implements Callable<Integer> {
 
   @Override
   public Integer call() throws Exception {
-    var config = com.altinity.ice.rest.catalog.internal.config.Config.load(configFile);
+    var config = Config.load(configFile());
 
-    // FIXME: remove
-    var awsRegion = config.getOrDefault(Config.OPTION_S3_REGION, "");
-    if (!awsRegion.isEmpty()) {
-      System.setProperty("aws.region", awsRegion);
+    var icebergConfig = config.toIcebergConfig();
+    logger.info(
+        "Iceberg configuration: {}",
+        icebergConfig.entrySet().stream()
+            .map(e -> !e.getKey().contains("key") ? e.getKey() + "=" + e.getValue() : e.getKey())
+            .sorted()
+            .collect(Collectors.joining(", ")));
+    ObjectMapper om = new ObjectMapper();
+    for (Config.Token t : config.bearerTokens()) {
+      if (Strings.isNullOrEmpty(t.name())) {
+        logger.info(
+            "Catalog accessible via bearer token named \"{}\" (config: {})",
+            t.name(),
+            om.writeValueAsString(t.accessConfig()));
+      } else {
+        logger.info(
+            "Catalog accessible via bearer token (config: {})",
+            om.writeValueAsString(t.accessConfig()));
+      }
+    }
+    if (config.anonymousAccess().enabled()) {
+      logger.warn(
+          "Anonymous access enabled (config: {})",
+          om.writeValueAsString(config.anonymousAccess().accessConfig()));
     }
 
-    // TODO: use "addr" instead
-    int port = PropertyUtil.propertyAsInt(config, Config.OPTION_REST_CATALOG_PORT, 5000);
-    ;
-    int debugPort = PropertyUtil.propertyAsInt(config, Config.OPTION_REST_CATALOG_DEBUG_PORT, 5001);
+    // FIXME: remove
+    if (config.s3() != null) {
+      var awsRegion = config.s3().region();
+      if (!awsRegion.isEmpty()) {
+        System.setProperty("aws.region", awsRegion);
+      }
+    }
 
-    // TODO: ensure all http handler are hooked in
+    // TODO: ensure all http handlers are hooked in
     JvmMetrics.builder().register();
 
-    Catalog catalog = CatalogUtil.buildIcebergCatalog("rest_backend", config, null);
+    String catalogImpl = icebergConfig.get(CatalogProperties.CATALOG_IMPL);
+    Catalog catalog;
+    if (EtcdCatalog.class.getName().equals(catalogImpl)) {
+      catalog = newEctdCatalog(icebergConfig);
+    } else {
+      catalog = CatalogUtil.buildIcebergCatalog("default", icebergConfig, null);
+    }
 
     // Initialize and start the maintenance scheduler
     initializeMaintenanceScheduler(catalog, config);
 
     // TODO: replace with uds (jetty-unixdomain-server is all that is needed here but in ice you'll
     // need to implement custom org.apache.iceberg.rest.RESTClient)
-    String adminPort = config.get(Config.OPTION_ADMIN_PORT);
-    if (adminPort != null && !adminPort.isEmpty()) {
-      Server adminServer = createAdminServer(Integer.parseInt(adminPort), catalog, config);
+    if (!Strings.isNullOrEmpty(config.adminAddr())) {
+      HostAndPort adminHostAndPort = HostAndPort.fromString(config.adminAddr());
+      Server adminServer =
+          createAdminServer(
+              adminHostAndPort.getHost(),
+              adminHostAndPort.getPort(),
+              catalog,
+              config,
+              icebergConfig);
       adminServer.start();
-      logger.info("Serving admin endpoint at http://localhost:{}/v1/{config,*}", adminPort);
+      logger.warn("Serving admin endpoint at http://{}/v1/{config,*}", adminHostAndPort);
     }
 
-    Server httpServer = createServer(port, catalog, config);
+    HostAndPort hostAndPort = HostAndPort.fromString(config.addr());
+    Server httpServer =
+        createServer(hostAndPort.getHost(), hostAndPort.getPort(), catalog, config, icebergConfig);
     httpServer.start();
-    logger.info("Serving http://0.0.0.0:{}/v1/{config,*}", port);
+    logger.info("Serving http://{}/v1/{config,*}", hostAndPort);
 
     // FIXME: exception here does not terminate the process
-    createDebugServer(debugPort).start();
-    logger.info("Serving http://0.0.0.0:{}/{metrics,healtz,livez,readyz}", debugPort);
+    HostAndPort debugHostAndPort = HostAndPort.fromString(config.debugAddr());
+    createDebugServer(debugHostAndPort.getHost(), debugHostAndPort.getPort()).start();
+    logger.info("Serving http://{}/{metrics,healtz,livez,readyz}", debugHostAndPort);
 
     httpServer.join();
     return 0;
   }
 
-  private void initializeMaintenanceScheduler(Catalog catalog, Map<String, String> config) {
-    if (maintenanceInterval == null || maintenanceInterval.trim().isEmpty()) {
-      logger.info("Maintenance scheduler is disabled (no maintenance interval specified)");
+  private void initializeMaintenanceScheduler(Catalog catalog, Config config) {
+    if (Strings.isNullOrEmpty(config.maintenanceSchedule())) {
+      logger.info("Catalog maintenance disabled (no maintenance schedule specified)");
       return;
     }
-
     try {
       MaintenanceScheduler scheduler =
-          new MaintenanceScheduler(catalog, config, maintenanceInterval);
+          new MaintenanceScheduler(
+              catalog, config.maintenanceSchedule(), config.snapshotTTLInDays());
       scheduler.startScheduledMaintenance();
-      logger.info("Maintenance scheduler initialized with interval: {}", maintenanceInterval);
+      logger.info(
+          "Maintenance scheduler initialized with schedule: {}", config.maintenanceSchedule());
     } catch (Exception e) {
       logger.error("Failed to initialize maintenance scheduler", e);
       throw new RuntimeException(e);
     }
   }
 
+  private static Catalog newEctdCatalog(Map<String, String> config) {
+    // TODO: remove; params all verified by config
+    String uri = config.getOrDefault(CatalogProperties.URI, "etcd:http://localhost:2379");
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(uri), "etcd catalog: \"%s\" required", CatalogProperties.URI);
+
+    String inputWarehouseLocation = config.get(CatalogProperties.WAREHOUSE_LOCATION);
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(inputWarehouseLocation),
+        "etcd catalog: \"%s\" required",
+        CatalogProperties.WAREHOUSE_LOCATION);
+
+    String ioImpl = config.get(CatalogProperties.FILE_IO_IMPL);
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(ioImpl),
+        "etcd catalog: \"%s\" required",
+        CatalogProperties.FILE_IO_IMPL);
+
+    var io = CatalogUtil.loadFileIO(ioImpl, config, null);
+    return new EtcdCatalog(
+        "default", Strings.removePrefix(uri, "etcd:"), inputWarehouseLocation, io);
+  }
+
   public static void main(String[] args) throws Exception {
-    int exitCode = new CommandLine(new Main()).execute(args);
+    SLF4JBridgeHandler.install();
+    CommandLine cmd = new CommandLine(new Main());
+    cmd.setExecutionExceptionHandler(
+        (Exception ex, CommandLine self, CommandLine.ParseResult res) -> {
+          logger.error("Fatal", ex);
+          return 1;
+        });
+    int exitCode = cmd.execute(args);
     System.exit(exitCode);
   }
 }

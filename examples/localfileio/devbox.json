@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.10.7/.schema/devbox.schema.json",
+  "env": {
+    "AT": "ice:examples/localfileio"
+  },
+  "packages": {
+    "sqlite": "latest"
+  }
+}

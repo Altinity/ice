@@ -1,10 +1,17 @@
+/*
+ * Copyright (c) 2025 Altinity Inc and/or its affiliates. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ */
 package com.altinity.ice.rest.catalog.internal.maintenance;
 
-import com.altinity.ice.rest.catalog.internal.config.Config;
 import com.github.shyiko.skedule.Schedule;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -20,7 +27,6 @@ import org.slf4j.LoggerFactory;
 
 public class MaintenanceScheduler {
   private static final Logger logger = LoggerFactory.getLogger(MaintenanceScheduler.class);
-  private static final int DEFAULT_EXPIRATION_DAYS = 30;
 
   private final Catalog catalog;
   private final AtomicBoolean isMaintenanceMode = new AtomicBoolean(false);
@@ -31,18 +37,12 @@ public class MaintenanceScheduler {
   private ScheduledFuture<?> currentTask;
   private final Integer snapshotExpirationDays;
 
-  public MaintenanceScheduler(
-      Catalog catalog, Map<String, String> config, String maintenanceInterval) {
+  public MaintenanceScheduler(Catalog catalog, String schedule, int snapshotExpirationDays) {
     this.catalog = catalog;
     this.executor = new ScheduledThreadPoolExecutor(1);
     ((ScheduledThreadPoolExecutor) executor).setRemoveOnCancelPolicy(true);
-    this.schedule = Schedule.parse(maintenanceInterval);
-    if (config.containsKey(Config.OPTION_SNAPSHOT_EXPIRATION_DAYS)) {
-      this.snapshotExpirationDays =
-          Integer.parseInt(config.get(Config.OPTION_SNAPSHOT_EXPIRATION_DAYS));
-    } else {
-      this.snapshotExpirationDays = DEFAULT_EXPIRATION_DAYS;
-    }
+    this.schedule = Schedule.parse(schedule);
+    this.snapshotExpirationDays = snapshotExpirationDays;
   }
 
   public void startScheduledMaintenance() {
@@ -94,8 +94,7 @@ public class MaintenanceScheduler {
       if (catalog != null) {
         logger.info("Performing maintenance on catalog: {}", catalog.name());
         List<Namespace> namespaces;
-        if (catalog instanceof SupportsNamespaces) {
-          SupportsNamespaces nsCatalog = (SupportsNamespaces) catalog;
+        if (catalog instanceof SupportsNamespaces nsCatalog) {
           namespaces = nsCatalog.listNamespaces();
           for (Namespace ns : namespaces) {
             logger.debug("Namespace: " + ns);

@@ -47,7 +47,6 @@ public class RESTObjectMapper {
           MAPPER.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
           MAPPER.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
           MAPPER.setPropertyNamingStrategy(new PropertyNamingStrategies.KebabCaseStrategy());
-          // MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL);
           RESTSerializers.registerAll(MAPPER);
           isInitialized = true;
         }

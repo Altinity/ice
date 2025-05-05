@@ -11,14 +11,20 @@ In the example below, we:
 # feel free to skip it if you have clickhouse client installed already
 devbox shell
 
-docker compose down -v && sudo rm -rf docker-compose.volumes/
-docker compose up # spins up ice-rest-catalog + clickhouse
+docker compose down -v && sudo rm -rf data/
+docker compose up # spin up minio, ice-rest-catalog & clickhouse
 
 ice insert nyc.taxis -p \
   https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
 
 clickhouse client --query 'select count(*) from ice.`nyc.taxis`;'
 ```
+
+### Troubleshooting
+
+1. `docker compose up` fails with `ERROR: Invalid interpolation format for "content" option in config "clickhouse-init": "#!/bin/bash`
+
+Solution: Upgrade docker/docker compose to v2.
 
 #### Spark Iceberg 
 A spark-iceberg container can be launched using the `docker-compose-spark-iceberg.yml` file.

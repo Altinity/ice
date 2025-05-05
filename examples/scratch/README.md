@@ -10,7 +10,7 @@ All without using containers.
 This is mostly intended for `ice`/`ice-rest-catalog` development.
 
 ```shell
-# open shell containing `clickhouse`, `minio` and `mc` (minio client)
+# open shell containing `clickhouse`, `minio` and `mc` (minio client) + optional etcd/etcdctl, sqlite3 (sqlite client)
 devbox shell
 
 # start minio (local s3://), then create bucket named "bucket1"
@@ -39,7 +39,7 @@ AWS_REGION=us-east-2 ice insert btc.transactions -p --s3-no-sign-request \
 date=2025-01-01/part-00000-33e8d075-2099-409b-a806-68dd17217d39-c000.snappy.parquet \
   s3://aws-public-blockchain/v1.0/btc/transactions/date=2025-01-02/*.parquet
 
-# upload file to minio using local-mc, 
+# upload file to minio using local-mc,
 # then add file to the catalog without making a copy
 ice create-table flowers.iris_no_copy --schema-from-parquet=file://iris.parquet
 
@@ -74,7 +74,7 @@ CREATE DATABASE ice
   SETTINGS catalog_type = 'rest',
     auth_header = 'Authorization: Bearer foo', 
     storage_endpoint = 'http://localhost:9000', 
-    warehouse = 's3://bucket1/';
+    warehouse = 's3://bucket1';
 
 -- inspect
 SHOW DATABASES;
@@ -103,7 +103,28 @@ select * from ice.`flowers.iris_no_copy` limit 10 FORMAT CSVWithNamesAndTypes;
 
 ### Troubleshooting
 
-1`Code: 336. DB::Exception: Unknown database engine: DataLakeCatalog. (UNKNOWN_DATABASE_ENGINE)`
+1. `Code: 336. DB::Exception: Unknown database engine: DataLakeCatalog. (UNKNOWN_DATABASE_ENGINE)`
 
 Solution: Make sure `clickhouse --version` is >=25.4.1.2514 or   
 use [devbox](https://www.jetify.com/docs/devbox/installing_devbox/) as shown above.   
+
+### Supplemental
+
+#### Inspecting sqlite db content
+
+```shell
+# inspect sqlite data
+sqlite3 data/ice-rest-catalog/db.sqlite
+sqlite> .help
+sqlite> .tables
+sqlite> .mode table
+sqlite> select * from iceberg_tables;
+sqlite> select * from iceberg_namespace_properties;
+sqlite> .quit
+```
+
+#### Inspecting etcd content
+
+```shell
+etcdctl get --prefix ""
+```

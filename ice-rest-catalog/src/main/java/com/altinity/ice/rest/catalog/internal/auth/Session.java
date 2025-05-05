@@ -1,20 +1,23 @@
+/*
+ * Copyright (c) 2025 Altinity Inc and/or its affiliates. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ */
 package com.altinity.ice.rest.catalog.internal.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
-import java.io.IOException;
-import java.util.Map;
 
-public record Session(String uid, Map<String, String> attrs) {
+public record Session(String uid, boolean readOnly, String awsAssumeRoleARN) {
 
   public void applyTo(HttpServletRequest r) {
-    r.setAttribute("session_uid", uid);
-    r.setAttribute("session_attrs", attrs);
+    r.setAttribute("session", this);
   }
 
-  public static Session from(HttpServletRequest r) throws IOException {
-    //noinspection unchecked
-    return new Session(
-        (String) r.getAttribute("session_uid"),
-        (Map<String, String>) r.getAttribute("session_attrs"));
+  public static Session from(HttpServletRequest r) {
+    return (Session) r.getAttribute("session");
   }
 }

@@ -19,17 +19,18 @@ ARG VERSION
 COPY . .
 
 RUN ./mvnw -am -pl ice-rest-catalog versions:set -DnewVersion=${VERSION}
-RUN ./mvnw -Pno-check -pl ice-rest-catalog clean package -Dmaven.test.skip=true
+RUN ./mvnw -Pno-check -am -pl ice-rest-catalog clean package -Dmaven.test.skip=true
 
 FROM gcr.io/distroless/java21-debian12:${BASE_IMAGE_TAG}
 
-# not using executable jar as there is not shell in non-"debug" version of distroless
-COPY --from=build /app/ice-rest-catalog/target/ice-rest-catalog-jar-with-dependencies.jar /usr/local/bin/ice-rest-catalog.jar
+COPY --from=build /app/ice-rest-catalog/target/ice-rest-catalog-jar /usr/local/bin/ice-rest-catalog
 
 # iceberg
 EXPOSE 5000
 # debug
 EXPOSE 5001
 
-ENTRYPOINT ["java", "-jar", "/usr/local/bin/ice-rest-catalog.jar"]
-CMD ["-c", "/etc/ice/ice-rest-catalog.yaml"]
+ENV ICE_REST_CATALOG_CONFIG=/etc/ice/ice-rest-catalog.yaml
+
+# using java -jar instead of executing jar directly as there is not shell in non-"debug" version of distroless
+ENTRYPOINT ["java", "-jar", "/usr/local/bin/ice-rest-catalog"]

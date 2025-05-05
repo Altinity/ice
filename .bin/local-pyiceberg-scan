@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/../ice-rest-catalog/pyiceberg-test"
+cd "$(dirname "${BASH_SOURCE[0]}")/../ice-rest-catalog/src/test/pyiceberg"
 
 uv run ice_scan.py "$@"

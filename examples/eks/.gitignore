@@ -1,3 +1,4 @@
 /ice-rest-catalog.eks.yaml
 /eks.yaml
 /kubeconfig
+/aws.credentials

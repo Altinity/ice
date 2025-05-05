@@ -40,7 +40,7 @@ for q in "" "debug-"; do
   docker manifest create "$image_name:$q$IMAGE_TAG" \
     --amend "$image_name:$q$IMAGE_TAG-amd64" \
     --amend "$image_name:$q$IMAGE_TAG-arm64"
-  docker manifest push "$image_name:$q$IMAGE_TAG"
+  docker manifest push --purge "$image_name:$q$IMAGE_TAG"
 done
 
 regctl image copy "$image_name:$IMAGE_TAG" "$image_name:latest"

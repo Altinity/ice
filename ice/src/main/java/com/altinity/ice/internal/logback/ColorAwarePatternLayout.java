@@ -1,3 +1,12 @@
+/*
+ * Copyright (c) 2025 Altinity Inc and/or its affiliates. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ */
 package com.altinity.ice.internal.logback;
 
 import ch.qos.logback.classic.PatternLayout;
@@ -10,6 +19,7 @@ import picocli.CommandLine;
  * href="https://stackoverflow.com/a/68633212">stackoverflow.com/a/68633212</a>.
  */
 public class ColorAwarePatternLayout extends PatternLayout {
+
   static {
     if (!CommandLine.Help.Ansi.AUTO.enabled()) { // Usage of Picocli heuristic
       DEFAULT_CONVERTER_MAP.put("black", NoColorConverter.class.getName());

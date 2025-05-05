@@ -2,7 +2,8 @@ This project includes code derived from "Apache Iceberg", licensed under the
 Apache License, Version 2.0 (the "Apache License").
 
 Derived work
-- src/main/java/com/altinity/ice/rest/catalog/internal/rest/*.java with Apache License 2.0 header
+- subset of src/main/java/com/altinity/ice/rest/catalog/internal/rest/*.java
+- subset of src/main/java/com/altinity/ice/internal/iceberg/io/internal/*.java
 
 A copy of the Apache License 2.0 is provided below and at:
 

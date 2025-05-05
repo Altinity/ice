@@ -97,7 +97,7 @@ public class RESTCatalogServlet extends HttpServlet {
 
     Session session = Session.from(request);
     String userToLog = "";
-    if (session.uid() != null) { // uid is null only for requests coming through admin port
+    if (session != null) {
       userToLog = "@" + session.uid() + " ";
     }
     logger.info("{}{} {}", userToLog, method, path);

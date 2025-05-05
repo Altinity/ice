@@ -12,36 +12,32 @@ COPY mvnw .
 COPY pom.xml .
 COPY ice/pom.xml ice/pom.xml
 COPY ice-rest-catalog/pom.xml ice-rest-catalog/pom.xml
-RUN ./mvnw dependency:go-offline
+RUN ./mvnw -am -pl ice-rest-catalog dependency:go-offline
 
 ARG VERSION
 
 COPY . .
 
-RUN ./mvnw versions:set -DnewVersion=${VERSION}
-RUN ./mvnw -Pno-check clean package -Dmaven.test.skip=true
+RUN ./mvnw -am -pl ice-rest-catalog versions:set -DnewVersion=${VERSION}
+RUN ./mvnw -Pno-check -am -pl ice-rest-catalog clean package -Dmaven.test.skip=true
 
 FROM gcr.io/distroless/java21-debian12:${BASE_IMAGE_TAG}
 
-# not supported by docker
-# COPY --from=altinity/ice:${ICE_IMAGE_TAG} /usr/local/bin/ice /usr/local/bin/ice
-COPY --from=build /app/ice/target/ice-jar /usr/local/bin/ice
-ENV ICE_CATALOG_DEFAULT_URI=http://localhost:5002
-# TOOD: find a better way
-# for exec ice
+COPY --from=build /app/ice-rest-catalog/target/ice-rest-catalog-jar /usr/local/bin/ice-rest-catalog
+
+# there is no /bin/sh in distroless (and it's needed to execute ice-rest-catalog without java -jar)
 SHELL ["/busybox/sh", "-c"]
 RUN ln -s /busybox/sh /bin/sh
-
-# not using executable jar as there is not shell in non-"debug" version of distroless
-COPY --from=build /app/ice-rest-catalog/target/ice-rest-catalog-jar-with-dependencies.jar /usr/local/bin/ice-rest-catalog.jar
+RUN echo -e '#!/bin/sh\nexec ice-rest-catalog ice "$@"' > /usr/local/bin/ice && chmod +x /usr/local/bin/ice
 
 # iceberg
 EXPOSE 5000
 # debug
 EXPOSE 5001
 
-# make ice-rest-catalog open admin port
-ENV ICE_REST_CATALOG_ICE_ADMIN_PORT=5002
+ENV ICE_REST_CATALOG_CONFIG=/etc/ice/ice-rest-catalog.yaml
 
-ENTRYPOINT ["java", "-jar", "/usr/local/bin/ice-rest-catalog.jar"]
-CMD ["-c", "/etc/ice/ice-rest-catalog.yaml"]
+ENV ICE_REST_CATALOG_ADMIN_ADDR=localhost:5002
+ENV ICE_URI=http://localhost:5002
+
+ENTRYPOINT ["/usr/local/bin/ice-rest-catalog"]

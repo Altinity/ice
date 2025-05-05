@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DIR="$(dirname "${BASH_SOURCE[0]}")/.."
-exec "$DIR/mvnw" -f "$DIR/pom.xml" -q -Pno-check -pl ice-rest-catalog compile exec:java -Dexec.mainClass=com.altinity.ice.rest.catalog.Main -Dexec.args="$*" # FIXME: $*
+exec "$DIR/mvnw" -f "$DIR/pom.xml" -q -P ice-rest-catalog-exec -Pno-check -am -pl ice-rest-catalog compile exec:java -Dexec.mainClass=com.altinity.ice.rest.catalog.Main -Dexec.args="$*" # FIXME: $*
