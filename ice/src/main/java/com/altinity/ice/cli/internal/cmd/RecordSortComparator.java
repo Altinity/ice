@@ -7,7 +7,7 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
-package com.altinity.ice.internal.cmd;
+package com.altinity.ice.cli.internal.cmd;
 
 import java.util.Comparator;
 import java.util.List;
