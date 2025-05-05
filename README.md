@@ -36,3 +36,20 @@ sdk env
 # shows how to build, test, etc. project
 ./mvnw
 ```
+
+## License
+
+Copyright (c) 2025, Altinity Inc and/or its affiliates. All rights reserved.
+`ice` is licensed under the Apache License 2.0.
+
+See [LICENSE](./LICENSE) for more details.
+
+## Commercial Support
+
+- [Official website](https://altinity.com/) - Get a high level overview of Altinity and our offerings.
+- [Altinity.Cloud](https://altinity.com/cloud-database/) - Run ClickHouse in our cloud or yours.
+- [Altinity Support](https://altinity.com/support/) - Get Enterprise-class support for ClickHouse.
+- [Slack](https://altinity.com/slack) - Talk directly with ClickHouse users and Altinity devs.
+- [Contact us](https://hubs.la/Q020sH3Z0) - Contact Altinity with your questions or issues.
+- [Free consultation](https://hubs.la/Q020sHkv0) - Get a free consultation with a ClickHouse expert today.
+ 

@@ -138,7 +138,7 @@
             ./mvnw validate
 
             # format
-            ./mvnw -Dformat
+            ./mvnw com.spotify.fmt:fmt-maven-plugin:format license:format
 
             # test
             ./mvnw verify
@@ -171,6 +171,40 @@
       </activation>
       <build>
         <plugins>
+          <plugin>
+            <groupId>com.mycila</groupId>
+            <artifactId>license-maven-plugin</artifactId>
+            <version>4.5</version>
+            <configuration>
+              <header>${maven.multiModuleProjectDirectory}/license-header.txt</header>
+              <properties>
+                <year>2025</year>
+              </properties>
+              <includes>
+                <include>src/main/java/**/*.java</include>
+                <include>src/test/java/**/*.java</include>
+              </includes>
+              <excludes>
+                <!-- TODO: find a better way -->
+                <exclude>src/main/java/**/RESTCatalogAdapter.java</exclude>
+                <exclude>src/main/java/**/RESTCatalogServlet.java</exclude>
+                <exclude>src/main/java/**/RESTObjectMapper.java</exclude>
+                <exclude>src/main/java/**/Route.java</exclude>
+                <exclude>src/main/java/**/iceberg/io/internal/*.java</exclude>
+                <exclude>src/main/java/**/iceberg/io/SchemeFileIO.java</exclude>
+              </excludes>
+              <strictCheck>true</strictCheck>
+            </configuration>
+            <executions>
+              <execution>
+                <id>check-license</id>
+                <phase>validate</phase>
+                <goals>
+                  <goal>check</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-enforcer-plugin</artifactId>
@@ -231,17 +265,6 @@
           <name>no-check</name>
         </property>
       </activation>
-    </profile>
-    <profile>
-      <id>format</id>
-      <activation>
-        <property>
-          <name>format</name>
-        </property>
-      </activation>
-      <build>
-        <defaultGoal>com.spotify.fmt:fmt-maven-plugin:format</defaultGoal>
-      </build>
     </profile>
   </profiles>
 </project>
