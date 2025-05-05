@@ -47,7 +47,7 @@ public final class CreateTable {
       boolean s3NoSignRequest,
       List<String> partitionColumns,
       List<String> sortAscendingColumns,
-      List<String> sortDescingColumns)
+      List<String> sortDescendingColumns)
       throws IOException {
     Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
 
@@ -84,7 +84,7 @@ public final class CreateTable {
         // Create sort order based on provided sort columns (z-order)
         SortOrder sortOrder = null;
         if ((sortAscendingColumns != null && !sortAscendingColumns.isEmpty())
-            || (sortDescingColumns != null && !sortDescingColumns.isEmpty())) {
+            || (sortDescendingColumns != null && !sortDescendingColumns.isEmpty())) {
           SortOrder.Builder sortOrderBuilder = SortOrder.builderFor(fileSchema);
 
           // Add ascending columns first
@@ -95,8 +95,8 @@ public final class CreateTable {
           }
 
           // Add descending columns
-          if (sortDescingColumns != null) {
-            for (String column : sortDescingColumns) {
+          if (sortDescendingColumns != null) {
+            for (String column : sortDescendingColumns) {
               sortOrderBuilder.desc(column);
             }
           }
