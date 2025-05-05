@@ -64,7 +64,8 @@ public final class Insert {
       boolean s3CopyObject,
       String retryListFile,
       List<String> partitionColumns,
-      List<String> sortColumns,
+      List<String> sortAscendingColumns,
+      List<String> sortDescendingColumns,
       int threadCount)
       throws IOException, InterruptedException {
     if (files.length == 0) {
@@ -88,29 +89,8 @@ public final class Insert {
         options.forceNoCopy() ? options.toBuilder().noCopy(true).build() : options;
     Table table = catalog.loadTable(nsTable);
 
-    // Update partition spec if provided
-    if (partitionColumns != null && !partitionColumns.isEmpty()) {
-      var updateSpec = table.updateSpec();
-      for (String column : partitionColumns) {
-        updateSpec.addField(column);
-      }
-      updateSpec.commit();
-    }
-
-    // Update sort order if provided
-    if (sortColumns != null && !sortColumns.isEmpty()) {
-      table
-          .updateProperties()
-          .set(
-              TableProperties.WRITE_DISTRIBUTION_MODE,
-              TableProperties.WRITE_DISTRIBUTION_MODE_RANGE)
-          .commit();
-      var updatedSortOrder = table.replaceSortOrder();
-      for (String column : sortColumns) {
-        updatedSortOrder.asc(column);
-      }
-      updatedSortOrder.commit();
-    }
+    updatePartitionAndSortOrderMetadata(
+        table, partitionColumns, sortAscendingColumns, sortDescendingColumns);
 
     try (FileIO tableIO = table.io()) {
       final Supplier<S3Client> s3ClientSupplier;
@@ -260,6 +240,47 @@ public final class Insert {
     }
   }
 
+  private static void updatePartitionAndSortOrderMetadata(
+      Table table,
+      List<String> partitionColumns,
+      List<String> sortAscendingColumns,
+      List<String> sortDescendingColumns) {
+    // Update partition spec if provided
+    if (partitionColumns != null && !partitionColumns.isEmpty()) {
+      var updateSpec = table.updateSpec();
+      for (String column : partitionColumns) {
+        updateSpec.addField(column);
+      }
+      updateSpec.commit();
+    }
+
+    // Update sort order if provided
+    if ((sortAscendingColumns != null && !sortAscendingColumns.isEmpty())
+        || (sortDescendingColumns != null && !sortDescendingColumns.isEmpty())) {
+      table
+          .updateProperties()
+          .set(
+              TableProperties.WRITE_DISTRIBUTION_MODE,
+              TableProperties.WRITE_DISTRIBUTION_MODE_RANGE)
+          .commit();
+      var updatedSortOrder = table.replaceSortOrder();
+
+      if (sortAscendingColumns != null) {
+        for (String column : sortAscendingColumns) {
+          updatedSortOrder.asc(column);
+        }
+      }
+
+      if (sortDescendingColumns != null) {
+        for (String column : sortDescendingColumns) {
+          updatedSortOrder.desc(column);
+        }
+      }
+
+      updatedSortOrder.commit();
+    }
+  }
+
   private static List<DataFile> processFile(
       Table table,
       RESTCatalog catalog,
@@ -338,7 +359,8 @@ public final class Insert {
       if (checkNotExists.apply(dstDataFile)) {
         return null;
       }
-      return copyParquetWithPartition(file, dstDataFile, tableSchema, table, inputFile);
+      return copyParquetWithPartition(
+          file, replacePrefix(dstDataFile, "s3://", "s3a://"), tableSchema, table, inputFile);
     } else {
       String dstDataFile = dstDataFileSource.get(file);
       if (checkNotExists.apply(dstDataFile)) {
@@ -391,7 +413,7 @@ public final class Insert {
     GenericAppenderFactory appenderFactory = new GenericAppenderFactory(tableSchema, table.spec());
 
     PartitionKey partitionKey = new PartitionKey(table.spec(), tableSchema);
-    Map<PartitionKey, FileAppender<Record>> openAppenders = new HashMap<>();
+    Map<PartitionKey, List<Record>> partitionedRecords = new HashMap<>();
     Map<PartitionKey, OutputFile> writtenFiles = new HashMap<>();
 
     Parquet.ReadBuilder readBuilder =
@@ -399,49 +421,54 @@ public final class Insert {
             .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
             .project(tableSchema)
             .reuseContainers();
-    Map<PartitionKey, Long> recordCounts = new HashMap<>();
 
+    // Read and group records by partition
     try (CloseableIterable<Record> records = readBuilder.build()) {
       for (Record record : records) {
         partitionKey.partition(record);
         PartitionKey keyCopy = partitionKey.copy();
 
-        FileAppender<Record> appender = openAppenders.get(keyCopy);
-        if (appender == null) {
-          OutputFile outFile = fileFactory.newOutputFile(keyCopy).encryptingOutputFile();
-          appender = appenderFactory.newAppender(outFile, FileFormat.PARQUET);
-          openAppenders.put(keyCopy, appender);
-          writtenFiles.put(keyCopy, outFile);
-          recordCounts.put(keyCopy, 0L);
-        }
-
-        appender.add(record);
-        recordCounts.put(keyCopy, recordCounts.get(keyCopy) + 1);
+        partitionedRecords.computeIfAbsent(keyCopy, k -> new ArrayList<>()).add(record);
       }
     }
 
     List<DataFile> dataFiles = new ArrayList<>();
 
-    for (Map.Entry<PartitionKey, FileAppender<Record>> entry : openAppenders.entrySet()) {
+    // Create a comparator based on table.sortOrder()
+    RecordSortComparator comparator = new RecordSortComparator(table.sortOrder(), tableSchema);
+
+    // Write sorted records for each partition
+    for (Map.Entry<PartitionKey, List<Record>> entry : partitionedRecords.entrySet()) {
       PartitionKey partKey = entry.getKey();
-      FileAppender<Record> appender = entry.getValue();
-      appender.close();
+      List<Record> records = entry.getValue();
 
-      OutputFile outFile = writtenFiles.get(partKey);
-      InputFile inFile = outFile.toInputFile();
+      // Sort records within the partition
+      records.sort(comparator);
 
-      MetricsConfig metricsConfig = MetricsConfig.forTable(table);
-      Metrics metrics = ParquetUtil.fileMetrics(inFile, metricsConfig);
+      OutputFile outFile = fileFactory.newOutputFile(partKey).encryptingOutputFile();
+      writtenFiles.put(partKey, outFile);
 
-      dataFiles.add(
-          DataFiles.builder(table.spec())
-              .withPath(outFile.location())
-              .withFileSizeInBytes(inFile.getLength())
-              .withPartition(partKey)
-              .withFormat(FileFormat.PARQUET)
-              .withRecordCount(recordCounts.get(partKey))
-              .withMetrics(metrics)
-              .build());
+      try (FileAppender<Record> appender =
+          appenderFactory.newAppender(outFile, FileFormat.PARQUET)) {
+        for (Record rec : records) {
+          appender.add(rec);
+        }
+        appender.close();
+
+        InputFile inFile = outFile.toInputFile();
+        MetricsConfig metricsConfig = MetricsConfig.forTable(table);
+        Metrics metrics = ParquetUtil.fileMetrics(inFile, metricsConfig);
+
+        dataFiles.add(
+            DataFiles.builder(table.spec())
+                .withPath(outFile.location())
+                .withFileSizeInBytes(inFile.getLength())
+                .withPartition(partKey)
+                .withFormat(FileFormat.PARQUET)
+                .withRecordCount(records.size())
+                .withMetrics(metrics)
+                .build());
+      }
     }
 
     return dataFiles;

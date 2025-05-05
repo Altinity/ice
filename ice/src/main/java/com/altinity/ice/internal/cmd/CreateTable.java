@@ -35,7 +35,8 @@ public final class CreateTable {
       boolean ignoreAlreadyExists,
       boolean s3NoSignRequest,
       List<String> partitionColumns,
-      List<String> sortColumns)
+      List<String> sortAscendingColumns,
+      List<String> sortDescingColumns)
       throws IOException {
     Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
 
@@ -71,11 +72,24 @@ public final class CreateTable {
 
         // Create sort order based on provided sort columns (z-order)
         SortOrder sortOrder = null;
-        if (sortColumns != null && !sortColumns.isEmpty()) {
+        if ((sortAscendingColumns != null && !sortAscendingColumns.isEmpty())
+            || (sortDescingColumns != null && !sortDescingColumns.isEmpty())) {
           SortOrder.Builder sortOrderBuilder = SortOrder.builderFor(fileSchema);
-          for (String column : sortColumns) {
-            sortOrderBuilder.asc(column);
+
+          // Add ascending columns first
+          if (sortAscendingColumns != null) {
+            for (String column : sortAscendingColumns) {
+              sortOrderBuilder.asc(column);
+            }
           }
+
+          // Add descending columns
+          if (sortDescingColumns != null) {
+            for (String column : sortDescingColumns) {
+              sortOrderBuilder.desc(column);
+            }
+          }
+
           sortOrder = sortOrderBuilder.build();
         }
 
@@ -90,9 +104,21 @@ public final class CreateTable {
                   TableProperties.WRITE_DISTRIBUTION_MODE_RANGE)
               .commit();
           var updatedSortOrder = table.replaceSortOrder();
-          for (String column : sortColumns) {
-            updatedSortOrder.asc(column);
+
+          // Add ascending columns
+          if (sortAscendingColumns != null) {
+            for (String column : sortAscendingColumns) {
+              updatedSortOrder.asc(column);
+            }
           }
+
+          // Add descending columns
+          if (sortDescingColumns != null) {
+            for (String column : sortDescingColumns) {
+              updatedSortOrder.desc(column);
+            }
+          }
+
           updatedSortOrder.commit();
         }
       } catch (AlreadyExistsException e) {

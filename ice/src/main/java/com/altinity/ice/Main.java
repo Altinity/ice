@@ -107,10 +107,15 @@ public final class Main {
               split = ",")
           List<String> partitionColumns,
       @CommandLine.Option(
-              names = {"--sort-by"},
-              description = "Comma-separated list of columns to sort by",
+              names = {"--sort-ascending"},
+              description = "Comma-separated list of columns to sort in ascending order",
               split = ",")
-          List<String> sortColumns)
+          List<String> sortAscendingColumns,
+      @CommandLine.Option(
+              names = {"--sort-descending"},
+              description = "Comma-separated list of columns to sort in descending order",
+              split = ",")
+          List<String> sortDescendingColumns)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile)) {
       CreateTable.run(
@@ -121,7 +126,8 @@ public final class Main {
           createTableIfNotExists,
           s3NoSignRequest,
           partitionColumns,
-          sortColumns);
+          sortAscendingColumns,
+          sortDescendingColumns);
     }
   }
 
@@ -186,10 +192,15 @@ public final class Main {
               split = ",")
           List<String> partitionColumns,
       @CommandLine.Option(
-              names = {"--sort-by"},
-              description = "Comma-separated list of columns to sort by",
+              names = {"--sort-ascending"},
+              description = "Comma-separated list of columns to sort in ascending order",
               split = ",")
-          List<String> sortColumns,
+          List<String> sortAscendingColumns,
+      @CommandLine.Option(
+              names = {"--sort-descending"},
+              description = "Comma-separated list of columns to sort in descending order",
+              split = ",")
+          List<String> sortDescendingColumns,
       @CommandLine.Option(
               names = {"--thread-count"},
               description = "Number of threads to use for inserting data",
@@ -219,7 +230,8 @@ public final class Main {
             createTableIfNotExists,
             s3NoSignRequest,
             partitionColumns,
-            sortColumns);
+            sortAscendingColumns,
+            sortDescendingColumns);
       }
       Insert.run(
           catalog,
@@ -235,7 +247,8 @@ public final class Main {
           s3CopyObject,
           retryList,
           partitionColumns,
-          sortColumns,
+          sortAscendingColumns,
+          sortDescendingColumns,
           threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
     }
   }
