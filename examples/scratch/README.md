@@ -28,7 +28,7 @@ ice insert nyc.taxis -p \
   https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
   
 # Insert rows with sort-key
-ice insert --sort-by=VendorID nyc.taxis2 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
+ice insert --sort-descending=VendorID nyc.taxis2 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
 
 # Insert with partition key
 ice insert --partition-by=Airport_fee nyc2.taxis3 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet

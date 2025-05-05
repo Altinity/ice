@@ -335,9 +335,10 @@ public final class Insert {
       throw new BadRequestException(
           file + " cannot be added to catalog without copy"); // TODO: explain
     }
-    long dataFileSizeInBytes;
-    var dataFile = Strings.replacePrefix(file, "s3a://", "s3://");
+    long dataFileSizeInBytes = 0;
+
     var start = System.currentTimeMillis();
+    var dataFile = Strings.replacePrefix(file, "s3a://", "s3://");
     if (options.noCopy()) {
       if (checkNotExists.apply(dataFile)) {
         return null;
@@ -362,7 +363,6 @@ public final class Insert {
               .destinationKey(dst.path())
               .build();
       s3ClientLazy.getValue().copyObject(copyReq);
-      dataFileSizeInBytes = inputFile.getLength();
       dataFile = dstDataFile;
     } else if (partitionColumns != null && !partitionColumns.isEmpty()) {
       String dstDataFile = dstDataFileSource.get(file);
@@ -371,39 +371,66 @@ public final class Insert {
       }
       return copyParquetWithPartition(
           file,
-          Strings.replacePrefix(dstDataFile, "s3://", "s3a://"),
+          Strings.replacePrefix(dstDataFileSource.get(file), "s3://", "s3a://"),
           tableSchema,
           table,
-          inputFile);
+          inputFile,
+          metadata);
     } else {
       String dstDataFile = dstDataFileSource.get(file);
       if (checkNotExists.apply(dstDataFile)) {
         return null;
       }
+
       OutputFile outputFile =
           tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
-      // TODO: support transferTo below (note that compression, etc. might be different)
-      // try (var d = outputFile.create()) { try (var s = inputFile.newStream()) {
-      // s.transferTo(d); }}
+
       Parquet.ReadBuilder readBuilder =
           Parquet.read(inputFile)
               .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
-              .project(tableSchema); // TODO: ?
-      // TODO: reuseContainers?
+              .project(tableSchema);
+
+      logger.info("{}: copying to {}", file, dstDataFile);
+
+      // Read records into memory
+      List<Record> records = new ArrayList<>();
+      try (CloseableIterable<Record> iterable = readBuilder.build()) {
+        for (Record r : iterable) {
+          records.add(r);
+        }
+      }
+
+      // Sort records if sort order is defined and non-empty
+      SortOrder sortOrder = table.sortOrder();
+      if (sortOrder != null && !sortOrder.isUnsorted()) {
+        records.sort(new RecordSortComparator(sortOrder, tableSchema));
+      }
+
+      // Write sorted records out
       Parquet.WriteBuilder writeBuilder =
           Parquet.write(outputFile)
               .overwrite(dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL)
               .createWriterFunc(GenericParquetWriter::buildWriter)
               .schema(tableSchema);
-      logger.info("{}: copying to {}", file, dstDataFile);
-      // file size may have changed due to different compression, etc.
-      dataFileSizeInBytes = copy(readBuilder, writeBuilder);
+
+      try (FileAppender<Record> appender = writeBuilder.build()) {
+        for (Record record : records) {
+          appender.add(record);
+        }
+
+        // dataFileSizeInBytes = appender.length();
+      }
+
+      InputFile inFile = outputFile.toInputFile();
+      dataFileSizeInBytes = inFile.getLength();
       dataFile = dstDataFile;
     }
     logger.info(
         "{}: adding data file (copy took {}s)", file, (System.currentTimeMillis() - start) / 1000);
     MetricsConfig metricsConfig = MetricsConfig.forTable(table);
     Metrics metrics = ParquetUtil.fileMetrics(inputFile, metricsConfig);
+
+    // dataFileSizeInBytes = inputFile.getLength();
     DataFile dataFileObj =
         new DataFiles.Builder(table.spec())
             .withPath(dataFile)
@@ -416,10 +443,16 @@ public final class Insert {
   }
 
   private static List<DataFile> copyParquetWithPartition(
-      String file, String dstDataFile, Schema tableSchema, Table table, InputFile inputFile)
+      String file,
+      String dstDataFile,
+      Schema tableSchema,
+      Table table,
+      InputFile inputFile,
+      ParquetMetadata metadata)
       throws IOException {
 
     logger.info("{}: copying to partitions under {}", file, dstDataFile);
+    var start = System.currentTimeMillis();
 
     // Partition writer setup
     OutputFileFactory fileFactory =
@@ -449,6 +482,7 @@ public final class Insert {
 
     List<DataFile> dataFiles = new ArrayList<>();
 
+    logger.info("Sort order: " + table.sortOrder().toString());
     // Create a comparator based on table.sortOrder()
     RecordSortComparator comparator = new RecordSortComparator(table.sortOrder(), tableSchema);
 
@@ -470,10 +504,13 @@ public final class Insert {
         }
         appender.close();
 
+        logger.info(
+            "{}: adding data file (copy took {}s)",
+            file,
+            (System.currentTimeMillis() - start) / 1000);
         InputFile inFile = outFile.toInputFile();
         MetricsConfig metricsConfig = MetricsConfig.forTable(table);
         Metrics metrics = ParquetUtil.fileMetrics(inFile, metricsConfig);
-
         dataFiles.add(
             DataFiles.builder(table.spec())
                 .withPath(outFile.location())
