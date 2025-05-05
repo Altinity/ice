@@ -2,8 +2,8 @@
 
 A suite of tools aimed at making [Iceberg](https://iceberg.apache.org/) REST Catalogs more approachable. 
 
-- [ice-rest-catalog](ice-rest-catalog/) - A Kubernetes-ready Iceberg REST catalog backed by [etcd](https://etcd.io/) (WIP).  
-Starts with a one-liner: `ice-rest-catalog -c config.yaml`.
+- [ice-rest-catalog](ice-rest-catalog/) - A Kubernetes-ready Iceberg REST catalog backed by [etcd](https://etcd.io/).  
+Run locally with a one-liner: `ice-rest-catalog -c config.yaml`.
 
 - [ice](ice/) - A CLI for interacting with Iceberg REST catalogs.  
 Create/delete tables, insert data with `ice insert -p ns1.table1 file://example.parquet`, etc. 

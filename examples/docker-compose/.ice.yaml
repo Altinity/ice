@@ -1,7 +1,4 @@
-catalog:
-  default:
-    uri: http://localhost:5000
-    header.authorization: bearer foo
-    s3.endpoint: http://localhost:8999
-    client.region: mino
-    ice.http.cache: var/cache/ice/http
+uri: http://localhost:5000
+bearerToken: foo
+s3:
+  endpoint: http://localhost:8999

@@ -10,6 +10,7 @@ import picocli.CommandLine;
  * href="https://stackoverflow.com/a/68633212">stackoverflow.com/a/68633212</a>.
  */
 public class ColorAwarePatternLayout extends PatternLayout {
+
   static {
     if (!CommandLine.Help.Ansi.AUTO.enabled()) { // Usage of Picocli heuristic
       DEFAULT_CONVERTER_MAP.put("black", NoColorConverter.class.getName());

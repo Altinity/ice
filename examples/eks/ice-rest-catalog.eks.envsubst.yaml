@@ -13,9 +13,13 @@ metadata:
   name: ice-rest-catalog
 stringData:
   ice-rest-catalog.yaml: |
-    uri: "jdbc:sqlite:file:/var/lib/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500"
+    # uri: jdbc:sqlite:file:/var/lib/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500
+    uri: etcd:http://ice-rest-catalog-etcd:2379
     warehouse: s3://${CATALOG_BUCKET}
-    ice.token: foo
+    s3:
+      region: ${AWS_REGION}
+    bearerTokens:
+    - value: foo
 ---
 apiVersion: v1
 kind: Service
@@ -30,6 +34,8 @@ spec:
     - port: 5001
       name: debug
 ---
+# this can be a simple Deployment without volumes when uri is ectd:...
+# keeping it StatefulSet for testing purposes only
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -56,8 +62,9 @@ spec:
             secretName: ice-rest-catalog
       containers:
         - name: iceberg
-          image: altinity/ice-rest-catalog:latest
-          # imagePullPolicy: "Always"
+          # image: altinity/ice-rest-catalog:latest
+          image: altinity/ice-rest-catalog:debug-0.0.0-SNAPSHOT
+          imagePullPolicy: "Always" # for test purposes only
           ports:
             - containerPort: 5000 # iceberg
             - containerPort: 5001 # /{healthz,livez,readyz,metrics}

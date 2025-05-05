@@ -2,7 +2,9 @@
   "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.10.7/.schema/devbox.schema.json",
   "packages": [
     "minio@latest",
-    "minio-client@latest"
+    "minio-client@latest",
+    "sqlite@latest",
+    "etcd_3_5@latest"
   ],
   "env": {
     "AT": "ice:examples/scratch"

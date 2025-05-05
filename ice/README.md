@@ -4,6 +4,9 @@ A CLI for loading data into Iceberg REST catalogs.
 
 ## Reference
 
+Sample configs can be found among included [../examples/](../examples/).  
+When in doubt, `.ice.yaml` format is defined [here](src/main/java/com/altinity/ice/cli/internal/config/Config.java).
+
 <table>
 <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
 <tbody>
@@ -15,9 +18,7 @@ ice check
 
 </td><td>
 
-Checks if `ice` is able to connect to the Iceberg REST Catalog using config in `$(pwd)/.ice.yaml`.
-
-Look for `.ice.yaml` files in [../examples/](../examples/) to get started. 
+Checks if `ice` is able to connect to the Iceberg REST Catalog using `$(pwd)/.ice.yaml` config.
 
 </td></tr>
 <tr><td>

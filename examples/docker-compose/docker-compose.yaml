@@ -26,7 +26,7 @@ services:
     depends_on:
       - minio
   ice-rest-catalog:
-    image: altinity/ice-rest-catalog:latest
+    image: altinity/ice-rest-catalog:${ICE_REST_CATALOG_TAG:-latest}
     restart: unless-stopped
     ports:
       - '5000:5000' # iceberg/http
@@ -35,7 +35,7 @@ services:
         target: /etc/ice/ice-rest-catalog.yaml
     volumes:
       # for access to /var/lib/ice-rest-catalog/db.sqlite
-      - ./docker-compose.volumes/ice-rest-catalog/var/lib/ice-rest-catalog:/var/lib/ice-rest-catalog
+      - ./data/docker-compose/ice-rest-catalog/var/lib/ice-rest-catalog:/var/lib/ice-rest-catalog
     depends_on:
       - minio-init
   clickhouse:
@@ -51,7 +51,7 @@ services:
         target: /docker-entrypoint-initdb.d/init-db.sh
     volumes:
       # for access to clickhouse-logs
-      - ./docker-compose.volumes/clickhouse/var/log/clickhouse-server:/var/log/clickhouse-server
+      - ./data/docker-compose/clickhouse/var/log/clickhouse-server:/var/log/clickhouse-server
     depends_on:
       - ice-rest-catalog
 configs:
@@ -68,16 +68,19 @@ configs:
           SETTINGS catalog_type = 'rest',
             auth_header = 'Authorization: Bearer foo',
             storage_endpoint = 'http://minio:8999',
-            warehouse = 's3://bucket1/';
+            warehouse = 's3://bucket1';
       "
   ice-rest-catalog-yaml:
     content: |
-      uri: "jdbc:sqlite:file:/var/lib/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500"
+      uri: jdbc:sqlite:file:/var/lib/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500
       warehouse: s3://bucket1
-      s3.endpoint: http://minio:8999
-      s3.access-key-id: "miniouser"
-      s3.secret-access-key: "miniopassword"
-      ice.s3.region: minio
-      ice.token: foo
+      s3:
+        endpoint: http://minio:8999
+        pathStyleAccess: true
+        accessKeyID: miniouser
+        secretAccessKey: miniopassword
+        region: minio
+      bearerTokens:
+        - value: foo
 volumes:
   minio:

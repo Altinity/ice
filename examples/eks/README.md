@@ -3,16 +3,18 @@
 In the example below, we:
 
 - create a new EKS cluster + s3 bucket
-- deploy `ice-rest-catalog` (inside EKS)
+- deploy `ice-rest-catalog` backed by etcd
 - insert data via `ice`
 - query data using clickhouse
 
 ```shell
-# open shell containing `eksctl`, `kubectl`, `aws` (awscli2), `envsubst`, `clickhouse`
+# open shell containing `eksctl`, `kubectl`, `aws` (awscli2), `envsubst`, `clickhouse` + optional etcdctl
 devbox shell
 
 export CATALOG_BUCKET="$USER-ice-rest-catalog-demo"
 export AWS_REGION=us-west-1
+
+source aws.credentials
 
 # create eks cluster
 cat eks.envsubst.yaml | envsubst -no-unset -no-empty > eks.yaml
@@ -23,9 +25,14 @@ eksctl create cluster -f eks.yaml --kubeconfig=./kubeconfig
 aws s3api create-bucket --bucket "$CATALOG_BUCKET" \
     --create-bucket-configuration "LocationConstraint=$AWS_REGION"
 
+# deploy etcd
+KUBECONFIG=./kubeconfig kubectl -n ice apply -f etcd.eks.yaml
+# KUBECONFIG=./kubeconfig kubectl -n ice logs pods/ice-rest-catalog-etcd-0
+
 # deploy ice-rest-catalog
 cat ice-rest-catalog.eks.envsubst.yaml | envsubst -no-unset -no-empty > ice-rest-catalog.eks.yaml
 KUBECONFIG=./kubeconfig kubectl -n ice apply -f ice-rest-catalog.eks.yaml
+# KUBECONFIG=./kubeconfig kubectl -n ice logs pods/ice-rest-catalog-0
 
 # make ice-rest-catalog reachable via http://localhost:5000
 KUBECONFIG=./kubeconfig kubectl -n ice port-forward svc/ice-rest-catalog 5000:5000
@@ -52,7 +59,9 @@ select count(*) from ice.\`nyc.taxis\`;
 
 # clean up
 KUBECONFIG=./kubeconfig kubectl -n ice delete -f ice-rest-catalog.eks.yaml
-KUBECONFIG=./kubeconfig kubectl -n ice delete pvc/data-ice-rest-catalog-0 # do no leak pv
+KUBECONFIG=./kubeconfig kubectl -n ice delete -f etcd.eks.yaml
+KUBECONFIG=./kubeconfig kubectl -n ice delete \
+  pvc/data-ice-rest-catalog-0 pvc/data-ice-rest-catalog-etcd-0 # do no leak pvs
 
 # delete bucket
 aws s3 rb "s3://$CATALOG_BUCKET" --force

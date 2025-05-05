@@ -1,7 +1,7 @@
 package com.altinity.ice.rest.catalog.internal.rest;
 
 import com.altinity.ice.rest.catalog.internal.auth.Session;
-import com.altinity.ice.rest.catalog.internal.auth.Token;
+import com.altinity.ice.rest.catalog.internal.config.Config;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,10 +21,10 @@ public class RESTCatalogAuthorizationHandler extends HandlerWrapper {
   private static final Set<String> READ_ONLY_METHODS =
       new ImmutableSet.Builder<String>().add("GET").add("HEAD").build();
 
-  private final Token[] tokens;
+  private final Config.Token[] tokens;
   private final Session anonymousSession;
 
-  public RESTCatalogAuthorizationHandler(Token[] tokens, Session anonymousSession) {
+  public RESTCatalogAuthorizationHandler(Config.Token[] tokens, Session anonymousSession) {
     this.tokens = tokens;
     this.anonymousSession = anonymousSession;
   }
@@ -37,10 +37,11 @@ public class RESTCatalogAuthorizationHandler extends HandlerWrapper {
     String prefix = "bearer ";
     if (auth != null && auth.toLowerCase().startsWith(prefix)) {
       var providedToken = auth.substring(prefix.length());
-      for (Token token : tokens) { // FIXME: slow
+      for (var token : tokens) { // FIXME: slow
         if (java.security.MessageDigest.isEqual(
             providedToken.getBytes(), token.value().getBytes())) {
-          Session session = new Session(token.resourceName(), token.params());
+          Config.AccessConfig o = token.accessConfig();
+          Session session = new Session(token.resourceName(), o.readOnly(), o.awsAssumeRoleARN());
           next(target, baseRequest, req, res, session);
           return;
         }
@@ -66,8 +67,7 @@ public class RESTCatalogAuthorizationHandler extends HandlerWrapper {
       HttpServletResponse res,
       Session s)
       throws ServletException, IOException {
-    if (s.attrs().containsKey(Token.TOKEN_PARAM_READ_ONLY)
-        && !READ_ONLY_METHODS.contains(req.getMethod())) {
+    if (s.readOnly() && !READ_ONLY_METHODS.contains(req.getMethod())) {
       sendForbidden(baseRequest, res, req.getMethod() + " not allowed");
       return;
     }
