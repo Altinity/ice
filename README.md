@@ -39,12 +39,15 @@ sdk env
 
 ## License
 
-Copyright (c) 2025, Altinity Inc and/or its affiliates. All rights reserved.
+Copyright (c) 2025, Altinity Inc and/or its affiliates. All rights reserved.  
 `ice` is licensed under the Apache License 2.0.
 
 See [LICENSE](./LICENSE) for more details.
 
 ## Commercial Support
+
+`ice` is maintained by Altinity.  
+Altinity offers a range of services related to ClickHouse and analytics applications on Kubernetes.
 
 - [Official website](https://altinity.com/) - Get a high level overview of Altinity and our offerings.
 - [Altinity.Cloud](https://altinity.com/cloud-database/) - Run ClickHouse in our cloud or yours.
