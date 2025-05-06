@@ -10,7 +10,8 @@ We rely on [devbox](https://www.jetify.com/docs/devbox/installing_devbox/) to la
 but you can skip `devbox shell` if you have `clickhouse` & `minio`/`mc` already. 
 
 ```shell
-# open shell containing `clickhouse`, `minio` and `mc` (minio client) + optional etcd/etcdctl, sqlite3 (sqlite client)
+# open shell containing `clickhouse`, `minio` and `mc` (minio client) 
+#   + optional etcd/etcdctl, sqlite3 (sqlite client)
 devbox shell
 
 # start minio (local s3://), then create bucket named "bucket1"
