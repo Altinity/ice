@@ -3,11 +3,11 @@
 In the example below, we:
 
 - launch a local instance of Iceberg REST Catalog (`ice-rest-catalog`).
-- insert a few `file://`, `https://` and `s3://` parquet files into Iceberg REST Catalog using `ice` CLI.
+- insert a few parquet files from `file://`, `https://` and `s3://` into Iceberg REST Catalog using `ice` CLI.
 - query all imported data from ClickHouse.
 
-All without using containers.  
-This is mostly intended for `ice`/`ice-rest-catalog` development.
+We rely on [devbox](https://www.jetify.com/docs/devbox/installing_devbox/) to launch a shell with third-party tools, 
+but you can skip `devbox shell` if you have `clickhouse` & `minio`/`mc` already. 
 
 ```shell
 # open shell containing `clickhouse`, `minio` and `mc` (minio client) + optional etcd/etcdctl, sqlite3 (sqlite client)
@@ -18,9 +18,11 @@ local-minio
 local-mc mb --ignore-existing local/bucket1
 
 # start Iceberg REST Catalog server
+# ice-rest-catalog loads config from .ice-rest-catalog.yaml by default 
 ice-rest-catalog
 
 # insert data into catalog
+# ice loads config from .ice.yaml by default
 ice insert flowers.iris -p \
   file://iris.parquet
 
@@ -97,7 +99,7 @@ use [devbox](https://www.jetify.com/docs/devbox/installing_devbox/) as shown abo
 
 ### Supplemental
 
-#### Inspecting sqlite db content
+#### Inspecting sqlite content (when used)
 
 ```shell
 # inspect sqlite data
@@ -110,7 +112,7 @@ sqlite> select * from iceberg_namespace_properties;
 sqlite> .quit
 ```
 
-#### Inspecting etcd content
+#### Inspecting etcd content (when used)
 
 ```shell
 etcdctl get --prefix ""
