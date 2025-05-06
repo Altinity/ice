@@ -2,91 +2,35 @@
 
 A CLI for loading data into Iceberg REST catalogs.
 
-## Reference
-
-Sample configs can be found among included [../examples/](../examples/).  
-When in doubt, `.ice.yaml` format is defined [here](src/main/java/com/altinity/ice/cli/internal/config/Config.java).
-
-<table>
-<thead><tr><th>Command</th><th>Outcome</th></tr></thead>
-<tbody>
-<tr><td>
+## Usage
 
 ```shell
+echo $'
+uri: http://localhost:5000
+bearerToken: foo
+' > .ice.yaml
+
+# check if we're able to connect to the Iceberg REST Catalog
 ice check
-```
 
-</td><td>
-
-Checks if `ice` is able to connect to the Iceberg REST Catalog using `$(pwd)/.ice.yaml` config.
-
-Sample output:
-```shell
-OK
-```
-
-</td></tr>
-<tr><td>
-
-```shell
+# show all tables and their metadata
+# TIP: use -a flag to include metrics, schema, etc. 
 ice describe
-```
 
-</td><td>
-
-Sample output: 
-
-```yaml
-...
-```
-
-Run with `-a` for more details.
-
-</td></tr>
-<tr><td>
-
-```shell
+# create table named iris in flowers namespace
+# (-p means "create table if not exists")
+# 
+# Supported URI schemes: `file://`, `https://`, `http://`, `s3://`.
 ice create-table flowers.iris -p \
-  --schema-from-parquet \
-    file://iris.parquet
+  --schema-from-parquet file://iris.parquet
+
+# Add one or more parquet files to the table.
+#
+# Supported URI schemes: `file://`, `https://`, `http://`, `s3://`.
+# s3:// supports wildcards.
+ice insert flowers.iris -p file://iris.parquet
+
+ice delete-table flowers.iris 
 ```
 
-</td><td>
-
-Creates table named `iris` inside `flowers` namespace
-using schema from the input (`iris.parquet` file in this case).  
-`-p` is used to ignore TableAlreadyExistsError.
-
-Supported URI schemes: `file://`, `https://`, `http://`, `s3://`.
-
-</td></tr>
-<tr><td>
-
-```shell
-ice insert flowers.iris -p \
-  file://iris.parquet
-```
-
-</td><td>
-
-`-p` is an alias for `--create-table`, which instructs `ice` to create a table named `iris` inside `flowers` namespace 
-using schema from the input (`iris.parquet` file in this case) (but only if the table does not exist).
-
-Once table is found, `ice` appends `iris.parquet` to the catalog.
-
-Supported URI schemes: `file://`, `https://`, `http://`, `s3://`.  
-
-</td></tr>
-<tr><td>
-
-```shell
-ice delete-table flowers.iris
-```
-
-</td><td>
-
-Delete table.
-
-</td></tr>
-</tbody></table>
-
+See `ice --help` for more.

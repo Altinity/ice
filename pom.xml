@@ -176,7 +176,7 @@
             <artifactId>license-maven-plugin</artifactId>
             <version>4.5</version>
             <configuration>
-              <header>${maven.multiModuleProjectDirectory}/license-header.txt</header>
+              <header>${maven.multiModuleProjectDirectory}/apache-header.txt</header>
               <properties>
                 <year>2025</year>
               </properties>

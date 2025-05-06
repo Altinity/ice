@@ -8,12 +8,6 @@ Run locally with a one-liner: `ice-rest-catalog -c config.yaml`.
 - [ice](ice/) - A CLI for interacting with Iceberg REST catalogs.  
 Create/delete tables, insert data with `ice insert -p ns1.table1 file://example.parquet`, etc. 
 
-## Demo
-
-> `ice-rest-catalog` as Iceberg REST Catalog + `ice` to insert data + `clickhouse` to query
-
-[![demo](https://github.com/user-attachments/assets/e3cfdb48-e7f0-4893-abe8-736c9655811d)](examples/scratch/)
-
 ## Installation
 
 Pre-built binaries\* (+ links to Docker images for [ice](https://hub.docker.com/r/altinity/ice) and [ice-rest-catalog](https://hub.docker.com/r/altinity/ice-rest-catalog)) are available form [GitHub Releases](https://github.com/Altinity/ice/releases) page.

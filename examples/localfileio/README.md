@@ -1,7 +1,10 @@
 # examples/localfileio
 
+This example is primarily intended for learning and experimentation.  
+All data is stored in data/ directory as regular files.
+
 ```shell
-# open shell containing `sqlite3` (sqlite command line client)
+# optional: open shell containing `sqlite3` (sqlite command line client)
 devbox shell
 
 # start Iceberg REST Catalog server backed by sqlite with warehouse set to file://warehouse
@@ -13,7 +16,7 @@ ice insert flowers.iris -p file://iris.parquet
 # inspect
 ice describe
 
-# list all files
+# list all warehouse files
 find data/ice-rest-catalog/warehouse
 
 # inspect sqlite data
