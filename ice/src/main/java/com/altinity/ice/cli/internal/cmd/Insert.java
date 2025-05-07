@@ -35,6 +35,7 @@ import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.io.*;
 import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.NameMapping;
@@ -73,7 +74,7 @@ public final class Insert {
       boolean s3NoSignRequest,
       boolean s3CopyObject,
       String retryListFile,
-      List<String> partitionColumns,
+      List<Main.IcePartition> partitionColumns,
       List<Main.IceSortOrder> sortOrders,
       int threadCount)
       throws IOException, InterruptedException {
@@ -248,26 +249,55 @@ public final class Insert {
   }
 
   private static void updatePartitionAndSortOrderMetadata(
-      Table table, List<String> partitionColumns, List<Main.IceSortOrder> sortOrders) {
-    // Update partition spec if provided
-    if (partitionColumns != null && !partitionColumns.isEmpty()) {
-      var updateSpec = table.updateSpec();
-      for (String column : partitionColumns) {
-        updateSpec.addField(column);
+      Table table, List<Main.IcePartition> partitions, List<Main.IceSortOrder> sortOrders) {
+
+    // Create a new transaction.
+    Transaction txn = table.newTransaction();
+
+    if (partitions != null && !partitions.isEmpty()) {
+      var updateSpec = txn.updateSpec();
+      for (Main.IcePartition partition : partitions) {
+        String transform = partition.transform().toLowerCase();
+        if (transform.startsWith("bucket[")) {
+          int numBuckets = Integer.parseInt(transform.substring(7, transform.length() - 1));
+          updateSpec.addField(Expressions.bucket(partition.column(), numBuckets));
+        } else if (transform.startsWith("truncate[")) {
+          int width = Integer.parseInt(transform.substring(9, transform.length() - 1));
+          updateSpec.addField(Expressions.truncate(partition.column(), width));
+        } else {
+          switch (transform) {
+            case "year":
+              updateSpec.addField(Expressions.year(partition.column()));
+              break;
+            case "month":
+              updateSpec.addField(Expressions.month(partition.column()));
+              break;
+            case "day":
+              updateSpec.addField(Expressions.day(partition.column()));
+              break;
+            case "hour":
+              updateSpec.addField(Expressions.hour(partition.column()));
+              break;
+            case "identity":
+            default:
+              updateSpec.addField(partition.column());
+              break;
+          }
+        }
       }
       updateSpec.commit();
     }
 
     // Update sort order if provided
     if (sortOrders != null && !sortOrders.isEmpty()) {
-      table
+      txn
           .updateProperties()
           .set(
               TableProperties.WRITE_DISTRIBUTION_MODE,
               TableProperties.WRITE_DISTRIBUTION_MODE_RANGE)
           .commit();
 
-      ReplaceSortOrder replaceSortOrder = table.replaceSortOrder();
+      ReplaceSortOrder replaceSortOrder = txn.replaceSortOrder();
       for (Main.IceSortOrder order : sortOrders) {
         SortDirection dir = order.desc() ? SortDirection.DESC : SortDirection.ASC;
         NullOrder nullOrd = order.nullFirst() ? NullOrder.NULLS_FIRST : NullOrder.NULLS_LAST;
@@ -279,6 +309,9 @@ public final class Insert {
       }
       replaceSortOrder.commit();
     }
+
+    // Commit transaction.
+    txn.commitTransaction();
   }
 
   private static List<DataFile> processFile(
@@ -293,7 +326,7 @@ public final class Insert {
       Schema tableSchema,
       DataFileNamingStrategy.Name dataFileNamingStrategy,
       String file,
-      List<String> partitionColumns)
+      List<Main.IcePartition> partitionColumns)
       throws IOException {
     logger.info("{}: processing", file);
     logger.info("{}: jvm: {}", file, Stats.gather());

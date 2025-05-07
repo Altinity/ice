@@ -43,7 +43,7 @@ public final class CreateTable {
       String location,
       boolean ignoreAlreadyExists,
       boolean s3NoSignRequest,
-      List<String> partitionColumns,
+      List<Main.IcePartition> partitionColumns,
       List<Main.IceSortOrder> sortOrders)
       throws IOException {
     Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
@@ -72,8 +72,34 @@ public final class CreateTable {
         // Create partition spec based on provided partition columns
         final PartitionSpec.Builder partitionSpecBuilder = PartitionSpec.builderFor(fileSchema);
         if (partitionColumns != null && !partitionColumns.isEmpty()) {
-          for (String column : partitionColumns) {
-            partitionSpecBuilder.identity(column);
+          for (Main.IcePartition partition : partitionColumns) {
+            String transform = partition.transform().toLowerCase();
+            if (transform.startsWith("bucket[")) {
+              int numBuckets = Integer.parseInt(transform.substring(7, transform.length() - 1));
+              partitionSpecBuilder.bucket(partition.column(), numBuckets);
+            } else if (transform.startsWith("truncate[")) {
+              int width = Integer.parseInt(transform.substring(9, transform.length() - 1));
+              partitionSpecBuilder.truncate(partition.column(), width);
+            } else {
+              switch (transform) {
+                case "year":
+                  partitionSpecBuilder.year(partition.column());
+                  break;
+                case "month":
+                  partitionSpecBuilder.month(partition.column());
+                  break;
+                case "day":
+                  partitionSpecBuilder.day(partition.column());
+                  break;
+                case "hour":
+                  partitionSpecBuilder.hour(partition.column());
+                  break;
+                case "identity":
+                default:
+                  partitionSpecBuilder.identity(partition.column());
+                  break;
+              }
+            }
           }
         }
         final PartitionSpec partitionSpec = partitionSpecBuilder.build();

@@ -122,6 +122,9 @@ public final class Main {
       @JsonProperty("desc") boolean desc,
       @JsonProperty("nullFirst") boolean nullFirst) {}
 
+  public record IcePartition(
+      @JsonProperty("column") String column, @JsonProperty("transform") String transform) {}
+
   @CommandLine.Command(name = "create-table", description = "Create table.")
   void createTable(
       @CommandLine.Parameters(
@@ -148,10 +151,10 @@ public final class Main {
               description = "/path/to/file.parquet")
           String schemaFile,
       @CommandLine.Option(
-              names = {"--partition-by"},
-              description = "Comma-separated list of columns to partition by",
-              split = ",")
-          List<String> partitionColumns,
+              names = {"--partition"},
+              description =
+                  "JSON array of partition specifications: [{\"column\":\"date\",\"transform\":\"year\"}]")
+          String partitionJson,
       @CommandLine.Option(
               names = {"--sort-order"},
               description =
@@ -160,11 +163,18 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
       List<IceSortOrder> sortOrders = new ArrayList<>();
+      List<IcePartition> partitions = new ArrayList<>();
 
       if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
         ObjectMapper mapper = new ObjectMapper();
         IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
         sortOrders = Arrays.asList(orders);
+      }
+
+      if (partitionJson != null && !partitionJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
+        partitions = Arrays.asList(parts);
       }
 
       CreateTable.run(
@@ -174,7 +184,7 @@ public final class Main {
           location,
           createTableIfNotExists,
           s3NoSignRequest,
-          partitionColumns,
+          partitions,
           sortOrders);
     }
   }
@@ -235,10 +245,10 @@ public final class Main {
                       + " (useful for retrying partially failed insert using `cat ice.retry | ice insert - --retry-list=ice.retry`)")
           String retryList,
       @CommandLine.Option(
-              names = {"--partition-by"},
-              description = "Comma-separated list of columns to partition by",
-              split = ",")
-          List<String> partitionColumns,
+              names = {"--partition"},
+              description =
+                  "JSON array of partition specifications: [{\"column\":\"date\",\"transform\":\"year\"}]")
+          String partitionJson,
       @CommandLine.Option(
               names = {"--sort-order"},
               description =
@@ -264,11 +274,18 @@ public final class Main {
       }
 
       List<IceSortOrder> sortOrders = new ArrayList<>();
+      List<IcePartition> partitions = new ArrayList<>();
 
       if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
         ObjectMapper mapper = new ObjectMapper();
         IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
         sortOrders = Arrays.asList(orders);
+      }
+
+      if (partitionJson != null && !partitionJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
+        partitions = Arrays.asList(parts);
       }
 
       TableIdentifier tableId = TableIdentifier.parse(name);
@@ -280,7 +297,7 @@ public final class Main {
             null,
             createTableIfNotExists,
             s3NoSignRequest,
-            partitionColumns,
+            partitions,
             sortOrders);
       }
       Insert.run(
@@ -296,7 +313,7 @@ public final class Main {
           s3NoSignRequest,
           s3CopyObject,
           retryList,
-          partitionColumns,
+          partitions,
           sortOrders,
           threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
     }

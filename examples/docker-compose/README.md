@@ -33,7 +33,8 @@ A spark-iceberg container can be launched using the `docker-compose-spark-iceber
 The default configuration is located in the following path
 `/opt/spark/conf/spark-defaults.conf`
 
-For spark to communicate with `ice-rest-catalog` and `minio`, the following configuration variables need to be updated.\
+For spark to communicate with `ice-rest-catalog` and `minio`, the following configuration variables 
+in `/opt/spark/conf/spark-defaults.conf` can to be updated.\
 
 `spark.sql.catalog.demo.uri` - ice-rest-catalog URI \
 `spark.sql.catalog.demo.s3.endpoint` - minio server url.
@@ -58,4 +59,11 @@ spark.eventLog.enabled                 true
 spark.eventLog.dir                     /home/iceberg/spark-events
 spark.history.fs.logDirectory          /home/iceberg/spark-events
 spark.sql.catalogImplementation        in-memory
+```
+
+The spark-sql shell can now query the tables directory
+
+```
+docker exec -it <container_id> bash
+./spark-sql
 ```
