@@ -290,8 +290,7 @@ public final class Insert {
 
     // Update sort order if provided
     if (sortOrders != null && !sortOrders.isEmpty()) {
-      txn
-          .updateProperties()
+      txn.updateProperties()
           .set(
               TableProperties.WRITE_DISTRIBUTION_MODE,
               TableProperties.WRITE_DISTRIBUTION_MODE_RANGE)

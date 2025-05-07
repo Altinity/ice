@@ -31,10 +31,13 @@ ice insert nyc.taxis -p \
   https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
   
 # Insert rows with sort-key
-ice insert --sort-descending=VendorID nyc.taxis2 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
+ice insert --sort-order='[{"column": "VendorID", "desc": true, "nullFirst": true}]' nyc.taxis2 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
+
+# Insert sort-key(multiple columns)
+ice insert --sort-order='[{"column": "VendorID", "desc": true, "nullFirst": true}, {"column": "Airport_fee", "desc": false, "nullFirst": false}]' nyc.taxis24 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
 
 # Insert with partition key
-ice insert --partition-by=Airport_fee nyc2.taxis3 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
+ice insert --partition='[{"column": "RatecodeID", "transform": "identity"}]' nyc.taxis20 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
 
 # warning: each parquet file below is ~500mb. this may take a while
 AWS_REGION=us-east-2 ice insert btc.transactions -p --s3-no-sign-request \
@@ -50,7 +53,7 @@ ice create-table flowers.iris_no_copy --schema-from-parquet=file://iris.parquet
 ice create-table flowers.irs_no_copy_partition --schema-from-parquet=file://iris.parquet --partition-by=variety,petal.width
 
 # create table with sort columns
-ice create-table flowers.irs_no_copy_sort --schema-from-parquet=file://iris.parquet --sort-by=variety
+ice create-table flowers.irs_no_copy_sort --schema-from-parquet=file://iris.parquet --sort-order='[{"column": "variety", "desc": false}]'
 
 local-mc cp iris.parquet local/bucket1/flowers/iris_no_copy/
 ice insert flowers.iris_no_copy --no-copy s3://bucket1/flowers/iris_no_copy/iris.parquet
