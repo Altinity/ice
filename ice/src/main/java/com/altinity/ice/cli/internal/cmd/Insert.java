@@ -452,7 +452,7 @@ public final class Insert {
     logger.info(
         "{}: adding data file (copy took {}s)", file, (System.currentTimeMillis() - start) / 1000);
     MetricsConfig metricsConfig = MetricsConfig.forTable(table);
-    Metrics metrics = ParquetUtil.fileMetrics(inputFile, metricsConfig);
+    Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
 
     // dataFileSizeInBytes = inputFile.getLength();
     DataFile dataFileObj =
@@ -534,7 +534,7 @@ public final class Insert {
             (System.currentTimeMillis() - start) / 1000);
         InputFile inFile = outFile.toInputFile();
         MetricsConfig metricsConfig = MetricsConfig.forTable(table);
-        Metrics metrics = ParquetUtil.fileMetrics(inFile, metricsConfig);
+        Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
         dataFiles.add(
             DataFiles.builder(table.spec())
                 .withPath(outFile.location())
