@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
+import com.altinity.ice.cli.Main;
 import com.altinity.ice.cli.internal.iceberg.io.Input;
 import com.altinity.ice.cli.internal.iceberg.parquet.Metadata;
 import com.altinity.ice.cli.internal.s3.S3;
@@ -16,10 +17,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.iceberg.PartitionSpec;
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.SortOrder;
-import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.*;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
@@ -46,8 +44,7 @@ public final class CreateTable {
       boolean ignoreAlreadyExists,
       boolean s3NoSignRequest,
       List<String> partitionColumns,
-      List<String> sortAscendingColumns,
-      List<String> sortDescendingColumns)
+      List<Main.IceSortOrder> sortOrders)
       throws IOException {
     Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
 
@@ -81,32 +78,25 @@ public final class CreateTable {
         }
         final PartitionSpec partitionSpec = partitionSpecBuilder.build();
 
-        // Create sort order based on provided sort columns (z-order)
-        SortOrder sortOrder = null;
-        if ((sortAscendingColumns != null && !sortAscendingColumns.isEmpty())
-            || (sortDescendingColumns != null && !sortDescendingColumns.isEmpty())) {
-          SortOrder.Builder sortOrderBuilder = SortOrder.builderFor(fileSchema);
-
-          // Add ascending columns first
-          if (sortAscendingColumns != null) {
-            for (String column : sortAscendingColumns) {
-              sortOrderBuilder.asc(column);
-            }
-          }
-
-          // Add descending columns
-          if (sortDescendingColumns != null) {
-            for (String column : sortDescendingColumns) {
-              sortOrderBuilder.desc(column);
-            }
-          }
-
-          sortOrder = sortOrderBuilder.build();
-        }
-
         // if we don't set location, it's automatically set to $warehouse/$namespace/$table
         createNamespace(catalog, nsTable.namespace());
-        catalog.createTable(nsTable, fileSchema, PartitionSpec.unpartitioned(), location, props);
+        Table table = catalog.createTable(nsTable, fileSchema, partitionSpec, location, props);
+        // ToDO: Move this shared code from Input and CreateTable to base class or common.
+        // Create sort order based on provided sort columns
+        if (sortOrders != null && !sortOrders.isEmpty()) {
+
+          ReplaceSortOrder replaceSortOrder = table.replaceSortOrder();
+          for (Main.IceSortOrder order : sortOrders) {
+            SortDirection dir = order.desc() ? SortDirection.DESC : SortDirection.ASC;
+            NullOrder nullOrd = order.nullFirst() ? NullOrder.NULLS_FIRST : NullOrder.NULLS_LAST;
+            if (dir == SortDirection.ASC) {
+              replaceSortOrder.asc(order.column(), nullOrd);
+            } else {
+              replaceSortOrder.desc(order.column(), nullOrd);
+            }
+          }
+          replaceSortOrder.commit();
+        }
       } catch (AlreadyExistsException e) {
         if (ignoreAlreadyExists) {
           return;

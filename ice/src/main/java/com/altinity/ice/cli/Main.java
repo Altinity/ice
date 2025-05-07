@@ -18,8 +18,11 @@ import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
@@ -114,6 +117,11 @@ public final class Main {
     }
   }
 
+  public record IceSortOrder(
+      @JsonProperty("column") String column,
+      @JsonProperty("desc") boolean desc,
+      @JsonProperty("nullFirst") boolean nullFirst) {}
+
   @CommandLine.Command(name = "create-table", description = "Create table.")
   void createTable(
       @CommandLine.Parameters(
@@ -145,17 +153,20 @@ public final class Main {
               split = ",")
           List<String> partitionColumns,
       @CommandLine.Option(
-              names = {"--sort-ascending"},
-              description = "Comma-separated list of columns to sort in ascending order",
-              split = ",")
-          List<String> sortAscendingColumns,
-      @CommandLine.Option(
-              names = {"--sort-descending"},
-              description = "Comma-separated list of columns to sort in descending order",
-              split = ",")
-          List<String> sortDescendingColumns)
+              names = {"--sort-order"},
+              description =
+                  "JSON array of sort orders: [{\"column\":\"name\",\"desc\":true,\"nullFirst\":true}]")
+          String sortOrderJson)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+      List<IceSortOrder> sortOrders = new ArrayList<>();
+
+      if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
+        sortOrders = Arrays.asList(orders);
+      }
+
       CreateTable.run(
           catalog,
           TableIdentifier.parse(name),
@@ -164,8 +175,7 @@ public final class Main {
           createTableIfNotExists,
           s3NoSignRequest,
           partitionColumns,
-          sortAscendingColumns,
-          sortDescendingColumns);
+          sortOrders);
     }
   }
 
@@ -230,15 +240,10 @@ public final class Main {
               split = ",")
           List<String> partitionColumns,
       @CommandLine.Option(
-              names = {"--sort-ascending"},
-              description = "Comma-separated list of columns to sort in ascending order",
-              split = ",")
-          List<String> sortAscendingColumns,
-      @CommandLine.Option(
-              names = {"--sort-descending"},
-              description = "Comma-separated list of columns to sort in descending order",
-              split = ",")
-          List<String> sortDescendingColumns,
+              names = {"--sort-order"},
+              description =
+                  "JSON array of sort orders: [{\"column\":\"name\",\"desc\":true,\"nullFirst\":true}]")
+          String sortOrderJson,
       @CommandLine.Option(
               names = {"--thread-count"},
               description = "Number of threads to use for inserting data",
@@ -257,9 +262,17 @@ public final class Main {
           return;
         }
       }
+
+      List<IceSortOrder> sortOrders = new ArrayList<>();
+
+      if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
+        sortOrders = Arrays.asList(orders);
+      }
+
       TableIdentifier tableId = TableIdentifier.parse(name);
       if (createTableIfNotExists) {
-        // TODO: newCreateTableTransaction
         CreateTable.run(
             catalog,
             tableId,
@@ -268,8 +281,7 @@ public final class Main {
             createTableIfNotExists,
             s3NoSignRequest,
             partitionColumns,
-            sortAscendingColumns,
-            sortDescendingColumns);
+            sortOrders);
       }
       Insert.run(
           catalog,
@@ -285,8 +297,7 @@ public final class Main {
           s3CopyObject,
           retryList,
           partitionColumns,
-          sortAscendingColumns,
-          sortDescendingColumns,
+          sortOrders,
           threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
     }
   }

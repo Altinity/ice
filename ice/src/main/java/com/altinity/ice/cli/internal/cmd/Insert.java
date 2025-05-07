@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
+import com.altinity.ice.cli.Main;
 import com.altinity.ice.cli.internal.iceberg.io.Input;
 import com.altinity.ice.cli.internal.iceberg.parquet.Metadata;
 import com.altinity.ice.cli.internal.jvm.Stats;
@@ -73,8 +74,7 @@ public final class Insert {
       boolean s3CopyObject,
       String retryListFile,
       List<String> partitionColumns,
-      List<String> sortAscendingColumns,
-      List<String> sortDescendingColumns,
+      List<Main.IceSortOrder> sortOrders,
       int threadCount)
       throws IOException, InterruptedException {
     if (files.length == 0) {
@@ -97,8 +97,7 @@ public final class Insert {
         options.forceNoCopy() ? options.toBuilder().noCopy(true).build() : options;
     Table table = catalog.loadTable(nsTable);
 
-    updatePartitionAndSortOrderMetadata(
-        table, partitionColumns, sortAscendingColumns, sortDescendingColumns);
+    updatePartitionAndSortOrderMetadata(table, partitionColumns, sortOrders);
 
     try (FileIO tableIO = table.io()) {
       final Supplier<S3Client> s3ClientSupplier;
@@ -249,10 +248,7 @@ public final class Insert {
   }
 
   private static void updatePartitionAndSortOrderMetadata(
-      Table table,
-      List<String> partitionColumns,
-      List<String> sortAscendingColumns,
-      List<String> sortDescendingColumns) {
+      Table table, List<String> partitionColumns, List<Main.IceSortOrder> sortOrders) {
     // Update partition spec if provided
     if (partitionColumns != null && !partitionColumns.isEmpty()) {
       var updateSpec = table.updateSpec();
@@ -263,29 +259,25 @@ public final class Insert {
     }
 
     // Update sort order if provided
-    if ((sortAscendingColumns != null && !sortAscendingColumns.isEmpty())
-        || (sortDescendingColumns != null && !sortDescendingColumns.isEmpty())) {
+    if (sortOrders != null && !sortOrders.isEmpty()) {
       table
           .updateProperties()
           .set(
               TableProperties.WRITE_DISTRIBUTION_MODE,
               TableProperties.WRITE_DISTRIBUTION_MODE_RANGE)
           .commit();
-      var updatedSortOrder = table.replaceSortOrder();
 
-      if (sortAscendingColumns != null) {
-        for (String column : sortAscendingColumns) {
-          updatedSortOrder.asc(column);
+      ReplaceSortOrder replaceSortOrder = table.replaceSortOrder();
+      for (Main.IceSortOrder order : sortOrders) {
+        SortDirection dir = order.desc() ? SortDirection.DESC : SortDirection.ASC;
+        NullOrder nullOrd = order.nullFirst() ? NullOrder.NULLS_FIRST : NullOrder.NULLS_LAST;
+        if (dir == SortDirection.ASC) {
+          replaceSortOrder.asc(order.column(), nullOrd);
+        } else {
+          replaceSortOrder.desc(order.column(), nullOrd);
         }
       }
-
-      if (sortDescendingColumns != null) {
-        for (String column : sortDescendingColumns) {
-          updatedSortOrder.desc(column);
-        }
-      }
-
-      updatedSortOrder.commit();
+      replaceSortOrder.commit();
     }
   }
 
