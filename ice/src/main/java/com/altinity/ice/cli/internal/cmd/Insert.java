@@ -182,7 +182,8 @@ public final class Insert {
                                   tableSchema,
                                   dataFileNamingStrategy,
                                   file,
-                                  partitionColumns);
+                                  partitionColumns,
+                                  sortOrders);
                           if (dataFiles != null) {
                             for (DataFile df : dataFiles) {
                               atLeastOneFileAppended.set(true);
@@ -325,7 +326,8 @@ public final class Insert {
       Schema tableSchema,
       DataFileNamingStrategy.Name dataFileNamingStrategy,
       String file,
-      List<Main.IcePartition> partitionColumns)
+      List<Main.IcePartition> partitionColumns,
+      List<Main.IceSortOrder> sortOrders)
       throws IOException {
     logger.info("{}: processing", file);
     logger.info("{}: jvm: {}", file, Stats.gather());
@@ -400,66 +402,48 @@ public final class Insert {
           table,
           inputFile,
           metadata);
+    } else if (sortOrders != null && !sortOrders.isEmpty()) {
+      return copyParquetWithSortOrder(
+          file,
+          Strings.replacePrefix(dstDataFileSource.get(file), "s3://", "s3a://"),
+          tableSchema,
+          table,
+          inputFile,
+          metadata,
+          dataFileNamingStrategy);
     } else {
       String dstDataFile = dstDataFileSource.get(file);
       if (checkNotExists.apply(dstDataFile)) {
         return null;
       }
-
       OutputFile outputFile =
           tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
-
+      // TODO: support transferTo below (note that compression, etc. might be different)
+      // try (var d = outputFile.create()) { try (var s = inputFile.newStream()) {
+      // s.transferTo(d); }}
       Parquet.ReadBuilder readBuilder =
           Parquet.read(inputFile)
               .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
-              .project(tableSchema);
-
-      logger.info("{}: copying to {}", file, dstDataFile);
-
-      // Read records into memory
-      List<Record> records = new ArrayList<>();
-      try (CloseableIterable<Record> iterable = readBuilder.build()) {
-        for (Record r : iterable) {
-          records.add(r);
-        }
-      }
-
-      // Sort records if sort order is defined and non-empty
-      SortOrder sortOrder = table.sortOrder();
-      if (sortOrder != null && !sortOrder.isUnsorted()) {
-        records.sort(new RecordSortComparator(sortOrder, tableSchema));
-      }
-
-      // Write sorted records out
+              .project(tableSchema); // TODO: ?
+      // TODO: reuseContainers?
       Parquet.WriteBuilder writeBuilder =
           Parquet.write(outputFile)
               .overwrite(dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL)
               .createWriterFunc(GenericParquetWriter::buildWriter)
               .schema(tableSchema);
-
-      try (FileAppender<Record> appender = writeBuilder.build()) {
-        for (Record record : records) {
-          appender.add(record);
-        }
-
-        // dataFileSizeInBytes = appender.length();
-      }
-
-      InputFile inFile = outputFile.toInputFile();
-      dataFileSizeInBytes = inFile.getLength();
+      logger.info("{}: copying to {}", file, dstDataFile);
+      // file size may have changed due to different compression, etc.
+      dataFileSizeInBytes = copy(readBuilder, writeBuilder);
       dataFile = dstDataFile;
     }
     logger.info(
         "{}: adding data file (copy took {}s)", file, (System.currentTimeMillis() - start) / 1000);
     MetricsConfig metricsConfig = MetricsConfig.forTable(table);
     Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
-
-    // dataFileSizeInBytes = inputFile.getLength();
     DataFile dataFileObj =
         new DataFiles.Builder(table.spec())
             .withPath(dataFile)
             .withFormat("PARQUET")
-            // .withRecordCount(recordCount)
             .withFileSizeInBytes(dataFileSizeInBytes)
             .withMetrics(metrics)
             .build();
@@ -548,6 +532,72 @@ public final class Insert {
     }
 
     return dataFiles;
+  }
+
+  private static List<DataFile> copyParquetWithSortOrder(
+      String file,
+      String dstDataFile,
+      Schema tableSchema,
+      Table table,
+      InputFile inputFile,
+      ParquetMetadata metadata,
+      DataFileNamingStrategy.Name dataFileNamingStrategy)
+      throws IOException {
+    Logger logger = LoggerFactory.getLogger(Insert.class);
+    logger.info("{}: copying with sort order to {}", file, dstDataFile);
+    long start = System.currentTimeMillis();
+
+    OutputFile outputFile = table.io().newOutputFile(dstDataFile);
+
+    Parquet.ReadBuilder readBuilder =
+        Parquet.read(inputFile)
+            .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
+            .project(tableSchema);
+
+    // Read records into memory
+    List<Record> records = new ArrayList<>();
+    try (CloseableIterable<Record> iterable = readBuilder.build()) {
+      for (Record r : iterable) {
+        records.add(r);
+      }
+    }
+
+    // Sort records if sort order is defined and non-empty
+    SortOrder sortOrder = table.sortOrder();
+    if (sortOrder != null && !sortOrder.isUnsorted()) {
+      records.sort(new RecordSortComparator(sortOrder, tableSchema));
+    }
+
+    // Write sorted records out
+    Parquet.WriteBuilder writeBuilder =
+        Parquet.write(outputFile)
+            .overwrite(dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL)
+            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .schema(tableSchema);
+
+    try (FileAppender<Record> appender = writeBuilder.build()) {
+      for (Record record : records) {
+        appender.add(record);
+      }
+    }
+
+    InputFile inFile = outputFile.toInputFile();
+    MetricsConfig metricsConfig = MetricsConfig.forTable(table);
+    Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
+
+    DataFile dataFileObj =
+        new DataFiles.Builder(table.spec())
+            .withPath(dstDataFile)
+            .withFormat("PARQUET")
+            .withFileSizeInBytes(inFile.getLength())
+            .withMetrics(metrics)
+            .build();
+
+    logger.info(
+        "{}: adding data file (copy with sort order took {}s)",
+        file,
+        (System.currentTimeMillis() - start) / 1000);
+    return Collections.singletonList(dataFileObj);
   }
 
   private static boolean sameSchema(Table table, Schema fileSchema) {
