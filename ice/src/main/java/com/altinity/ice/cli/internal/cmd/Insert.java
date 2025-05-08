@@ -185,18 +185,15 @@ public final class Insert {
                                   partitionColumns,
                                   sortOrders);
                           if (dataFiles != null) {
-                            for (DataFile df : dataFiles) {
-                              atLeastOneFileAppended.set(true);
-                              appendOp.appendFile(df);
-                            }
+                            return dataFiles;
                           }
-                          return dataFiles;
+                          return Collections.emptyList();
                         } catch (Exception e) {
                           if (retryLog != null) {
                             logger.error(
                                 "{}: error (adding to retry list and continuing)", file, e);
                             retryLog.add(file);
-                            return null;
+                            return Collections.emptyList();
                           } else {
                             throw e;
                           }
@@ -207,11 +204,9 @@ public final class Insert {
             for (var future : futures) {
               try {
                 List<DataFile> dataFiles = future.get();
-                if (dataFiles != null) {
-                  for (DataFile df : dataFiles) {
-                    atLeastOneFileAppended.set(true);
-                    appendOp.appendFile(df);
-                  }
+                for (DataFile df : dataFiles) {
+                  atLeastOneFileAppended.set(true);
+                  appendOp.appendFile(df); // ✅ Only main thread appends now
                 }
               } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
