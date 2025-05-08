@@ -19,7 +19,6 @@ import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -158,7 +157,7 @@ public final class Insert {
                 retryListFile != null && !retryListFile.isEmpty()
                     ? new RetryLog(retryListFile)
                     : null) {
-          AtomicBoolean atLeastOneFileAppended = new AtomicBoolean(false);
+          boolean atLeastOneFileAppended = false;
 
           int numThreads = Math.min(finalOptions.threadCount(), filesExpanded.size());
           ExecutorService executor = Executors.newFixedThreadPool(numThreads);
@@ -205,7 +204,7 @@ public final class Insert {
               try {
                 List<DataFile> dataFiles = future.get();
                 for (DataFile df : dataFiles) {
-                  atLeastOneFileAppended.set(true);
+                  atLeastOneFileAppended = true;
                   appendOp.appendFile(df); // ✅ Only main thread appends now
                 }
               } catch (InterruptedException e) {
@@ -224,7 +223,7 @@ public final class Insert {
 
           if (!finalOptions.noCommit()) {
             // TODO: log
-            if (atLeastOneFileAppended.get()) {
+            if (atLeastOneFileAppended) {
               appendOp.commit();
             } else {
               logger.warn("Table commit skipped (no files to append)");
@@ -456,6 +455,7 @@ public final class Insert {
 
     logger.info("{}: copying to partitions under {}", file, dstDataFile);
     var start = System.currentTimeMillis();
+    long fileSizeInBytes = 0;
 
     // Partition writer setup
     OutputFileFactory fileFactory =
@@ -505,6 +505,8 @@ public final class Insert {
         for (Record rec : records) {
           appender.add(rec);
         }
+
+        fileSizeInBytes = appender.length();
         appender.close();
 
         logger.info(
@@ -517,10 +519,9 @@ public final class Insert {
         dataFiles.add(
             DataFiles.builder(table.spec())
                 .withPath(outFile.location())
-                .withFileSizeInBytes(inFile.getLength())
+                .withFileSizeInBytes(fileSizeInBytes)
                 .withPartition(partKey)
                 .withFormat(FileFormat.PARQUET)
-                .withRecordCount(records.size())
                 .withMetrics(metrics)
                 .build());
       }
@@ -541,6 +542,7 @@ public final class Insert {
     Logger logger = LoggerFactory.getLogger(Insert.class);
     logger.info("{}: copying with sort order to {}", file, dstDataFile);
     long start = System.currentTimeMillis();
+    long fileSizeInBytes = 0;
 
     OutputFile outputFile = table.io().newOutputFile(dstDataFile);
 
@@ -574,6 +576,8 @@ public final class Insert {
       for (Record record : records) {
         appender.add(record);
       }
+      fileSizeInBytes = appender.length();
+      ;
     }
 
     InputFile inFile = outputFile.toInputFile();
@@ -584,7 +588,7 @@ public final class Insert {
         new DataFiles.Builder(table.spec())
             .withPath(dstDataFile)
             .withFormat("PARQUET")
-            .withFileSizeInBytes(inFile.getLength())
+            .withFileSizeInBytes(fileSizeInBytes)
             .withMetrics(metrics)
             .build();
 

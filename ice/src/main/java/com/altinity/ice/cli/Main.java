@@ -19,6 +19,7 @@ import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -167,6 +168,7 @@ public final class Main {
 
       if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
         ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
         IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
         sortOrders = Arrays.asList(orders);
       }

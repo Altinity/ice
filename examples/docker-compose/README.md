@@ -64,6 +64,5 @@ spark.sql.catalogImplementation        in-memory
 The spark-sql shell can now query the tables directory
 
 ```
-docker exec -it <container_id> bash
-./spark-sql
+docker exec -it spark-iceberg ./spark-sql
 ```
