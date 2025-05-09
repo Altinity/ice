@@ -18,8 +18,12 @@ import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
@@ -114,6 +118,14 @@ public final class Main {
     }
   }
 
+  public record IceSortOrder(
+      @JsonProperty("column") String column,
+      @JsonProperty("desc") boolean desc,
+      @JsonProperty("nullFirst") boolean nullFirst) {}
+
+  public record IcePartition(
+      @JsonProperty("column") String column, @JsonProperty("transform") String transform) {}
+
   @CommandLine.Command(name = "create-table", description = "Create table.")
   void createTable(
       @CommandLine.Parameters(
@@ -138,16 +150,46 @@ public final class Main {
               required = true,
               names = "--schema-from-parquet",
               description = "/path/to/file.parquet")
-          String schemaFile)
+          String schemaFile,
+      @CommandLine.Option(
+              names = {"--partition"},
+              description =
+                  "JSON array of partition specifications: [{\"column\":\"date\",\"transform\":\"year\"}],"
+                      + "Supported transforms: hour, day, month, year, identity(default)")
+          String partitionJson,
+      @CommandLine.Option(
+              names = {"--sort-order"},
+              description =
+                  "JSON array of sort orders: [{\"column\":\"name\",\"desc\":true,\"nullFirst\":true}]")
+          String sortOrderJson)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+      List<IceSortOrder> sortOrders = new ArrayList<>();
+      List<IcePartition> partitions = new ArrayList<>();
+
+      if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
+        sortOrders = Arrays.asList(orders);
+      }
+
+      if (partitionJson != null && !partitionJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
+        partitions = Arrays.asList(parts);
+      }
+
       CreateTable.run(
           catalog,
           TableIdentifier.parse(name),
           schemaFile,
           location,
           createTableIfNotExists,
-          s3NoSignRequest);
+          s3NoSignRequest,
+          partitions,
+          sortOrders);
     }
   }
 
@@ -207,6 +249,17 @@ public final class Main {
                       + " (useful for retrying partially failed insert using `cat ice.retry | ice insert - --retry-list=ice.retry`)")
           String retryList,
       @CommandLine.Option(
+              names = {"--partition"},
+              description =
+                  "JSON array of partition specifications: [{\"column\":\"date\",\"transform\":\"year\"}],"
+                      + "Supported transforms: hour, day, month, year, identity(default)")
+          String partitionJson,
+      @CommandLine.Option(
+              names = {"--sort-order"},
+              description =
+                  "JSON array of sort orders: [{\"column\":\"name\",\"desc\":true,\"nullFirst\":true}]")
+          String sortOrderJson,
+      @CommandLine.Option(
               names = {"--thread-count"},
               description = "Number of threads to use for inserting data",
               defaultValue = "-1")
@@ -224,11 +277,35 @@ public final class Main {
           return;
         }
       }
+
+      List<IceSortOrder> sortOrders = new ArrayList<>();
+      List<IcePartition> partitions = new ArrayList<>();
+
+      if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
+        sortOrders = Arrays.asList(orders);
+      }
+
+      if (partitionJson != null && !partitionJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
+        partitions = Arrays.asList(parts);
+      }
+
       TableIdentifier tableId = TableIdentifier.parse(name);
       if (createTableIfNotExists) {
-        // TODO: newCreateTableTransaction
         CreateTable.run(
-            catalog, tableId, dataFiles[0], null, createTableIfNotExists, s3NoSignRequest);
+            catalog,
+            tableId,
+            dataFiles[0],
+            null,
+            createTableIfNotExists,
+            s3NoSignRequest,
+            partitions,
+            sortOrders);
       }
       Insert.run(
           catalog,
@@ -243,6 +320,8 @@ public final class Main {
           s3NoSignRequest,
           s3CopyObject,
           retryList,
+          partitions,
+          sortOrders,
           threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
     }
   }
