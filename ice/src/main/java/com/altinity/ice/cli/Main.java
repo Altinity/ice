@@ -251,8 +251,8 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                "JSON array of partition specifications: [{\"column\":\"date\",\"transform\":\"year\"}],"
-                  + "Supported transforms: hour, day, month, year, identity(default)")
+                  "JSON array of partition specifications: [{\"column\":\"date\",\"transform\":\"year\"}],"
+                      + "Supported transforms: hour, day, month, year, identity(default)")
           String partitionJson,
       @CommandLine.Option(
               names = {"--sort-order"},
