@@ -175,6 +175,7 @@ public final class Main {
 
       if (partitionJson != null && !partitionJson.isEmpty()) {
         ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
         IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
         partitions = Arrays.asList(parts);
       }
@@ -280,12 +281,14 @@ public final class Main {
 
       if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
         ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
         IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
         sortOrders = Arrays.asList(orders);
       }
 
       if (partitionJson != null && !partitionJson.isEmpty()) {
         ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
         IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
         partitions = Arrays.asList(parts);
       }
