@@ -17,15 +17,40 @@ import com.altinity.ice.cli.internal.retry.RetryLog;
 import com.altinity.ice.cli.internal.s3.S3;
 import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.iceberg.*;
+import org.apache.iceberg.AppendFiles;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.FileFormat;
+import org.apache.iceberg.Metrics;
+import org.apache.iceberg.MetricsConfig;
+import org.apache.iceberg.NullOrder;
+import org.apache.iceberg.PartitionKey;
+import org.apache.iceberg.ReplaceSortOrder;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.SortDirection;
+import org.apache.iceberg.SortOrder;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.Transaction;
 import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.GenericAppenderFactory;
@@ -35,7 +60,12 @@ import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.expressions.Expressions;
-import org.apache.iceberg.io.*;
+import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.io.FileAppender;
+import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.InputFile;
+import org.apache.iceberg.io.OutputFile;
+import org.apache.iceberg.io.OutputFileFactory;
 import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.mapping.NameMappingParser;
@@ -97,7 +127,9 @@ public final class Insert {
         options.forceNoCopy() ? options.toBuilder().noCopy(true).build() : options;
     Table table = catalog.loadTable(nsTable);
 
-    updatePartitionAndSortOrderMetadata(table, partitionColumns, sortOrders);
+    // Create transaction and pass it to updatePartitionAndSortOrderMetadata
+    Transaction txn = table.newTransaction();
+    updatePartitionAndSortOrderMetadata(txn, partitionColumns, sortOrders);
 
     try (FileIO tableIO = table.io()) {
       final Supplier<S3Client> s3ClientSupplier;
@@ -150,7 +182,8 @@ public final class Insert {
               case PRESERVE_ORIGINAL -> new DataFileNamingStrategy.InputFilename(dstPath);
             };
 
-        AppendFiles appendOp = table.newAppend();
+        // appendOp to use the same transaction.
+        AppendFiles appendOp = txn.newAppend();
 
         try (FileIO inputIO = Input.newIO(filesExpanded.getFirst(), table, s3ClientLazy);
             RetryLog retryLog =
@@ -205,7 +238,7 @@ public final class Insert {
                 List<DataFile> dataFiles = future.get();
                 for (DataFile df : dataFiles) {
                   atLeastOneFileAppended = true;
-                  appendOp.appendFile(df); // ✅ Only main thread appends now
+                  appendOp.appendFile(df); // Only main thread appends now
                 }
               } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -231,6 +264,9 @@ public final class Insert {
             if (retryLog != null) {
               retryLog.commit();
             }
+
+            // Commit transaction.
+            txn.commitTransaction();
           } else {
             logger.warn("Table commit skipped (--no-commit)");
           }
@@ -244,10 +280,7 @@ public final class Insert {
   }
 
   private static void updatePartitionAndSortOrderMetadata(
-      Table table, List<Main.IcePartition> partitions, List<Main.IceSortOrder> sortOrders) {
-
-    // Create a new transaction.
-    Transaction txn = table.newTransaction();
+      Transaction txn, List<Main.IcePartition> partitions, List<Main.IceSortOrder> sortOrders) {
 
     if (partitions != null && !partitions.isEmpty()) {
       var updateSpec = txn.updateSpec();
@@ -303,9 +336,6 @@ public final class Insert {
       }
       replaceSortOrder.commit();
     }
-
-    // Commit transaction.
-    txn.commitTransaction();
   }
 
   private static List<DataFile> processFile(
@@ -506,8 +536,8 @@ public final class Insert {
           appender.add(rec);
         }
 
-        fileSizeInBytes = appender.length();
         appender.close();
+        fileSizeInBytes = appender.length();
 
         logger.info(
             "{}: adding data file (copy took {}s)",
@@ -576,11 +606,10 @@ public final class Insert {
       for (Record record : records) {
         appender.add(record);
       }
+      appender.close();
       fileSizeInBytes = appender.length();
-      ;
     }
 
-    InputFile inFile = outputFile.toInputFile();
     MetricsConfig metricsConfig = MetricsConfig.forTable(table);
     Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
 
