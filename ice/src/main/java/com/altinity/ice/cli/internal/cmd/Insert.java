@@ -17,6 +17,10 @@ import com.altinity.ice.cli.internal.retry.RetryLog;
 import com.altinity.ice.cli.internal.s3.S3;
 import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,24 +40,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.iceberg.AppendFiles;
-import org.apache.iceberg.DataFile;
-import org.apache.iceberg.DataFiles;
-import org.apache.iceberg.FileFormat;
-import org.apache.iceberg.Metrics;
-import org.apache.iceberg.MetricsConfig;
-import org.apache.iceberg.NullOrder;
-import org.apache.iceberg.PartitionKey;
-import org.apache.iceberg.ReplaceSortOrder;
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.SortDirection;
-import org.apache.iceberg.SortOrder;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.TableProperties;
-import org.apache.iceberg.Transaction;
+import org.apache.iceberg.*;
 import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.GenericAppenderFactory;
+import org.apache.iceberg.data.GenericRecord;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
@@ -73,6 +64,10 @@ import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.parquet.ParquetSchemaUtil;
 import org.apache.iceberg.parquet.ParquetUtil;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.transforms.Days;
+import org.apache.iceberg.transforms.Hours;
+import org.apache.iceberg.transforms.Months;
+import org.apache.iceberg.transforms.Transform;
 import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
@@ -502,13 +497,36 @@ public final class Insert {
             .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
             .project(tableSchema)
             .reuseContainers();
+    PartitionSpec spec = table.spec();
+    Schema schema = table.schema();
 
-    // Read and group records by partition
     try (CloseableIterable<Record> records = readBuilder.build()) {
       for (Record record : records) {
-        partitionKey.partition(record);
+
+        Record partitionRecord = GenericRecord.create(schema);
+        for (Types.NestedField field : schema.columns()) {
+          partitionRecord.setField(field.name(), record.getField(field.name()));
+        }
+
+        for (PartitionField field : spec.fields()) {
+          String fieldName = schema.findField(field.sourceId()).name();
+          Object value = partitionRecord.getField(fieldName);
+          String transformName = field.transform().toString();
+
+          if (value != null
+              && (transformName.equals("day")
+                  || transformName.equals("month")
+                  || transformName.equals("hour"))) {
+            long micros = toMicros(value);
+            partitionRecord.setField(fieldName, micros);
+          }
+        }
+
+        // Partition based on converted values
+        partitionKey.partition(partitionRecord);
         PartitionKey keyCopy = partitionKey.copy();
 
+        // Store the original record (without converted timestamp fields)
         partitionedRecords.computeIfAbsent(keyCopy, k -> new ArrayList<>()).add(record);
       }
     }
@@ -558,6 +576,28 @@ public final class Insert {
     }
 
     return dataFiles;
+  }
+
+  public static long toMicros(Object tsValue) {
+    if (tsValue instanceof Long) {
+      return (Long) tsValue;
+
+    } else if (tsValue instanceof String) {
+      LocalDateTime ldt = LocalDateTime.parse((String) tsValue);
+      return ldt.toInstant(ZoneOffset.UTC).toEpochMilli() * 1000L;
+
+    } else if (tsValue instanceof LocalDateTime) {
+      return ((LocalDateTime) tsValue).toInstant(ZoneOffset.UTC).toEpochMilli() * 1000L;
+
+    } else if (tsValue instanceof OffsetDateTime) {
+      return ((OffsetDateTime) tsValue).toInstant().toEpochMilli() * 1000L;
+
+    } else if (tsValue instanceof Instant) {
+      return ((Instant) tsValue).toEpochMilli() * 1000L;
+
+    } else {
+      throw new IllegalArgumentException("Unsupported timestamp type: " + tsValue.getClass());
+    }
   }
 
   private static List<DataFile> copyParquetWithSortOrder(

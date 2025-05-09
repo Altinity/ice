@@ -39,6 +39,12 @@ ice insert --sort-order='[{"column": "VendorID", "desc": true, "nullFirst": true
 # Insert with partition key
 ice insert --partition='[{"column": "RatecodeID", "transform": "identity"}]' nyc.taxis20 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
 
+# Partition by day
+ice insert --partition='[{"column": "tpep_pickup_datetime", "transform": "day"}]' nyc.taxis20 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
+
+# Partition by year
+ice insert --partition='[{"column": "tpep_pickup_datetime", "transform": "year"}]' nyc44.taxis111 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
+
 # warning: each parquet file below is ~500mb. this may take a while
 AWS_REGION=us-east-2 ice insert btc.transactions -p --s3-no-sign-request \
   s3://aws-public-blockchain/v1.0/btc/transactions/\
