@@ -376,7 +376,7 @@ public final class Insert {
       throw new BadRequestException(
           file + " cannot be added to catalog without copy"); // TODO: explain
     }
-    long dataFileSizeInBytes;
+    long dataFileSizeInBytes = 0;
 
     var start = System.currentTimeMillis();
     var dataFile = Strings.replacePrefix(file, "s3a://", "s3://");
@@ -386,7 +386,6 @@ public final class Insert {
       }
       dataFileSizeInBytes = inputFile.getLength();
     } else if (options.s3CopyObject()) {
-      dataFileSizeInBytes = 0;
       if (!dataFile.startsWith("s3://") || !table.location().startsWith("s3://")) {
         throw new BadRequestException("--s3-copy-object is only supported between s3:// buckets");
       }
@@ -405,6 +404,7 @@ public final class Insert {
               .destinationKey(dst.path())
               .build();
       s3ClientLazy.getValue().copyObject(copyReq);
+      dataFileSizeInBytes = inputFile.getLength();
       dataFile = dstDataFile;
     } else if (partitionColumns != null && !partitionColumns.isEmpty()) {
       String dstDataFile = dstDataFileSource.get(file);
