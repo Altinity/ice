@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
@@ -370,7 +371,18 @@ public final class Main {
   private RESTCatalog loadCatalog(String configFile) throws IOException {
     Config config = Config.load(configFile);
     RESTCatalog catalog = new RESTCatalog();
-    catalog.initialize("default", config.toIcebergConfig());
+    var icebergConfig = config.toIcebergConfig();
+    logger.debug(
+        "Iceberg configuration: {}",
+        icebergConfig.entrySet().stream()
+            .map(
+                e ->
+                    !e.getKey().contains("key") && !e.getKey().contains("authorization")
+                        ? e.getKey() + "=" + e.getValue()
+                        : e.getKey())
+            .sorted()
+            .collect(Collectors.joining(", ")));
+    catalog.initialize("default", icebergConfig);
     return catalog;
   }
 
