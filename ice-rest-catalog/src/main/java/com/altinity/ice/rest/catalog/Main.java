@@ -274,7 +274,7 @@ public final class Main implements Callable<Integer> {
     var config = Config.load(configFile());
 
     var icebergConfig = config.toIcebergConfig();
-    logger.info(
+    logger.debug(
         "Iceberg configuration: {}",
         icebergConfig.entrySet().stream()
             .map(e -> !e.getKey().contains("key") ? e.getKey() + "=" + e.getValue() : e.getKey())
