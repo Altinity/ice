@@ -10,11 +10,7 @@
 package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
-import com.altinity.ice.cli.internal.cmd.Check;
-import com.altinity.ice.cli.internal.cmd.CreateTable;
-import com.altinity.ice.cli.internal.cmd.DeleteTable;
-import com.altinity.ice.cli.internal.cmd.Describe;
-import com.altinity.ice.cli.internal.cmd.Insert;
+import com.altinity.ice.cli.internal.cmd.*;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
@@ -22,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -353,6 +350,20 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
       DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound);
+    }
+  }
+
+  @CommandLine.Command(name = "delete-file", description = "Delete file.")
+  void deleteFile(
+      @CommandLine.Option(names = "--file", description = "File to delete") String file,
+      @CommandLine.Option(names = "--pos", description = "Position to delete") int pos,
+      @CommandLine.Option(names = "--namespace", description = "Namespace name") String namespace,
+      @CommandLine.Option(names = "--table", description = "Table name") String tableName)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+      DeleteFile.run(catalog, file, pos, namespace, tableName);
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
     }
   }
 
