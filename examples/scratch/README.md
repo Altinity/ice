@@ -46,10 +46,8 @@ ice insert --partition='[{"column": "tpep_pickup_datetime", "transform": "day"}]
 ice insert --partition='[{"column": "tpep_pickup_datetime", "transform": "year"}]' nyc44.taxis111 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
 
 # warning: each parquet file below is ~500mb. this may take a while
-AWS_REGION=us-east-2 ice insert btc.transactions -p --s3-no-sign-request \
-  s3://aws-public-blockchain/v1.0/btc/transactions/\
-date=2025-01-01/part-00000-33e8d075-2099-409b-a806-68dd17217d39-c000.snappy.parquet \
-  s3://aws-public-blockchain/v1.0/btc/transactions/date=2025-01-02/*.parquet
+ice insert btc.transactions -p --s3-region=us-east-2 --s3-no-sign-request \
+  s3://aws-public-blockchain/v1.0/btc/transactions/date=2025-01-01/*.parquet
 
 # upload file to minio using local-mc,
 # then add file to the catalog without making a copy

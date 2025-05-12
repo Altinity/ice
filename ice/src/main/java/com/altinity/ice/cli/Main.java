@@ -141,9 +141,10 @@ public final class Main {
               names = {"-p"},
               description = "Create table if not exists")
           boolean createTableIfNotExists,
+      @CommandLine.Option(names = {"--s3-region"}) String s3Region,
       @CommandLine.Option(
               names = {"--s3-no-sign-request"},
-              description = "Access input file(s) ")
+              description = "Access input file(s)")
           boolean s3NoSignRequest,
       @CommandLine.Option(
               arity = "1",
@@ -163,6 +164,7 @@ public final class Main {
                   "JSON array of sort orders: [{\"column\":\"name\",\"desc\":true,\"nullFirst\":true}]")
           String sortOrderJson)
       throws IOException {
+    setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
       List<IceSortOrder> sortOrders = new ArrayList<>();
       List<IcePartition> partitions = new ArrayList<>();
@@ -223,9 +225,10 @@ public final class Main {
               description =
                   "Use table credentials to access input files (instead of credentials from execution environment)")
           boolean forceTableAuth,
+      @CommandLine.Option(names = {"--s3-region"}) String s3Region,
       @CommandLine.Option(
               names = {"--s3-no-sign-request"},
-              description = "Access input file(s) ")
+              description = "Access input file(s)")
           boolean s3NoSignRequest,
       @CommandLine.Option(
               names = "--s3-copy-object",
@@ -269,6 +272,7 @@ public final class Main {
       throw new UnsupportedOperationException(
           "--s3-no-sign-request + --s3-copy-object is not supported by AWS (see --help for details)");
     }
+    setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
       if (dataFiles.length == 1 && "-".equals(dataFiles[0])) {
         dataFiles = readInput().toArray(new String[0]);
@@ -323,6 +327,13 @@ public final class Main {
           partitions,
           sortOrders,
           threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
+    }
+  }
+
+  // FIXME: do not modify system properties, configure aws sdk instead
+  private static void setAWSRegion(String v) {
+    if (!Strings.isNullOrEmpty(v)) {
+      System.setProperty("aws.region", v);
     }
   }
 
