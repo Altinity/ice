@@ -156,13 +156,13 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "JSON array of partition specifications: [{\"column\":\"date\",\"transform\":\"year\"}],"
-                      + "Supported transforms: hour, day, month, year, identity(default)")
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                      + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
-              names = {"--sort-order"},
+              names = {"--sort"},
               description =
-                  "JSON array of sort orders: [{\"column\":\"name\",\"desc\":true,\"nullFirst\":true}]")
+                  "Sort order, e.g. [{\"column\":\"name\", \"desc\":false, \"nullFirst\":false}]")
           String sortOrderJson)
       throws IOException {
     setAWSRegion(s3Region);
@@ -255,13 +255,13 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "JSON array of partition specifications: [{\"column\":\"date\",\"transform\":\"year\"}],"
-                      + "Supported transforms: hour, day, month, year, identity(default)")
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                      + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
-              names = {"--sort-order"},
+              names = {"--sort"},
               description =
-                  "JSON array of sort orders: [{\"column\":\"name\",\"desc\":true,\"nullFirst\":true}]")
+                  "Sort order, e.g. [{\"column\":\"name\", \"desc\":false, \"nullFirst\":false}]")
           String sortOrderJson,
       @CommandLine.Option(
               names = {"--thread-count"},
@@ -283,21 +283,20 @@ public final class Main {
         }
       }
 
-      List<IceSortOrder> sortOrders = new ArrayList<>();
-      List<IcePartition> partitions = new ArrayList<>();
-
-      if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
-        IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
-        sortOrders = Arrays.asList(orders);
-      }
-
+      List<IcePartition> partitions = null;
       if (partitionJson != null && !partitionJson.isEmpty()) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
         IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
         partitions = Arrays.asList(parts);
+      }
+
+      List<IceSortOrder> sortOrders = null;
+      if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
+        sortOrders = Arrays.asList(orders);
       }
 
       TableIdentifier tableId = TableIdentifier.parse(name);
