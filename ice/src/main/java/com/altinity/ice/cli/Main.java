@@ -355,17 +355,30 @@ public final class Main {
 
   @CommandLine.Command(name = "delete-file", description = "Delete file.")
   void deleteFile(
-      @CommandLine.Option(names = "--file", description = "File to delete") String file,
-      @CommandLine.Option(names = "--pos", description = "Position to delete") int pos,
       @CommandLine.Option(names = "--namespace", description = "Namespace name") String namespace,
-      @CommandLine.Option(names = "--table", description = "Table name") String tableName)
+      @CommandLine.Option(names = "--table", description = "Table name") String tableName,
+      @CommandLine.Option(
+              names = {"--partition"},
+              description =
+                  "JSON array of partition filters: [{\"partition_name\": \"vendorId\", \"value\": 5}]")
+          String partitionJson)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
-      DeleteFile.run(catalog, file, pos, namespace, tableName);
+      List<PartitionFilter> partitions = new ArrayList<>();
+      if (partitionJson != null && !partitionJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        PartitionFilter[] parts = mapper.readValue(partitionJson, PartitionFilter[].class);
+        partitions = Arrays.asList(parts);
+      }
+      DeleteFile.run(catalog, namespace, tableName, partitions);
     } catch (URISyntaxException e) {
       throw new RuntimeException(e);
     }
   }
+
+  public record PartitionFilter(
+      @JsonProperty("partition_name") String partitionName, @JsonProperty("value") Object value) {}
 
   private RESTCatalog loadCatalog(String configFile) throws IOException {
     Config config = Config.load(configFile);

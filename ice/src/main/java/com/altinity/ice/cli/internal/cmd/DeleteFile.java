@@ -10,12 +10,11 @@
 package com.altinity.ice.cli.internal.cmd;
 
 import java.io.IOException;
-import java.net.URI;
 import java.net.URISyntaxException;
-import org.apache.iceberg.FileMetadata;
-import org.apache.iceberg.Table;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.iceberg.*;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,55 +26,36 @@ public final class DeleteFile {
   private DeleteFile() {}
 
   public static void run(
-      RESTCatalog catalog, String file, int pos, String namespace, String tableName)
+      RESTCatalog catalog,
+      String namespace,
+      String tableName,
+      List<com.altinity.ice.cli.Main.PartitionFilter> partitions)
       throws IOException, URISyntaxException {
-
-    // if file is empty,
-    if (file == null || file.isEmpty()) {
-      throw new IllegalArgumentException("File is empty");
+    Table table = catalog.loadTable(TableIdentifier.of(namespace, tableName));
+    TableScan scan = table.newScan();
+    if (partitions != null && !partitions.isEmpty()) {
+      org.apache.iceberg.expressions.Expression expr = null;
+      for (com.altinity.ice.cli.Main.PartitionFilter pf : partitions) {
+        org.apache.iceberg.expressions.Expression e =
+            org.apache.iceberg.expressions.Expressions.equal(pf.partitionName(), pf.value());
+        expr = (expr == null) ? e : org.apache.iceberg.expressions.Expressions.and(expr, e);
+      }
+      scan = scan.filter(expr);
     }
-
-    // Parse the S3 URL
-    URI fileUri = new URI(file);
-    String scheme = fileUri.getScheme();
-    if (!"s3".equals(scheme)) {
-      throw new IllegalArgumentException("Only s3:// URLs are supported");
+    Iterable<FileScanTask> tasks = scan.planFiles();
+    List<DataFile> filesToDelete = new ArrayList<>();
+    for (FileScanTask task : tasks) {
+      filesToDelete.add(task.file());
     }
-
-    // Extract bucket and key
-    String bucket = fileUri.getHost();
-    String key = fileUri.getPath().substring(1); // Remove leading slash
-
-    // Create delete file in the same S3 location
-    String deleteKey =
-        key.substring(0, key.lastIndexOf('/') + 1)
-            + "delete-"
-            + System.currentTimeMillis()
-            + ".parquet";
-    String deleteFileLocation = String.format("s3://%s/%s", bucket, deleteKey);
-
-    // Load the table
-    TableIdentifier tableId = TableIdentifier.of(namespace, tableName);
-    Table table = catalog.loadTable(tableId);
-
-    // Create the output file
-    OutputFile deleteOutput = table.io().newOutputFile(deleteFileLocation);
-
-    // Get the data file info
-    var dataFile = table.newScan().planFiles().iterator().next().file();
-
-    org.apache.iceberg.DeleteFile deleteFile =
-        FileMetadata.deleteFileBuilder(table.spec())
-            .ofPositionDeletes()
-            .withPath(deleteOutput.location())
-            .withPartition(dataFile.partition())
-            .withReferencedDataFile(dataFile.location())
-            .withFileSizeInBytes(deleteOutput.toInputFile().getLength())
-            .withRecordCount(1)
-            .build();
-
-    table.newRowDelta().addDeletes(deleteFile).commit();
-
-    logger.info("Position delete committed for file {} at position {}", file, pos);
+    if (!filesToDelete.isEmpty()) {
+      RewriteFiles rewrite = table.newRewrite();
+      for (DataFile deleteFile : filesToDelete) {
+        rewrite.deleteFile(deleteFile);
+      }
+      rewrite.commit();
+      logger.info("Partition(s) deleted.");
+    } else {
+      logger.info("No files found for the partition(s).");
+    }
   }
 }
