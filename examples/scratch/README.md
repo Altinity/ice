@@ -29,38 +29,24 @@ ice insert flowers.iris -p \
 
 ice insert nyc.taxis -p \
   https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
+
+# insert data partitioned by day using tpep_pickup_datetime column
+ice insert nyc.taxis_p_by_day -p \
+  https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet \
+  --partition='[{"column":"tpep_pickup_datetime","transform":"day"}]'
   
-# Insert rows with sort-key
-ice insert --sort-order='[{"column": "VendorID", "desc": true, "nullFirst": true}]' nyc.taxis2 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
-
-# Insert sort-key(multiple columns)
-ice insert --sort-order='[{"column": "VendorID", "desc": true, "nullFirst": true}, {"column": "Airport_fee", "desc": false, "nullFirst": false}]' nyc.taxis24 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
-
-# Insert with partition key
-ice insert --partition='[{"column": "RatecodeID", "transform": "identity"}]' nyc.taxis20 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
-
-# Partition by day
-ice insert --partition='[{"column": "tpep_pickup_datetime", "transform": "day"}]' nyc.taxis20 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
-
-# Partition by year
-ice insert --partition='[{"column": "tpep_pickup_datetime", "transform": "year"}]' nyc44.taxis111 -p https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet
+# insert data ordered by tpep_pickup_datetime column
+ice insert nyc.taxis_s_by_day -p \
+  https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet \
+  --sort='[{"column":"tpep_pickup_datetime"}]'
 
 # warning: each parquet file below is ~500mb. this may take a while
-AWS_REGION=us-east-2 ice insert btc.transactions -p --s3-no-sign-request \
-  s3://aws-public-blockchain/v1.0/btc/transactions/\
-date=2025-01-01/part-00000-33e8d075-2099-409b-a806-68dd17217d39-c000.snappy.parquet \
-  s3://aws-public-blockchain/v1.0/btc/transactions/date=2025-01-02/*.parquet
+ice insert btc.transactions -p --s3-region=us-east-2 --s3-no-sign-request \
+  s3://aws-public-blockchain/v1.0/btc/transactions/date=2025-01-01/*.parquet
 
 # upload file to minio using local-mc,
 # then add file to the catalog without making a copy
 ice create-table flowers.iris_no_copy --schema-from-parquet=file://iris.parquet
-
-# create table with partitioning columns
-ice create-table flowers.irs_no_copy_partition --schema-from-parquet=file://iris.parquet --partition-by=variety,petal.width
-
-# create table with sort columns
-ice create-table flowers.irs_no_copy_sort --schema-from-parquet=file://iris.parquet --sort-order='[{"column": "variety", "desc": false}]'
-
 local-mc cp iris.parquet local/bucket1/flowers/iris_no_copy/
 ice insert flowers.iris_no_copy --no-copy s3://bucket1/flowers/iris_no_copy/iris.parquet
 

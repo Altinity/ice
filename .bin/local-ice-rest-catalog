@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DIR="$(dirname "${BASH_SOURCE[0]}")/.."
-exec "$DIR/mvnw" -f "$DIR/pom.xml" -q -P ice-rest-catalog-exec -Pno-check -am -pl ice-rest-catalog compile exec:java -Dexec.mainClass=com.altinity.ice.rest.catalog.Main -Dexec.args="$*" # FIXME: $*
+exec_args=""
+for arg in "$@"; do
+  exec_args+=("'${arg//\'/\'\\\'\'}'")
+done
+exec_args=$(IFS=" "; echo "${exec_args[*]}")
+exec "$DIR/mvnw" -f "$DIR/pom.xml" -q -P ice-rest-catalog-exec -Pno-check -am -pl ice-rest-catalog compile exec:java -Dexec.mainClass=com.altinity.ice.rest.catalog.Main -Dexec.args="$exec_args"

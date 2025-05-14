@@ -18,7 +18,9 @@
  */
 package com.altinity.ice.internal.iceberg.io;
 
+import com.altinity.ice.internal.strings.Strings;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -149,10 +151,31 @@ public class SchemeFileIO implements DelegateFileIO {
         impl,
         key -> {
           Map<String, String> props = Maps.newHashMap(properties);
-          if (props.containsKey("s3.region") && !props.containsKey("client.region")) {
-            props.put("client.region", props.get("s3.region"));
-          }
           props.put("init-creation-stacktrace", "false"); // ResolvingFileIO.createStack
+
+          // s3.endpoint, client.region, ... defaults
+          for (Map.Entry<String, String> e : new HashMap<>(props).entrySet()) {
+            if (e.getKey().startsWith("ice.io.default.")) {
+              String k = Strings.removePrefix(e.getKey(), "ice.io.default.");
+              if (!props.containsKey(k)) {
+                props.put(k, e.getValue());
+              }
+            }
+          }
+
+          logger.debug(
+              "Iceberg configuration for {}/{}: {}",
+              impl,
+              key,
+              props.entrySet().stream()
+                  .map(
+                      e ->
+                          !e.getKey().contains("key") && !e.getKey().contains("authorization")
+                              ? e.getKey() + "=" + e.getValue()
+                              : e.getKey())
+                  .sorted()
+                  .collect(Collectors.joining(", ")));
+
           FileIO fileIO = CatalogUtil.loadFileIO(key, props, null);
           Preconditions.checkState(
               fileIO instanceof DelegateFileIO,

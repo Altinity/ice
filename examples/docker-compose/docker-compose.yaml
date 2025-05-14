@@ -27,6 +27,7 @@ services:
       - minio
   ice-rest-catalog:
     image: altinity/ice-rest-catalog:${ICE_REST_CATALOG_TAG:-latest}
+    pull_policy: ${ICE_REST_CATALOG_PULL_POLICY:-always}
     restart: unless-stopped
     ports:
       - '5000:5000' # iceberg/http

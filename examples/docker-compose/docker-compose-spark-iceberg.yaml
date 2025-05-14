@@ -1,17 +1,36 @@
 services:
   spark-iceberg:
-    image: tabulario/spark-iceberg
+    # https://github.com/databricks/docker-spark-iceberg
+    image: tabulario/spark-iceberg:3.5.5_1.8.1
     container_name: spark-iceberg
     network_mode: host
-    volumes:
-      - ./warehouse:/home/iceberg/warehouse
-      - ./notebooks:/home/iceberg/notebooks/notebooks
-    environment:
-      - AWS_ACCESS_KEY_ID=miniouser
-      - AWS_SECRET_ACCESS_KEY=miniopassword
-      - AWS_REGION=minio
+    # volumes:
+    #   - ./notebooks:/home/iceberg/notebooks/local
+    configs:
+      - source: spark-defaults.conf
+        target: /opt/spark/conf/spark-defaults.conf
     ports:
-      - 8888:8888
-      - 8080:8080
-      - 10000:10000
-      - 10001:10001
+      - 8888:8888 # jupyter-notebook
+      - 8080:8080 # spark-master
+configs:
+  spark-defaults.conf:
+    content: |
+      spark.sql.extensions                      org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+      spark.sql.catalog.default                 org.apache.iceberg.spark.SparkCatalog
+      spark.sql.catalog.default.type            rest
+      spark.sql.catalog.default.uri             http://localhost:5000
+      spark.sql.catalog.default.header.authorization bearer foo
+      spark.sql.catalog.default.io-impl         org.apache.iceberg.aws.s3.S3FileIO
+      spark.sql.catalog.default.warehouse       s3://bucket1
+      spark.sql.catalog.default.s3.endpoint     http://localhost:8999
+      spark.sql.catalog.default.s3.path-style-access true
+      spark.sql.catalog.default.s3.access-key   miniouser
+      spark.sql.catalog.default.s3.secret-key   miniopassword
+      spark.sql.catalog.default.client.region   minio
+      spark.sql.catalog.default.s3.ssl-enabled  false
+      spark.sql.defaultCatalog                  default
+      spark.eventLog.enabled                    true
+      spark.eventLog.dir                        /home/iceberg/spark-events
+      spark.history.fs.logDirectory             /home/iceberg/spark-events
+      spark.sql.catalogImplementation           in-memory
+      # spark.log.level                         DEBUG

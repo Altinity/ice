@@ -28,8 +28,10 @@ public class RetryLog implements Closeable {
     this.w = new BufferedWriter(new FileWriter(f + "~"));
   }
 
+  // This method is expected to be thread-safe.
   public void add(String fileToRetry) throws IOException {
-    w.append(fileToRetry).write("\n");
+    //noinspection StringConcatenationInsideStringBufferAppend
+    w.append(fileToRetry + "\n");
   }
 
   public void commit() throws IOException {

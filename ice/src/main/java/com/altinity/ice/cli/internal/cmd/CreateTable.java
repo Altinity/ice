@@ -10,6 +10,8 @@
 package com.altinity.ice.cli.internal.cmd;
 
 import com.altinity.ice.cli.Main;
+import com.altinity.ice.cli.internal.iceberg.Partitioning;
+import com.altinity.ice.cli.internal.iceberg.Sorting;
 import com.altinity.ice.cli.internal.iceberg.io.Input;
 import com.altinity.ice.cli.internal.iceberg.parquet.Metadata;
 import com.altinity.ice.cli.internal.s3.S3;
@@ -17,13 +19,12 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.iceberg.NullOrder;
+import javax.annotation.Nullable;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.ReplaceSortOrder;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.SortDirection;
-import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
@@ -49,8 +50,8 @@ public final class CreateTable {
       String location,
       boolean ignoreAlreadyExists,
       boolean s3NoSignRequest,
-      List<Main.IcePartition> partitionColumns,
-      List<Main.IceSortOrder> sortOrders)
+      @Nullable List<Main.IcePartition> partitionList,
+      @Nullable List<Main.IceSortOrder> sortOrderList)
       throws IOException {
     Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
 
@@ -75,60 +76,26 @@ public final class CreateTable {
           props = Map.of(TableProperties.DEFAULT_NAME_MAPPING, mappingJson);
         }
 
-        // Create partition spec based on provided partition columns
-        final PartitionSpec.Builder partitionSpecBuilder = PartitionSpec.builderFor(fileSchema);
-        if (partitionColumns != null && !partitionColumns.isEmpty()) {
-          for (Main.IcePartition partition : partitionColumns) {
-            String transform = partition.transform().toLowerCase();
-            if (transform.startsWith("bucket[")) {
-              int numBuckets = Integer.parseInt(transform.substring(7, transform.length() - 1));
-              partitionSpecBuilder.bucket(partition.column(), numBuckets);
-            } else if (transform.startsWith("truncate[")) {
-              int width = Integer.parseInt(transform.substring(9, transform.length() - 1));
-              partitionSpecBuilder.truncate(partition.column(), width);
-            } else {
-              switch (transform) {
-                case "year":
-                  partitionSpecBuilder.year(partition.column());
-                  break;
-                case "month":
-                  partitionSpecBuilder.month(partition.column());
-                  break;
-                case "day":
-                  partitionSpecBuilder.day(partition.column());
-                  break;
-                case "hour":
-                  partitionSpecBuilder.hour(partition.column());
-                  break;
-                case "identity":
-                default:
-                  partitionSpecBuilder.identity(partition.column());
-                  break;
-              }
-            }
-          }
+        PartitionSpec partitionSpec =
+            partitionList == null
+                ? PartitionSpec.unpartitioned()
+                : Partitioning.newPartitionSpec(fileSchema, partitionList);
+
+        if (ignoreAlreadyExists) { // -p
+          createNamespace(catalog, nsTable.namespace());
         }
-        final PartitionSpec partitionSpec = partitionSpecBuilder.build();
 
         // if we don't set location, it's automatically set to $warehouse/$namespace/$table
-        createNamespace(catalog, nsTable.namespace());
-        Table table = catalog.createTable(nsTable, fileSchema, partitionSpec, location, props);
-        // ToDO: Move this shared code from Input and CreateTable to base class or common.
-        // Create sort order based on provided sort columns
-        if (sortOrders != null && !sortOrders.isEmpty()) {
+        Transaction tx =
+            catalog.newCreateTableTransaction(nsTable, fileSchema, partitionSpec, location, props);
 
-          ReplaceSortOrder replaceSortOrder = table.replaceSortOrder();
-          for (Main.IceSortOrder order : sortOrders) {
-            SortDirection dir = order.desc() ? SortDirection.DESC : SortDirection.ASC;
-            NullOrder nullOrd = order.nullFirst() ? NullOrder.NULLS_FIRST : NullOrder.NULLS_LAST;
-            if (dir == SortDirection.ASC) {
-              replaceSortOrder.asc(order.column(), nullOrd);
-            } else {
-              replaceSortOrder.desc(order.column(), nullOrd);
-            }
-          }
-          replaceSortOrder.commit();
+        if (sortOrderList != null && !sortOrderList.isEmpty()) {
+          ReplaceSortOrder op = tx.replaceSortOrder();
+          Sorting.apply(op, sortOrderList);
+          op.commit();
         }
+
+        tx.commitTransaction();
       } catch (AlreadyExistsException e) {
         if (ignoreAlreadyExists) {
           return;

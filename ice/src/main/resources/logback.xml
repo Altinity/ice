@@ -1,7 +1,12 @@
 <configuration>
 
+  <!--ice-->
   <logger name="org.apache.iceberg.CatalogUtil" level="WARN"/>
+  <logger name="org.apache.iceberg.metrics.LoggingMetricsReporter" level="WARN"/>
+  <logger name="org.apache.iceberg.SnapshotScan" level="WARN"/>
+
   <logger name="org.apache.hadoop.io.compress.CodecPool" level="WARN"/>
+  <logger name="org.apache.hadoop.util.NativeCodeLoader" level="ERROR"/>
 
   <!--ice-rest-catalog-->
   <!--<logger name="org.apache.iceberg.CatalogUtil" level="WARN"/>-->
@@ -11,8 +16,6 @@
   <logger name="org.apache.iceberg.aws.s3.S3FileIO" level="ERROR"/>
   <logger name="org.apache.iceberg.BaseMetastoreTableOperations" level="WARN"/>
   <logger name="io.grpc.internal" level="ERROR"/>
-  <logger name="org.apache.iceberg.metrics.LoggingMetricsReporter" level="WARN"/>
-  <logger name="org.apache.iceberg.SnapshotScan" level="WARN"/>
 
   <root level="INFO">
     <appender-ref ref="CONSOLE"/>

@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
@@ -138,9 +139,10 @@ public final class Main {
               names = {"-p"},
               description = "Create table if not exists")
           boolean createTableIfNotExists,
+      @CommandLine.Option(names = {"--s3-region"}) String s3Region,
       @CommandLine.Option(
               names = {"--s3-no-sign-request"},
-              description = "Access input file(s) ")
+              description = "Access input file(s)")
           boolean s3NoSignRequest,
       @CommandLine.Option(
               arity = "1",
@@ -151,15 +153,16 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "JSON array of partition specifications: [{\"column\":\"date\",\"transform\":\"year\"}],"
-                      + "Supported transforms: hour, day, month, year, identity(default)")
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                      + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
-              names = {"--sort-order"},
+              names = {"--sort"},
               description =
-                  "JSON array of sort orders: [{\"column\":\"name\",\"desc\":true,\"nullFirst\":true}]")
+                  "Sort order, e.g. [{\"column\":\"name\", \"desc\":false, \"nullFirst\":false}]")
           String sortOrderJson)
       throws IOException {
+    setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
       List<IceSortOrder> sortOrders = new ArrayList<>();
       List<IcePartition> partitions = new ArrayList<>();
@@ -220,9 +223,10 @@ public final class Main {
               description =
                   "Use table credentials to access input files (instead of credentials from execution environment)")
           boolean forceTableAuth,
+      @CommandLine.Option(names = {"--s3-region"}) String s3Region,
       @CommandLine.Option(
               names = {"--s3-no-sign-request"},
-              description = "Access input file(s) ")
+              description = "Access input file(s)")
           boolean s3NoSignRequest,
       @CommandLine.Option(
               names = "--s3-copy-object",
@@ -248,13 +252,13 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "JSON array of partition specifications: [{\"column\":\"date\",\"transform\":\"year\"}],"
-                      + "Supported transforms: hour, day, month, year, identity(default)")
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                      + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
-              names = {"--sort-order"},
+              names = {"--sort"},
               description =
-                  "JSON array of sort orders: [{\"column\":\"name\",\"desc\":true,\"nullFirst\":true}]")
+                  "Sort order, e.g. [{\"column\":\"name\", \"desc\":false, \"nullFirst\":false}]")
           String sortOrderJson,
       @CommandLine.Option(
               names = {"--thread-count"},
@@ -266,6 +270,7 @@ public final class Main {
       throw new UnsupportedOperationException(
           "--s3-no-sign-request + --s3-copy-object is not supported by AWS (see --help for details)");
     }
+    setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
       if (dataFiles.length == 1 && "-".equals(dataFiles[0])) {
         dataFiles = readInput().toArray(new String[0]);
@@ -275,21 +280,20 @@ public final class Main {
         }
       }
 
-      List<IceSortOrder> sortOrders = new ArrayList<>();
-      List<IcePartition> partitions = new ArrayList<>();
-
-      if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
-        IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
-        sortOrders = Arrays.asList(orders);
-      }
-
+      List<IcePartition> partitions = null;
       if (partitionJson != null && !partitionJson.isEmpty()) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
         IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
         partitions = Arrays.asList(parts);
+      }
+
+      List<IceSortOrder> sortOrders = null;
+      if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
+        sortOrders = Arrays.asList(orders);
       }
 
       TableIdentifier tableId = TableIdentifier.parse(name);
@@ -320,6 +324,13 @@ public final class Main {
           partitions,
           sortOrders,
           threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
+    }
+  }
+
+  // FIXME: do not modify system properties, configure aws sdk instead
+  private static void setAWSRegion(String v) {
+    if (!Strings.isNullOrEmpty(v)) {
+      System.setProperty("aws.region", v);
     }
   }
 
@@ -383,7 +394,18 @@ public final class Main {
   private RESTCatalog loadCatalog(String configFile) throws IOException {
     Config config = Config.load(configFile);
     RESTCatalog catalog = new RESTCatalog();
-    catalog.initialize("default", config.toIcebergConfig());
+    var icebergConfig = config.toIcebergConfig();
+    logger.debug(
+        "Iceberg configuration: {}",
+        icebergConfig.entrySet().stream()
+            .map(
+                e ->
+                    !e.getKey().contains("key") && !e.getKey().contains("authorization")
+                        ? e.getKey() + "=" + e.getValue()
+                        : e.getKey())
+            .sorted()
+            .collect(Collectors.joining(", ")));
+    catalog.initialize("default", icebergConfig);
     return catalog;
   }
 

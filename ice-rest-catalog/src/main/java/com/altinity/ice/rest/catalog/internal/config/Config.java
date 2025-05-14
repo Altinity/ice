@@ -174,14 +174,15 @@ public record Config(
   public Map<String, String> toIcebergLoadTableConfig() {
     var m = new HashMap<String, String>();
     if (s3 != null) {
+      String iceIODefault = "ice.io.default.";
       if (!Strings.isNullOrEmpty(s3.endpoint)) {
-        m.put(S3FileIOProperties.ENDPOINT, s3.endpoint);
+        m.put(iceIODefault + S3FileIOProperties.ENDPOINT, s3.endpoint);
       }
       if (s3.pathStyleAccess) {
-        m.put(S3FileIOProperties.PATH_STYLE_ACCESS, "true");
+        m.put(iceIODefault + S3FileIOProperties.PATH_STYLE_ACCESS, "true");
       }
       if (!Strings.isNullOrEmpty(s3.region)) {
-        m.put("s3.region", s3.region); // ice-specific
+        m.put(iceIODefault + AwsClientProperties.CLIENT_REGION, s3.region);
       }
     }
     for (Map.Entry<String, String> e : loadTableProperties.entrySet()) {

@@ -36,6 +36,7 @@ import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.iceberg.CatalogProperties;
@@ -189,7 +190,7 @@ public final class Main implements Callable<Integer> {
               : CredentialsProvider.assumeRule(
                   awsCredentialsProvider,
                   token.accessConfig().awsAssumeRoleARN(),
-                  "ice-rest-catalog." + token.name()));
+                  getUserAgentForToken(token)));
     }
     if (config.anonymousAccess().enabled()) {
       var token = new Config.Token("anonymous", "", config.anonymousAccess().accessConfig());
@@ -200,9 +201,15 @@ public final class Main implements Callable<Integer> {
               : CredentialsProvider.assumeRule(
                   awsCredentialsProvider,
                   token.accessConfig().awsAssumeRoleARN(),
-                  "ice-rest-catalog." + token.name()));
+                  getUserAgentForToken(token)));
     }
     return awsCredentialsProviders;
+  }
+
+  private static String getUserAgentForToken(Config.Token token) {
+    return !Strings.isNullOrEmpty(token.name())
+        ? "ice-rest-catalog." + token.name()
+        : "ice-rest-catalog";
   }
 
   private static RESTCatalogAuthorizationHandler createAuthorizationHandler(
@@ -267,7 +274,7 @@ public final class Main implements Callable<Integer> {
     var config = Config.load(configFile());
 
     var icebergConfig = config.toIcebergConfig();
-    logger.info(
+    logger.debug(
         "Iceberg configuration: {}",
         icebergConfig.entrySet().stream()
             .map(e -> !e.getKey().contains("key") ? e.getKey() + "=" + e.getValue() : e.getKey())
@@ -278,7 +285,7 @@ public final class Main implements Callable<Integer> {
       if (Strings.isNullOrEmpty(t.name())) {
         logger.info(
             "Catalog accessible via bearer token named \"{}\" (config: {})",
-            t.name(),
+            Objects.requireNonNullElse(t.name(), ""),
             om.writeValueAsString(t.accessConfig()));
       } else {
         logger.info(
