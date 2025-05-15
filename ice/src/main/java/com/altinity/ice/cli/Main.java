@@ -373,8 +373,8 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "JSON array of partition filters: [{\"partition_name\": \"vendorId\", \"value\": 5}]. " +
-                    "For timestmap columns, use ISO Datetime format YYYY-MM-ddTHH:mm:ss")
+                  "JSON array of partition filters: [{\"partition_name\": \"vendorId\", \"value\": 5}]. "
+                      + "For timestmap columns, use ISO Datetime format YYYY-MM-ddTHH:mm:ss")
           String partitionJson)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
