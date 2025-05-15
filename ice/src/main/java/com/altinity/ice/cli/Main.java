@@ -12,6 +12,7 @@ package com.altinity.ice.cli;
 import ch.qos.logback.classic.Level;
 import com.altinity.ice.cli.internal.cmd.Check;
 import com.altinity.ice.cli.internal.cmd.CreateTable;
+import com.altinity.ice.cli.internal.cmd.DeleteFile;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.Insert;
@@ -22,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -366,6 +368,36 @@ public final class Main {
       DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound);
     }
   }
+
+  @CommandLine.Command(name = "delete-file", description = "Delete file.")
+  void deleteFile(
+      @CommandLine.Option(names = "--namespace", description = "Namespace name", required = true)
+          String namespace,
+      @CommandLine.Option(names = "--table", description = "Table name", required = true)
+          String tableName,
+      @CommandLine.Option(
+              names = {"--partition"},
+              description =
+                  "JSON array of partition filters: [{\"partition_name\": \"vendorId\", \"value\": 5}]. "
+                      + "For timestmap columns, use ISO Datetime format YYYY-MM-ddTHH:mm:ss")
+          String partitionJson)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+      List<PartitionFilter> partitions = new ArrayList<>();
+      if (partitionJson != null && !partitionJson.isEmpty()) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        PartitionFilter[] parts = mapper.readValue(partitionJson, PartitionFilter[].class);
+        partitions = Arrays.asList(parts);
+      }
+      DeleteFile.run(catalog, namespace, tableName, partitions);
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public record PartitionFilter(
+      @JsonProperty("partition_name") String partitionName, @JsonProperty("value") Object value) {}
 
   private RESTCatalog loadCatalog(String configFile) throws IOException {
     Config config = Config.load(configFile);
