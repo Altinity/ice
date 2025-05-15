@@ -31,6 +31,7 @@ public final class DeleteFile {
       String tableName,
       List<com.altinity.ice.cli.Main.PartitionFilter> partitions)
       throws IOException, URISyntaxException {
+
     Table table = catalog.loadTable(TableIdentifier.of(namespace, tableName));
     TableScan scan = table.newScan();
     if (partitions != null && !partitions.isEmpty()) {

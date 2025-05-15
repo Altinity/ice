@@ -366,12 +366,15 @@ public final class Main {
 
   @CommandLine.Command(name = "delete-file", description = "Delete file.")
   void deleteFile(
-      @CommandLine.Option(names = "--namespace", description = "Namespace name") String namespace,
-      @CommandLine.Option(names = "--table", description = "Table name") String tableName,
+      @CommandLine.Option(names = "--namespace", description = "Namespace name", required = true)
+          String namespace,
+      @CommandLine.Option(names = "--table", description = "Table name", required = true)
+          String tableName,
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "JSON array of partition filters: [{\"partition_name\": \"vendorId\", \"value\": 5}]")
+                  "JSON array of partition filters: [{\"partition_name\": \"vendorId\", \"value\": 5}]. " +
+                    "For timestmap columns, use ISO Datetime format YYYY-MM-ddTHH:mm:ss")
           String partitionJson)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
