@@ -19,17 +19,18 @@ import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class DeleteFile {
+public final class DeletePartition {
 
-  private static final Logger logger = LoggerFactory.getLogger(DeleteFile.class);
+  private static final Logger logger = LoggerFactory.getLogger(DeletePartition.class);
 
-  private DeleteFile() {}
+  private DeletePartition() {}
 
   public static void run(
       RESTCatalog catalog,
       String namespace,
       String tableName,
-      List<com.altinity.ice.cli.Main.PartitionFilter> partitions)
+      List<com.altinity.ice.cli.Main.PartitionFilter> partitions,
+      boolean dryRun)
       throws IOException, URISyntaxException {
 
     Table table = catalog.loadTable(TableIdentifier.of(namespace, tableName));
@@ -38,7 +39,7 @@ public final class DeleteFile {
       org.apache.iceberg.expressions.Expression expr = null;
       for (com.altinity.ice.cli.Main.PartitionFilter pf : partitions) {
         org.apache.iceberg.expressions.Expression e =
-            org.apache.iceberg.expressions.Expressions.equal(pf.partitionName(), pf.value());
+            org.apache.iceberg.expressions.Expressions.equal(pf.name(), pf.value());
         expr = (expr == null) ? e : org.apache.iceberg.expressions.Expressions.and(expr, e);
       }
       scan = scan.filter(expr);
@@ -49,12 +50,19 @@ public final class DeleteFile {
       filesToDelete.add(task.file());
     }
     if (!filesToDelete.isEmpty()) {
-      RewriteFiles rewrite = table.newRewrite();
-      for (DataFile deleteFile : filesToDelete) {
-        rewrite.deleteFile(deleteFile);
+      if (dryRun) {
+        logger.info("Dry run: The following files would be deleted:");
+        for (DataFile file : filesToDelete) {
+          logger.info("  {}", file.path());
+        }
+      } else {
+        RewriteFiles rewrite = table.newRewrite();
+        for (DataFile deleteFile : filesToDelete) {
+          rewrite.deleteFile(deleteFile);
+        }
+        rewrite.commit();
+        logger.info("Partition(s) deleted.");
       }
-      rewrite.commit();
-      logger.info("Partition(s) deleted.");
     } else {
       logger.info("No files found for the partition(s).");
     }

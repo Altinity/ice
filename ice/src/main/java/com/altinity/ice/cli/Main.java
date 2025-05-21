@@ -12,7 +12,7 @@ package com.altinity.ice.cli;
 import ch.qos.logback.classic.Level;
 import com.altinity.ice.cli.internal.cmd.Check;
 import com.altinity.ice.cli.internal.cmd.CreateTable;
-import com.altinity.ice.cli.internal.cmd.DeleteFile;
+import com.altinity.ice.cli.internal.cmd.DeletePartition;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.Insert;
@@ -369,8 +369,8 @@ public final class Main {
     }
   }
 
-  @CommandLine.Command(name = "delete-file", description = "Delete file.")
-  void deleteFile(
+  @CommandLine.Command(name = "delete", description = "Delete Partition(s).")
+  void deletePartition(
       @CommandLine.Option(names = "--namespace", description = "Namespace name", required = true)
           String namespace,
       @CommandLine.Option(names = "--table", description = "Table name", required = true)
@@ -378,9 +378,13 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "JSON array of partition filters: [{\"partition_name\": \"vendorId\", \"value\": 5}]. "
-                      + "For timestmap columns, use ISO Datetime format YYYY-MM-ddTHH:mm:ss")
-          String partitionJson)
+                  "JSON array of partition filters: [{\"name\": \"vendorId\", \"value\": 5}]. "
+                      + "For timestamp columns, use ISO Datetime format YYYY-MM-ddTHH:mm:ss")
+          String partitionJson,
+      @CommandLine.Option(
+              names = "--dry-run",
+              description = "Log files that would be deleted without actually deleting them")
+          boolean dryRun)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
       List<PartitionFilter> partitions = new ArrayList<>();
@@ -390,14 +394,14 @@ public final class Main {
         PartitionFilter[] parts = mapper.readValue(partitionJson, PartitionFilter[].class);
         partitions = Arrays.asList(parts);
       }
-      DeleteFile.run(catalog, namespace, tableName, partitions);
+      DeletePartition.run(catalog, namespace, tableName, partitions, dryRun);
     } catch (URISyntaxException e) {
       throw new RuntimeException(e);
     }
   }
 
   public record PartitionFilter(
-      @JsonProperty("partition_name") String partitionName, @JsonProperty("value") Object value) {}
+      @JsonProperty("name") String name, @JsonProperty("value") Object value) {}
 
   private RESTCatalog loadCatalog(String configFile) throws IOException {
     Config config = Config.load(configFile);
