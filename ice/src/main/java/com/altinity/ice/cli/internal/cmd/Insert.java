@@ -441,27 +441,17 @@ public final class Insert {
       dataFile = dstDataFile;
     } else if (tableSpec.isPartitioned()) {
       return copyParquetWithPartition(
-          file,
-          table,
-          tableSchema,
-          tableSpec,
-          tableOrderSpec,
-          tableIO,
-          inputFile,
-          metadata,
-          dstDataFileSource);
+          file, tableSchema, tableSpec, tableOrderSpec, tableIO, inputFile, dstDataFileSource);
     } else if (tableOrderSpec.isSorted()) {
       return Collections.singletonList(
           copyParquetWithSortOrder(
               file,
               Strings.replacePrefix(dstDataFileSource.get(file), "s3://", "s3a://"),
-              table,
               tableSchema,
               tableSpec,
               tableOrderSpec,
               tableIO,
               inputFile,
-              metadata,
               dataFileNamingStrategy));
     } else {
       String dstDataFile = dstDataFileSource.get(file);
@@ -504,13 +494,11 @@ public final class Insert {
 
   private static List<DataFile> copyParquetWithPartition(
       String file,
-      Table table,
       Schema tableSchema,
       PartitionSpec tableSpec,
       SortOrder tableOrderSpec,
       FileIO tableIO,
       InputFile inputFile,
-      ParquetMetadata metadata,
       DataFileNamingStrategy dstDataFileSource)
       throws IOException {
     logger.info("{}: partitioning{}", file, tableOrderSpec.isSorted() ? "+sorting" : "");
@@ -580,6 +568,7 @@ public final class Insert {
           tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
 
       long fileSizeInBytes;
+      Metrics metrics;
       try (FileAppender<Record> appender =
           appenderFactory.newAppender(outFile, FileFormat.PARQUET)) {
         for (Record rec : records) {
@@ -587,12 +576,10 @@ public final class Insert {
         }
         appender.close();
         fileSizeInBytes = appender.length();
+        metrics = appender.metrics();
       }
 
       logger.info("{}: adding data file: {}", file, dstDataFile);
-
-      MetricsConfig metricsConfig = MetricsConfig.forTable(table);
-      Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
       dataFiles.add(
           DataFiles.builder(tableSpec)
               .withPath(outFile.location())
@@ -632,13 +619,11 @@ public final class Insert {
   private static DataFile copyParquetWithSortOrder(
       String file,
       String dstDataFile,
-      Table table,
       Schema tableSchema,
       PartitionSpec tableSpec,
       SortOrder tableOrderSpec,
       FileIO tableIO,
       InputFile inputFile,
-      ParquetMetadata metadata,
       DataFileNamingStrategy.Name dataFileNamingStrategy)
       throws IOException {
     logger.info("{}: copying (sorted) to {}", file, dstDataFile);
@@ -674,16 +659,15 @@ public final class Insert {
             .schema(tableSchema);
 
     long fileSizeInBytes;
+    Metrics metrics;
     try (FileAppender<Record> appender = writeBuilder.build()) {
       for (Record record : records) {
         appender.add(record);
       }
       appender.close();
       fileSizeInBytes = appender.length();
+      metrics = appender.metrics();
     }
-
-    MetricsConfig metricsConfig = MetricsConfig.forTable(table);
-    Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
 
     logger.info(
         "{}: adding data file (copy (sorted) took {}s)",
