@@ -38,8 +38,12 @@ public final class DeletePartition {
     if (partitions != null && !partitions.isEmpty()) {
       org.apache.iceberg.expressions.Expression expr = null;
       for (com.altinity.ice.cli.Main.PartitionFilter pf : partitions) {
-        org.apache.iceberg.expressions.Expression e =
-            org.apache.iceberg.expressions.Expressions.equal(pf.name(), pf.value());
+        org.apache.iceberg.expressions.Expression e = null;
+        for (Object value : pf.values()) {
+          org.apache.iceberg.expressions.Expression valueExpr =
+              org.apache.iceberg.expressions.Expressions.equal(pf.name(), value);
+          e = (e == null) ? valueExpr : org.apache.iceberg.expressions.Expressions.or(e, valueExpr);
+        }
         expr = (expr == null) ? e : org.apache.iceberg.expressions.Expressions.and(expr, e);
       }
       scan = scan.filter(expr);

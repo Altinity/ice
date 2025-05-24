@@ -378,7 +378,7 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "JSON array of partition filters: [{\"name\": \"vendorId\", \"value\": 5}]. "
+                  "JSON array of partition filters: [{\"name\": \"vendorId\", \"values\": [5, 6]}]. "
                       + "For timestamp columns, use ISO Datetime format YYYY-MM-ddTHH:mm:ss")
           String partitionJson,
       @CommandLine.Option(
@@ -401,7 +401,7 @@ public final class Main {
   }
 
   public record PartitionFilter(
-      @JsonProperty("name") String name, @JsonProperty("value") Object value) {}
+      @JsonProperty("name") String name, @JsonProperty("values") List<Object> values) {}
 
   private RESTCatalog loadCatalog(String configFile) throws IOException {
     Config config = Config.load(configFile);
