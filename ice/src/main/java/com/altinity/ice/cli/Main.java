@@ -21,6 +21,7 @@ import com.altinity.ice.internal.strings.Strings;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -368,7 +369,7 @@ public final class Main {
   }
 
   private ObjectMapper newObjectMapper() {
-    ObjectMapper om = new ObjectMapper();
+    ObjectMapper om = new ObjectMapper(new YAMLFactory());
     om.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
     return om;
   }
