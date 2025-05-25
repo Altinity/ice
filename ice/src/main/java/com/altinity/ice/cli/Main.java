@@ -50,7 +50,7 @@ public final class Main {
       names = {"-c", "--config"},
       description = "/path/to/config.yaml ($CWD/.ice.yaml by default)",
       scope = CommandLine.ScopeType.INHERIT)
-  String configFile;
+  private String configFile;
 
   public String configFile() {
     if (Strings.isNullOrEmpty(configFile)) {
@@ -70,7 +70,7 @@ public final class Main {
 
   @CommandLine.Command(name = "check", description = "Check configuration.")
   void check() throws IOException {
-    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+    try (RESTCatalog catalog = loadCatalog()) {
       Check.run(catalog);
       System.out.println("OK");
     }
@@ -104,7 +104,7 @@ public final class Main {
               description = "Output JSON instead of YAML")
           boolean json)
       throws IOException {
-    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+    try (RESTCatalog catalog = loadCatalog()) {
       var options = new HashSet<Describe.Option>();
       if (includeSchema || includeAll) {
         options.add(Describe.Option.INCLUDE_SCHEMA);
@@ -166,20 +166,18 @@ public final class Main {
           String sortOrderJson)
       throws IOException {
     setAWSRegion(s3Region);
-    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+    try (RESTCatalog catalog = loadCatalog()) {
       List<IceSortOrder> sortOrders = new ArrayList<>();
       List<IcePartition> partitions = new ArrayList<>();
 
       if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        ObjectMapper mapper = newObjectMapper();
         IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
         sortOrders = Arrays.asList(orders);
       }
 
       if (partitionJson != null && !partitionJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        ObjectMapper mapper = newObjectMapper();
         IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
         partitions = Arrays.asList(parts);
       }
@@ -274,7 +272,7 @@ public final class Main {
           "--s3-no-sign-request + --s3-copy-object is not supported by AWS (see --help for details)");
     }
     setAWSRegion(s3Region);
-    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+    try (RESTCatalog catalog = loadCatalog()) {
       if (dataFiles.length == 1 && "-".equals(dataFiles[0])) {
         dataFiles = readInput().toArray(new String[0]);
         if (dataFiles.length == 0) {
@@ -285,16 +283,14 @@ public final class Main {
 
       List<IcePartition> partitions = null;
       if (partitionJson != null && !partitionJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        ObjectMapper mapper = newObjectMapper();
         IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
         partitions = Arrays.asList(parts);
       }
 
       List<IceSortOrder> sortOrders = null;
       if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        ObjectMapper mapper = newObjectMapper();
         IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
         sortOrders = Arrays.asList(orders);
       }
@@ -362,9 +358,19 @@ public final class Main {
               description = "Ignore not found")
           boolean ignoreNotFound)
       throws IOException {
-    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+    try (RESTCatalog catalog = loadCatalog()) {
       DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound);
     }
+  }
+
+  private RESTCatalog loadCatalog() throws IOException {
+    return loadCatalog(this.configFile());
+  }
+
+  private ObjectMapper newObjectMapper() {
+    ObjectMapper om = new ObjectMapper();
+    om.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+    return om;
   }
 
   private RESTCatalog loadCatalog(String configFile) throws IOException {

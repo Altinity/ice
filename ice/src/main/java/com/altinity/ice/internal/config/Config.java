@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.internal.config;
 
+import com.altinity.ice.internal.strings.Strings;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,9 +24,10 @@ public final class Config {
 
   private Config() {}
 
-  public static <T> T load(String configFile, boolean configFileRequired, TypeReference<T> type)
+  public static <T> T load(
+      String configFile, boolean configFileRequired, String def, TypeReference<T> type)
       throws IOException {
-    String v = "{}";
+    String v = Strings.isNullOrEmpty(def) ? "{}" : def;
     try {
       v = Files.readString(Path.of(configFile));
     } catch (NoSuchFileException e) {

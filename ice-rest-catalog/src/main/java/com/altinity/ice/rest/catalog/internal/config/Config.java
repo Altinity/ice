@@ -159,6 +159,7 @@ public record Config(
         com.altinity.ice.internal.config.Config.load(
             configFileGiven ? configFile : ".ice-rest-catalog.yaml",
             configFileGiven,
+            System.getenv("ICE_REST_CATALOG_CONFIG_YAML"),
             new TypeReference<>() {});
     Set<String> set = Arrays.stream(c.bearerTokens).map(Token::name).collect(Collectors.toSet());
     if (set.contains("anonymous")) {
