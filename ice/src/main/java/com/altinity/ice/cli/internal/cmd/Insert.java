@@ -246,7 +246,7 @@ public final class Insert {
                             retryLog.add(file);
                             return Collections.emptyList();
                           } else {
-                            throw e;
+                            throw new IOException(String.format("Error processing %s", file), e);
                           }
                         }
                       }));
