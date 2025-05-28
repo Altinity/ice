@@ -45,6 +45,9 @@ class ParquetConversions {
       case LONG:
       case TIME:
       case TIMESTAMP:
+        if (parquetType.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT32) { // uint32
+          return (Literal<T>) Literal.of(Long.valueOf((Integer) value));
+        }
         return (Literal<T>) Literal.of((Long) value);
       case FLOAT:
         return (Literal<T>) Literal.of((Float) value);
