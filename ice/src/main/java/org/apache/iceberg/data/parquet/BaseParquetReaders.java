@@ -214,9 +214,10 @@ public abstract class BaseParquetReaders<T> {
     @Override
     public Optional<ParquetValueReader<?>> visit(IntLogicalTypeAnnotation intLogicalType) {
       if (intLogicalType.getBitWidth() == 64) {
-        Preconditions.checkArgument(
-            intLogicalType.isSigned(), "Cannot read UINT64 as a long value");
-
+        /*
+                Preconditions.checkArgument(
+                  intLogicalType.isSigned(), "Cannot read UINT64 as a long value");
+        */
         return Optional.of(new ParquetValueReaders.UnboxedReader<>(desc));
       }
 

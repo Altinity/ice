@@ -221,9 +221,11 @@ class MessageTypeToType extends ParquetTypeVisitor<Type> {
 
     @Override
     public Optional<Type> visit(LogicalTypeAnnotation.IntLogicalTypeAnnotation intType) {
-      Preconditions.checkArgument(
-          intType.isSigned() || intType.getBitWidth() < 64,
-          "Cannot use uint64: not a supported Java type");
+      /*
+            Preconditions.checkArgument(
+              intType.isSigned() || intType.getBitWidth() < 64,
+              "Cannot use uint64: not a supported Java type");
+      */
       if (intType.getBitWidth() < 32) {
         return Optional.of(Types.IntegerType.get());
       } else if (intType.getBitWidth() == 32 && intType.isSigned()) {
