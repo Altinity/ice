@@ -53,6 +53,10 @@ public final class CreateTable {
       @Nullable List<Main.IcePartition> partitionList,
       @Nullable List<Main.IceSortOrder> sortOrderList)
       throws IOException {
+    if (ignoreAlreadyExists && catalog.tableExists(nsTable)) {
+      return;
+    }
+
     Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
 
     if (schemaFile.startsWith("s3://") && schemaFile.contains("*")) {
