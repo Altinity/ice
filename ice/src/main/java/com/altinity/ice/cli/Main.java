@@ -11,7 +11,9 @@ package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
 import com.altinity.ice.cli.internal.cmd.Check;
+import com.altinity.ice.cli.internal.cmd.CreateNamespace;
 import com.altinity.ice.cli.internal.cmd.CreateTable;
+import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.Insert;
@@ -30,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
@@ -384,6 +387,40 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound);
+    }
+  }
+
+  @CommandLine.Command(name = "create-namespace", description = "Create namespace.")
+  void createNamespace(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Namespace name (e.g. parent_ns.child_ns)")
+          String name,
+      @CommandLine.Option(
+              names = {"-p"},
+              description = "Create namespace if not exists")
+          boolean createNamespaceIfNotExists)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      CreateNamespace.run(catalog, Namespace.of(name.split("[.]")), createNamespaceIfNotExists);
+    }
+  }
+
+  @CommandLine.Command(name = "delete-namespace", description = "Delete namespace.")
+  void deleteNamespace(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Namespace name (e.g. parent_ns.child_ns)")
+          String name,
+      @CommandLine.Option(
+              names = {"-p"},
+              description = "Ignore not found")
+          boolean ignoreNotFound)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      DeleteNamespace.run(catalog, Namespace.of(name.split("[.]")), ignoreNotFound);
     }
   }
 
