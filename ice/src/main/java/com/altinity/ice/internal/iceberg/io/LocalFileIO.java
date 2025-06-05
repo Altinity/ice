@@ -41,7 +41,6 @@ public class LocalFileIO implements DelegateFileIO {
 
   @Override
   public void initialize(Map<String, String> properties) {
-    System.out.println(properties);
     String warehouse =
         properties.getOrDefault(
             LOCALFILEIO_PROP_WAREHOUSE,
