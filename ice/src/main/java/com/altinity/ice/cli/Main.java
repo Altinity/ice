@@ -170,15 +170,13 @@ public final class Main {
       List<IcePartition> partitions = new ArrayList<>();
 
       if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        ObjectMapper mapper = newObjectMapper();
         IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
         sortOrders = Arrays.asList(orders);
       }
 
       if (partitionJson != null && !partitionJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        ObjectMapper mapper = newObjectMapper();
         IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
         partitions = Arrays.asList(parts);
       }
@@ -284,16 +282,14 @@ public final class Main {
 
       List<IcePartition> partitions = null;
       if (partitionJson != null && !partitionJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        ObjectMapper mapper = newObjectMapper();
         IcePartition[] parts = mapper.readValue(partitionJson, IcePartition[].class);
         partitions = Arrays.asList(parts);
       }
 
       List<IceSortOrder> sortOrders = null;
       if (sortOrderJson != null && !sortOrderJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        ObjectMapper mapper = newObjectMapper();
         IceSortOrder[] orders = mapper.readValue(sortOrderJson, IceSortOrder[].class);
         sortOrders = Arrays.asList(orders);
       }
@@ -442,8 +438,7 @@ public final class Main {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
       List<PartitionFilter> partitions = new ArrayList<>();
       if (partitionJson != null && !partitionJson.isEmpty()) {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+        ObjectMapper mapper = newObjectMapper();
         PartitionFilter[] parts = mapper.readValue(partitionJson, PartitionFilter[].class);
         partitions = Arrays.asList(parts);
       }
