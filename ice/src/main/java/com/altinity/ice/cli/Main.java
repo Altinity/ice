@@ -15,6 +15,7 @@ import com.altinity.ice.cli.internal.cmd.CreateTable;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.Insert;
+import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
@@ -345,6 +346,28 @@ public final class Main {
       }
     }
     return r;
+  }
+
+  @CommandLine.Command(name = "scan", description = "Scan table.")
+  void scanTable(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"--limit"},
+              description = "Number of rows to print",
+              defaultValue = "10")
+          int limit,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      Scan.run(catalog, TableIdentifier.parse(name), limit, json);
+    }
   }
 
   @CommandLine.Command(name = "delete-table", description = "Delete table.")
