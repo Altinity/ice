@@ -5,7 +5,8 @@
     "kubectl@latest",
     "envsubst@latest",
     "awscli2@latest",
-    "etcd_3_5@latest"
+    "etcd_3_5@latest",
+    "jdk-headless@21.0.7+6"
   ],
   "env": {
     "AT": "ice:examples/eks"

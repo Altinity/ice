@@ -4,6 +4,7 @@
     "AT": "ice:examples/localfileio"
   },
   "packages": {
-    "sqlite": "latest"
+    "sqlite": "latest",
+    "jdk-headless": "21.0.7+6"
   }
 }
