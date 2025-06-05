@@ -1,4 +1,4 @@
-# ice [![build](https://github.com/altinity/ice/actions/workflows/verify.yaml/badge.svg)](https://github.com/altinity/ice/actions/workflows/verify.yaml)
+# ice [![build](https://github.com/altinity/ice/actions/workflows/verify.yaml/badge.svg)](https://github.com/altinity/ice/actions/workflows/verify.yaml) [![status: experimental](https://img.shields.io/badge/status-experimental-orange.svg)]()
 
 A suite of tools aimed at making [Iceberg](https://iceberg.apache.org/) REST Catalogs more approachable. 
 

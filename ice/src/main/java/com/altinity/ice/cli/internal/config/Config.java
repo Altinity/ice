@@ -59,7 +59,10 @@ public record Config(
   public static Config load(String configFile) throws IOException {
     boolean configFileGiven = !Strings.isNullOrEmpty(configFile);
     return com.altinity.ice.internal.config.Config.load(
-        configFileGiven ? configFile : ".ice.yaml", configFileGiven, new TypeReference<>() {});
+        configFileGiven ? configFile : ".ice.yaml",
+        configFileGiven,
+        System.getenv("ICE_CONFIG_YAML"),
+        new TypeReference<>() {});
   }
 
   public Map<String, String> toIcebergConfig() {

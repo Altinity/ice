@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.rest.catalog;
 
+import java.io.IOException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 import picocli.CommandLine;
@@ -17,6 +18,23 @@ public class RESTCatalogIT {
 
   private Thread serverThread;
   private Main mainCommand;
+
+  private void shutdownServer(String adminAddr, String shutdownToken)
+      throws IOException, InterruptedException {
+    java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+    java.net.http.HttpRequest request =
+        java.net.http.HttpRequest.newBuilder()
+            .uri(java.net.URI.create("http://" + adminAddr + "/shutdown?token=" + shutdownToken))
+            .POST(java.net.http.HttpRequest.BodyPublishers.noBody())
+            .build();
+
+    java.net.http.HttpResponse<String> response =
+        client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() != 200) {
+      System.err.println("Failed to shutdown server. Status code: " + response.statusCode());
+    }
+  }
 
   @Test
   public void testMainCommandWithConfig() throws InterruptedException {
@@ -51,21 +69,8 @@ public class RESTCatalogIT {
       // Get the shutdown token from the config
       String shutdownToken = "foo";
 
-      // Create HTTP client and send shutdown request
-      java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
-      java.net.http.HttpRequest request =
-          java.net.http.HttpRequest.newBuilder()
-              .uri(java.net.URI.create("http://" + adminAddr + "/shutdown?token=" + shutdownToken))
-              // .header("Authorization", "bearer " + shutdownToken)
-              .POST(java.net.http.HttpRequest.BodyPublishers.noBody())
-              .build();
-
-      java.net.http.HttpResponse<String> response =
-          client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-
-      if (response.statusCode() != 200) {
-        System.err.println("Failed to shutdown server. Status code: " + response.statusCode());
-      }
+      // Shutdown the server
+      shutdownServer(adminAddr, shutdownToken);
 
       // Wait for the server thread to finish
       if (serverThread != null && serverThread.isAlive()) {

@@ -8,8 +8,7 @@ VERSION_TAG=v$VERSION
 
 mkdir -p release
 awk \
-  -v "chg=$(awk -v ver="$VERSION" '/^## / { if (p) { exit }; if ($$2 == ver) { p=1; next } } p' CHANGELOG.md)" \
   -v "tag=$VERSION_TAG" \
   -v "ver=$VERSION" \
-  '{gsub(/REPLACE_WITH_CHANGELOG/,chg);gsub(/REPLACE_WITH_TAG/,tag);gsub(/REPLACE_WITH_VER/,ver)}1' \
+  '{gsub(/REPLACE_WITH_TAG/,tag);gsub(/REPLACE_WITH_VER/,ver)}1' \
   GITHUB_RELEASE_TEMPLATE.md > release/GITHUB_RELEASE.md

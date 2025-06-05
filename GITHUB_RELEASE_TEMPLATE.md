@@ -1,7 +1,3 @@
-## Changelog
-
-REPLACE_WITH_CHANGELOG
-
 ## Installation
 
 ### ice
@@ -18,6 +14,8 @@ curl -sSL https://github.com/altinity/ice/releases/download/REPLACE_WITH_TAG/ice
 - `altinity/ice:REPLACE_WITH_VER`
 - `altinity/ice:debug-REPLACE_WITH_VER`
 
+> `debug-*` images contain busybox shell.
+
 ### ice-rest-catalog
 
 ```sh
@@ -32,3 +30,5 @@ curl -sSL https://github.com/altinity/ice/releases/download/REPLACE_WITH_TAG/ice
 - `altinity/ice-rest-catalog:REPLACE_WITH_VER`
 - `altinity/ice-rest-catalog:debug-REPLACE_WITH_VER`
 - `altinity/ice-rest-catalog:debug-with-ice-REPLACE_WITH_VER`
+
+> `debug-*` images contain busybox shell.

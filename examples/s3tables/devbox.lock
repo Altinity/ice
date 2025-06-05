@@ -1,0 +1,156 @@
+{
+  "lockfile_version": "1",
+  "packages": {
+    "awscli2@latest": {
+      "last_modified": "2025-05-19T23:16:24Z",
+      "resolved": "github:NixOS/nixpkgs/359c442b7d1f6229c1dc978116d32d6c07fe8440#awscli2",
+      "source": "devbox-search",
+      "version": "2.27.2",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/b5fa0fplfpiyx8zwc9y7d08a57lsk229-awscli2-2.27.2",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/sc270lyggbhz78lcxh9khqmggayqpp6i-awscli2-2.27.2-dist"
+            }
+          ],
+          "store_path": "/nix/store/b5fa0fplfpiyx8zwc9y7d08a57lsk229-awscli2-2.27.2"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/161s22pbddllc4mabgr5rvrpmhiffsp4-awscli2-2.27.2",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/ss8xqzwn1l8qdbwlml439bx1ik13vxlk-awscli2-2.27.2-dist"
+            }
+          ],
+          "store_path": "/nix/store/161s22pbddllc4mabgr5rvrpmhiffsp4-awscli2-2.27.2"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/l18j8wgidf145m0zw6ydg8blim44hrkq-awscli2-2.27.2",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/q9rzj2ikpl9vn4sns3ydsy7i8sachnha-awscli2-2.27.2-dist"
+            }
+          ],
+          "store_path": "/nix/store/l18j8wgidf145m0zw6ydg8blim44hrkq-awscli2-2.27.2"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/gx3hx0b3lbm11sishxl4k7a7ha4w405q-awscli2-2.27.2",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/r5cw3141myaf5lnzra9c0nc8prb2zv6y-awscli2-2.27.2-dist"
+            }
+          ],
+          "store_path": "/nix/store/gx3hx0b3lbm11sishxl4k7a7ha4w405q-awscli2-2.27.2"
+        }
+      }
+    },
+    "envsubst@latest": {
+      "last_modified": "2025-05-16T20:19:48Z",
+      "resolved": "github:NixOS/nixpkgs/12a55407652e04dcf2309436eb06fef0d3713ef3#envsubst",
+      "source": "devbox-search",
+      "version": "1.4.3",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/x53syh6dn8wp33var0nmmphnhz0vh269-envsubst-1.4.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/x53syh6dn8wp33var0nmmphnhz0vh269-envsubst-1.4.3"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/0z9przi3raij5jc31yrin797bsbmxnyq-envsubst-1.4.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/0z9przi3raij5jc31yrin797bsbmxnyq-envsubst-1.4.3"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/7055nw59099678fcib94bnv1flybq50k-envsubst-1.4.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/7055nw59099678fcib94bnv1flybq50k-envsubst-1.4.3"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/9012qqpjaa0j66lxv94j51z4xhnmqq5a-envsubst-1.4.3",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/9012qqpjaa0j66lxv94j51z4xhnmqq5a-envsubst-1.4.3"
+        }
+      }
+    },
+    "github:NixOS/nixpkgs/nixpkgs-unstable": {
+      "resolved": "github:NixOS/nixpkgs/e4b09e47ace7d87de083786b404bf232eb6c89d8?lastModified=1748856973&narHash=sha256-RlTsJUvvr8ErjPBsiwrGbbHYW8XbB%2Foek0Gi78XdWKg%3D"
+    },
+    "jdk-headless@21.0.7+6": {
+      "last_modified": "2025-05-16T20:19:48Z",
+      "resolved": "github:NixOS/nixpkgs/12a55407652e04dcf2309436eb06fef0d3713ef3#jdk21_headless",
+      "source": "devbox-search",
+      "version": "21.0.7+6",
+      "systems": {
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/r4isdsjpz1i2zi93y6cjl53m0ngvbww3-openjdk-headless-21.0.7+6",
+              "default": true
+            },
+            {
+              "name": "debug",
+              "path": "/nix/store/s7h859cnwfbr0ss7dlssphbhhivdc63p-openjdk-headless-21.0.7+6-debug"
+            }
+          ],
+          "store_path": "/nix/store/r4isdsjpz1i2zi93y6cjl53m0ngvbww3-openjdk-headless-21.0.7+6"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/jfxsvqhkxza9vrmpjw2nfxyz32883q1b-openjdk-headless-21.0.7+6",
+              "default": true
+            },
+            {
+              "name": "debug",
+              "path": "/nix/store/ffknhap8n6nh733c33z714a9whmqz392-openjdk-headless-21.0.7+6-debug"
+            }
+          ],
+          "store_path": "/nix/store/jfxsvqhkxza9vrmpjw2nfxyz32883q1b-openjdk-headless-21.0.7+6"
+        }
+      }
+    }
+  }
+}

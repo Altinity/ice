@@ -10,18 +10,14 @@
 package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
-import com.altinity.ice.cli.internal.cmd.Check;
-import com.altinity.ice.cli.internal.cmd.CreateTable;
-import com.altinity.ice.cli.internal.cmd.DeletePartition;
-import com.altinity.ice.cli.internal.cmd.DeleteTable;
-import com.altinity.ice.cli.internal.cmd.Describe;
-import com.altinity.ice.cli.internal.cmd.Insert;
+import com.altinity.ice.cli.internal.cmd.*;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -30,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
@@ -52,7 +49,7 @@ public final class Main {
       names = {"-c", "--config"},
       description = "/path/to/config.yaml ($CWD/.ice.yaml by default)",
       scope = CommandLine.ScopeType.INHERIT)
-  String configFile;
+  private String configFile;
 
   public String configFile() {
     if (Strings.isNullOrEmpty(configFile)) {
@@ -72,7 +69,7 @@ public final class Main {
 
   @CommandLine.Command(name = "check", description = "Check configuration.")
   void check() throws IOException {
-    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+    try (RESTCatalog catalog = loadCatalog()) {
       Check.run(catalog);
       System.out.println("OK");
     }
@@ -106,7 +103,7 @@ public final class Main {
               description = "Output JSON instead of YAML")
           boolean json)
       throws IOException {
-    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+    try (RESTCatalog catalog = loadCatalog()) {
       var options = new HashSet<Describe.Option>();
       if (includeSchema || includeAll) {
         options.add(Describe.Option.INCLUDE_SCHEMA);
@@ -168,7 +165,7 @@ public final class Main {
           String sortOrderJson)
       throws IOException {
     setAWSRegion(s3Region);
-    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+    try (RESTCatalog catalog = loadCatalog()) {
       List<IceSortOrder> sortOrders = new ArrayList<>();
       List<IcePartition> partitions = new ArrayList<>();
 
@@ -276,7 +273,7 @@ public final class Main {
           "--s3-no-sign-request + --s3-copy-object is not supported by AWS (see --help for details)");
     }
     setAWSRegion(s3Region);
-    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+    try (RESTCatalog catalog = loadCatalog()) {
       if (dataFiles.length == 1 && "-".equals(dataFiles[0])) {
         dataFiles = readInput().toArray(new String[0]);
         if (dataFiles.length == 0) {
@@ -352,6 +349,28 @@ public final class Main {
     return r;
   }
 
+  @CommandLine.Command(name = "scan", description = "Scan table.")
+  void scanTable(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"--limit"},
+              description = "Number of rows to print",
+              defaultValue = "10")
+          int limit,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      Scan.run(catalog, TableIdentifier.parse(name), limit, json);
+    }
+  }
+
   @CommandLine.Command(name = "delete-table", description = "Delete table.")
   void deleteTable(
       @CommandLine.Parameters(
@@ -364,8 +383,42 @@ public final class Main {
               description = "Ignore not found")
           boolean ignoreNotFound)
       throws IOException {
-    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+    try (RESTCatalog catalog = loadCatalog()) {
       DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound);
+    }
+  }
+
+  @CommandLine.Command(name = "create-namespace", description = "Create namespace.")
+  void createNamespace(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Namespace name (e.g. parent_ns.child_ns)")
+          String name,
+      @CommandLine.Option(
+              names = {"-p"},
+              description = "Create namespace if not exists")
+          boolean createNamespaceIfNotExists)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      CreateNamespace.run(catalog, Namespace.of(name.split("[.]")), createNamespaceIfNotExists);
+    }
+  }
+
+  @CommandLine.Command(name = "delete-namespace", description = "Delete namespace.")
+  void deleteNamespace(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Namespace name (e.g. parent_ns.child_ns)")
+          String name,
+      @CommandLine.Option(
+              names = {"-p"},
+              description = "Ignore not found")
+          boolean ignoreNotFound)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      DeleteNamespace.run(catalog, Namespace.of(name.split("[.]")), ignoreNotFound);
     }
   }
 
@@ -402,6 +455,16 @@ public final class Main {
 
   public record PartitionFilter(
       @JsonProperty("name") String name, @JsonProperty("values") List<Object> values) {}
+
+  private RESTCatalog loadCatalog() throws IOException {
+    return loadCatalog(this.configFile());
+  }
+
+  private ObjectMapper newObjectMapper() {
+    ObjectMapper om = new ObjectMapper(new YAMLFactory());
+    om.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+    return om;
+  }
 
   private RESTCatalog loadCatalog(String configFile) throws IOException {
     Config config = Config.load(configFile);

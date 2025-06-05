@@ -1,0 +1,8 @@
+uri: https://s3tables.${AWS_REGION}.amazonaws.com/iceberg
+warehouse: ${CATALOG_BUCKET_ARN}
+
+bearerTokens:
+- value: foo
+
+anonymousAccess:
+  enabled: true
