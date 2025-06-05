@@ -10,9 +10,7 @@
 package com.altinity.ice.cli.internal.cmd;
 
 import java.io.IOException;
-
 import org.apache.iceberg.catalog.Namespace;
-import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;

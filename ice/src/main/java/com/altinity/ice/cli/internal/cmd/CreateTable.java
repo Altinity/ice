@@ -101,10 +101,9 @@ public final class CreateTable {
 
         tx.commitTransaction();
       } catch (AlreadyExistsException e) {
-        if (ignoreAlreadyExists) {
-          return;
+        if (!ignoreAlreadyExists) {
+          throw e;
         }
-        throw e;
       }
     }
   }
