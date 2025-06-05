@@ -12,6 +12,7 @@ package com.altinity.ice.rest.catalog.internal.config;
 import com.altinity.ice.internal.iceberg.io.LocalFileIO;
 import com.altinity.ice.internal.iceberg.io.SchemeFileIO;
 import com.altinity.ice.internal.strings.Strings;
+import com.altinity.ice.rest.catalog.internal.aws.CustomS3TablesCatalog;
 import com.altinity.ice.rest.catalog.internal.etcd.EtcdCatalog;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -30,6 +31,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.aws.AwsClientProperties;
+import org.apache.iceberg.aws.AwsProperties;
 import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.relocated.com.google.common.io.Files;
@@ -174,8 +176,8 @@ public record Config(
 
   public Map<String, String> toIcebergLoadTableConfig() {
     var m = new HashMap<String, String>();
+    String iceIODefault = "ice.io.default.";
     if (s3 != null) {
-      String iceIODefault = "ice.io.default.";
       if (!Strings.isNullOrEmpty(s3.endpoint)) {
         m.put(iceIODefault + S3FileIOProperties.ENDPOINT, s3.endpoint);
       }
@@ -185,6 +187,10 @@ public record Config(
       if (!Strings.isNullOrEmpty(s3.region)) {
         m.put(iceIODefault + AwsClientProperties.CLIENT_REGION, s3.region);
       }
+    }
+    if (warehouse.startsWith("arn:aws:s3tables:")) {
+      String region = warehouse.split(":")[3];
+      m.putIfAbsent(iceIODefault + AwsClientProperties.CLIENT_REGION, region);
     }
     for (Map.Entry<String, String> e : loadTableProperties.entrySet()) {
       if (e.getValue() != null) {
@@ -258,7 +264,18 @@ public record Config(
       m.putIfAbsent(CatalogProperties.CATALOG_IMPL, EtcdCatalog.class.getName());
     }
 
-    if (m.getOrDefault(CatalogProperties.WAREHOUSE_LOCATION, "").startsWith("file://")) {
+    String warehouse = m.getOrDefault(CatalogProperties.WAREHOUSE_LOCATION, "");
+
+    if (warehouse.startsWith("arn:aws:s3tables:")) {
+      m.putIfAbsent(CatalogProperties.CATALOG_IMPL, CustomS3TablesCatalog.class.getName());
+      m.putIfAbsent("rest.sigv4-enabled", "true");
+      m.putIfAbsent(AwsProperties.REST_SIGNING_NAME, "s3tables");
+      String region = warehouse.split(":")[3];
+      m.putIfAbsent(AwsProperties.REST_SIGNER_REGION, region);
+      m.putIfAbsent(AwsClientProperties.CLIENT_REGION, region);
+    }
+
+    if (warehouse.startsWith("file://")) {
       if (!m.containsKey(LocalFileIO.LOCALFILEIO_PROP_BASEDIR)) {
         // FIXME: wrong thing to do if warehouse is absolute
         m.put(LocalFileIO.LOCALFILEIO_PROP_BASEDIR, new File(".").getAbsolutePath());
