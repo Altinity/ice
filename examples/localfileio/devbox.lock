@@ -2,11 +2,47 @@
   "lockfile_version": "1",
   "packages": {
     "github:NixOS/nixpkgs/nixpkgs-unstable": {
-      "resolved": "github:NixOS/nixpkgs/29335f23bea5e34228349ea739f31ee79e267b88?lastModified=1745804731&narHash=sha256-v%2FsK3AS0QKu%2FTu5sHIfddiEHCvrbNYPv8X10Fpux68g%3D"
+      "resolved": "github:NixOS/nixpkgs/e4b09e47ace7d87de083786b404bf232eb6c89d8?lastModified=1748856973&narHash=sha256-RlTsJUvvr8ErjPBsiwrGbbHYW8XbB%2Foek0Gi78XdWKg%3D"
+    },
+    "jdk-headless@21.0.7+6": {
+      "last_modified": "2025-05-16T20:19:48Z",
+      "resolved": "github:NixOS/nixpkgs/12a55407652e04dcf2309436eb06fef0d3713ef3#jdk21_headless",
+      "source": "devbox-search",
+      "version": "21.0.7+6",
+      "systems": {
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/r4isdsjpz1i2zi93y6cjl53m0ngvbww3-openjdk-headless-21.0.7+6",
+              "default": true
+            },
+            {
+              "name": "debug",
+              "path": "/nix/store/s7h859cnwfbr0ss7dlssphbhhivdc63p-openjdk-headless-21.0.7+6-debug"
+            }
+          ],
+          "store_path": "/nix/store/r4isdsjpz1i2zi93y6cjl53m0ngvbww3-openjdk-headless-21.0.7+6"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/jfxsvqhkxza9vrmpjw2nfxyz32883q1b-openjdk-headless-21.0.7+6",
+              "default": true
+            },
+            {
+              "name": "debug",
+              "path": "/nix/store/ffknhap8n6nh733c33z714a9whmqz392-openjdk-headless-21.0.7+6-debug"
+            }
+          ],
+          "store_path": "/nix/store/jfxsvqhkxza9vrmpjw2nfxyz32883q1b-openjdk-headless-21.0.7+6"
+        }
+      }
     },
     "sqlite@latest": {
-      "last_modified": "2025-04-13T09:22:33Z",
-      "resolved": "github:NixOS/nixpkgs/18dd725c29603f582cf1900e0d25f9f1063dbf11#sqlite",
+      "last_modified": "2025-05-29T08:12:58Z",
+      "resolved": "github:NixOS/nixpkgs/3866ad91cfc172f08a6839def503d8fc2923c603#sqlite",
       "source": "devbox-search",
       "version": "3.48.0",
       "systems": {
@@ -14,117 +50,117 @@
           "outputs": [
             {
               "name": "bin",
-              "path": "/nix/store/waxbjx406lfk73rbz4q0bsacb46c5rxg-sqlite-3.48.0-bin",
+              "path": "/nix/store/cq20rd1ci51s72zv7k29h63clrj6rl0l-sqlite-3.48.0-bin",
               "default": true
             },
             {
               "name": "man",
-              "path": "/nix/store/wbbq2kgsvl5c9nbx78pwmlg7ib5ybq5j-sqlite-3.48.0-man",
+              "path": "/nix/store/sal36w50bf6hlv076n4bypsyk51rn3ki-sqlite-3.48.0-man",
               "default": true
             },
             {
               "name": "dev",
-              "path": "/nix/store/0yysh964al76d622jg28g6pkbjhblz7i-sqlite-3.48.0-dev"
+              "path": "/nix/store/i30kh3xb6miyckm5nq554lmwfgciyxb7-sqlite-3.48.0-dev"
             },
             {
               "name": "doc",
-              "path": "/nix/store/7ay0nj9n4x6by0lfz9yma2dgygg8x3cs-sqlite-3.48.0-doc"
+              "path": "/nix/store/hxvmkk8icrgshsdg39qlsn9bia3dz41z-sqlite-3.48.0-doc"
             },
             {
               "name": "out",
-              "path": "/nix/store/vxhmpp6q709fwrmdzzdbb7g5jbk63wr4-sqlite-3.48.0"
+              "path": "/nix/store/3q2bsgj3rpj8xksh6zgscwv3g1mzcjxy-sqlite-3.48.0"
             }
           ],
-          "store_path": "/nix/store/waxbjx406lfk73rbz4q0bsacb46c5rxg-sqlite-3.48.0-bin"
+          "store_path": "/nix/store/cq20rd1ci51s72zv7k29h63clrj6rl0l-sqlite-3.48.0-bin"
         },
         "aarch64-linux": {
           "outputs": [
             {
               "name": "bin",
-              "path": "/nix/store/f69nf71kcw7a50mb4bh7mnyrix8jslaq-sqlite-3.48.0-bin",
+              "path": "/nix/store/j9gsxv41ravm46zxkq6bz0kih7vikf2q-sqlite-3.48.0-bin",
               "default": true
             },
             {
               "name": "man",
-              "path": "/nix/store/qciv9x7alnxvym8w04viy1z3nbz1dpgm-sqlite-3.48.0-man",
+              "path": "/nix/store/53xmz12n4qch61r792wvlm8aaw88r2mv-sqlite-3.48.0-man",
               "default": true
             },
             {
               "name": "debug",
-              "path": "/nix/store/ac0vp8pkgyrpq7nx5jprlz6by2r1d0bf-sqlite-3.48.0-debug"
+              "path": "/nix/store/cchzb2prmi3b93r0n252nj9kmi8sq15h-sqlite-3.48.0-debug"
             },
             {
               "name": "dev",
-              "path": "/nix/store/3m775wznw14kpg6570gipvj5jvy3s1i8-sqlite-3.48.0-dev"
+              "path": "/nix/store/qq5r0v7w2knd099ih1yi705sgqb6xrq4-sqlite-3.48.0-dev"
             },
             {
               "name": "doc",
-              "path": "/nix/store/ibcg7nabmj8aa73c20bga0ic8zx6i654-sqlite-3.48.0-doc"
+              "path": "/nix/store/dy5bgi74fdcyrvsqljcm71ys8vln6jwq-sqlite-3.48.0-doc"
             },
             {
               "name": "out",
-              "path": "/nix/store/x4nzxi8clih1rvs2pll815rm7q1s3d2i-sqlite-3.48.0"
+              "path": "/nix/store/nzzrpcj9r48kq73fwibjxbwpnykrj5rf-sqlite-3.48.0"
             }
           ],
-          "store_path": "/nix/store/f69nf71kcw7a50mb4bh7mnyrix8jslaq-sqlite-3.48.0-bin"
+          "store_path": "/nix/store/j9gsxv41ravm46zxkq6bz0kih7vikf2q-sqlite-3.48.0-bin"
         },
         "x86_64-darwin": {
           "outputs": [
             {
               "name": "bin",
-              "path": "/nix/store/728fy3v4a69z9crfsvf0y4v9wzxk045n-sqlite-3.48.0-bin",
+              "path": "/nix/store/whxzqmryz1s807f9difm7sbky86p0mpl-sqlite-3.48.0-bin",
               "default": true
             },
             {
               "name": "man",
-              "path": "/nix/store/n5wy6pmyjkdd8m5wpwmavp50yczik76b-sqlite-3.48.0-man",
+              "path": "/nix/store/c1q9an2k734218s47hsb3w7ppa5pdpgz-sqlite-3.48.0-man",
               "default": true
             },
             {
               "name": "out",
-              "path": "/nix/store/bkjkrpfm60bhsmhkzk1zvpj1r8zgv3dq-sqlite-3.48.0"
+              "path": "/nix/store/9wjh0cydjvncz80x3l3flw67rvq6jwdq-sqlite-3.48.0"
             },
             {
               "name": "dev",
-              "path": "/nix/store/ahjbrpwlbzxlhh0448xsqw6kysc41nmb-sqlite-3.48.0-dev"
+              "path": "/nix/store/2p883ilw7k58sq8hwcnl519di738wxp0-sqlite-3.48.0-dev"
             },
             {
               "name": "doc",
-              "path": "/nix/store/yjh1bg16ysswy2xij4l131mzmbyqvkac-sqlite-3.48.0-doc"
+              "path": "/nix/store/dz22l0c3h2gxvzx45vkwcwd3sr0mvjs5-sqlite-3.48.0-doc"
             }
           ],
-          "store_path": "/nix/store/728fy3v4a69z9crfsvf0y4v9wzxk045n-sqlite-3.48.0-bin"
+          "store_path": "/nix/store/whxzqmryz1s807f9difm7sbky86p0mpl-sqlite-3.48.0-bin"
         },
         "x86_64-linux": {
           "outputs": [
             {
               "name": "bin",
-              "path": "/nix/store/7f7pwbl3wx3kxpflxc66yrqqsdiwzvwj-sqlite-3.48.0-bin",
+              "path": "/nix/store/b83kagl3d98zf8dbvh52lw4xg881bhkf-sqlite-3.48.0-bin",
               "default": true
             },
             {
               "name": "man",
-              "path": "/nix/store/7rm2m74rigbfmpssfsdai2y5s53ivha4-sqlite-3.48.0-man",
+              "path": "/nix/store/xrjy0a756pb41qq9a38lqvy2m7jd78p5-sqlite-3.48.0-man",
               "default": true
             },
             {
               "name": "out",
-              "path": "/nix/store/kz7q992dqpfcbzi1ic9qdss1k7bcihnj-sqlite-3.48.0"
+              "path": "/nix/store/yfjzkkkyxcalyj7l1n4d4y6s81i65hmy-sqlite-3.48.0"
             },
             {
               "name": "debug",
-              "path": "/nix/store/y1yy8gd90f2ipmsa1ikh93ghqpaxql5n-sqlite-3.48.0-debug"
+              "path": "/nix/store/719sjqlrhmrn02079dam88m0ch4gwm7h-sqlite-3.48.0-debug"
             },
             {
               "name": "dev",
-              "path": "/nix/store/n2qk0bd06qk75jwy8nlh2iadpkxvaff6-sqlite-3.48.0-dev"
+              "path": "/nix/store/92gwa4j45skp8d096csmnj2a8jcn0q9w-sqlite-3.48.0-dev"
             },
             {
               "name": "doc",
-              "path": "/nix/store/01q4lwkm2k6apl1hqj0rvy10ycl85j1g-sqlite-3.48.0-doc"
+              "path": "/nix/store/a0h09d196h7j564mrcy15bldd95blw7j-sqlite-3.48.0-doc"
             }
           ],
-          "store_path": "/nix/store/7f7pwbl3wx3kxpflxc66yrqqsdiwzvwj-sqlite-3.48.0-bin"
+          "store_path": "/nix/store/b83kagl3d98zf8dbvh52lw4xg881bhkf-sqlite-3.48.0-bin"
         }
       }
     }
