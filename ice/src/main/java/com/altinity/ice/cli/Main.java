@@ -10,7 +10,14 @@
 package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
-import com.altinity.ice.cli.internal.cmd.*;
+import com.altinity.ice.cli.internal.cmd.Check;
+import com.altinity.ice.cli.internal.cmd.CreateNamespace;
+import com.altinity.ice.cli.internal.cmd.CreateTable;
+import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
+import com.altinity.ice.cli.internal.cmd.DeleteTable;
+import com.altinity.ice.cli.internal.cmd.Describe;
+import com.altinity.ice.cli.internal.cmd.Insert;
+import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
