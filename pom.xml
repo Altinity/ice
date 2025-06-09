@@ -144,7 +144,7 @@
             ./mvnw verify
 
             # publish a new version
-            GITHUB_TOKEN=... VERSION=0.0.0-0 release --push
+            GITHUB_TOKEN=... VERSION=0.0.0-0 .bin/release --push
 
             # BONUS
 
