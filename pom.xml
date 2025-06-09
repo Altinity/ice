@@ -192,6 +192,7 @@
                 <exclude>src/main/java/**/Route.java</exclude>
                 <exclude>src/main/java/**/iceberg/io/internal/*.java</exclude>
                 <exclude>src/main/java/**/iceberg/io/SchemeFileIO.java</exclude>
+                <exclude>src/main/java/org/apache/iceberg/**/*.java</exclude>
               </excludes>
               <strictCheck>true</strictCheck>
             </configuration>
