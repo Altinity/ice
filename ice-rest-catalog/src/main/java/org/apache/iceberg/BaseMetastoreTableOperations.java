@@ -37,6 +37,7 @@ import org.apache.iceberg.util.LocationUtil;
 import org.apache.iceberg.util.Tasks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.exception.SdkServiceException;
 
 public abstract class BaseMetastoreTableOperations extends BaseMetastoreOperations
     implements TableOperations {
@@ -187,6 +188,13 @@ public abstract class BaseMetastoreTableOperations extends BaseMetastoreOperatio
     // use null-safe equality check because new tables have a null metadata location
     if (!Objects.equal(currentMetadataLocation, newLocation)) {
       LOG.info("Refreshing table metadata from new version: {}", newLocation);
+
+      if (shouldRetry == null) {
+        shouldRetry =
+            e ->
+                e instanceof SdkServiceException
+                    && ((SdkServiceException) e).isRetryableException();
+      }
 
       AtomicReference<TableMetadata> newMetadata = new AtomicReference<>();
       Tasks.foreach(newLocation)
