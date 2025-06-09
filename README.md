@@ -24,7 +24,11 @@ Install [sdkman](https://sdkman.io/install), then
 ```shell
 git clone https://github.com/altinity/ice && cd ice
 
-# switch to java specified in .sdkmanrc (done automatically by direnv when `allow`ed)
+# optional but recommended
+cp .envrc.sample .envrc
+direnv allow
+
+# switch to java specified in .sdkmanrc (done automatically by direnv if `direnv allow`ed)
 sdk env
   
 # shows how to build, test, etc. project
