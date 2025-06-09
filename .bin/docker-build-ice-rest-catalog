@@ -12,17 +12,20 @@ fi
 image_name=altinity/ice-rest-catalog
 
 # TODO: s/latest/nonroot
-for q in "" "debug-"; do
-  base_image_prefix="$q"
-  if [[ "$q" == "" ]]; then
-    base_image_prefix="latest-"
-  fi
-  docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=${base_image_prefix}amd64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$IMAGE_TAG-amd64" -f ice-rest-catalog/Dockerfile .
-  docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=${base_image_prefix}arm64" --build-arg "VERSION=$VERSION" -t "$image_name:$q$IMAGE_TAG-arm64" -f ice-rest-catalog/Dockerfile .
-done
+docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=latest-amd64" --build-arg "VERSION=$VERSION" \
+  -t "$image_name:$IMAGE_TAG-amd64" -f ice-rest-catalog/Dockerfile .
+docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=latest-arm64" --build-arg "VERSION=$VERSION" \
+  -t "$image_name:$IMAGE_TAG-arm64" -f ice-rest-catalog/Dockerfile .
 
-docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=debug-amd64" --build-arg "VERSION=$VERSION" --build-arg "ICE_IMAGE_TAG=$IMAGE_TAG-amd64" -t "$image_name:debug-with-ice-$IMAGE_TAG-amd64" -f ice-rest-catalog/Dockerfile.with-ice .
-docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=debug-arm64" --build-arg "VERSION=$VERSION" --build-arg "ICE_IMAGE_TAG=$IMAGE_TAG-arm64" -t "$image_name:debug-with-ice-$IMAGE_TAG-arm64" -f ice-rest-catalog/Dockerfile.with-ice .
+docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=debug-amd64" --build-arg "VERSION=$VERSION" \
+  -t "$image_name:debug-$IMAGE_TAG-amd64" -f ice-rest-catalog/Dockerfile.debug .
+docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=debug-arm64" --build-arg "VERSION=$VERSION" \
+  -t "$image_name:debug-$IMAGE_TAG-arm64" -f ice-rest-catalog/Dockerfile.debug .
+
+docker build --platform linux/amd64 --build-arg "BASE_IMAGE_TAG=debug-amd64" --build-arg "VERSION=$VERSION" --build-arg "ICE_IMAGE_TAG=$IMAGE_TAG-amd64" \
+  -t "$image_name:debug-with-ice-$IMAGE_TAG-amd64" -f ice-rest-catalog/Dockerfile.debug-with-ice .
+docker build --platform linux/arm64 --build-arg "BASE_IMAGE_TAG=debug-arm64" --build-arg "VERSION=$VERSION" --build-arg "ICE_IMAGE_TAG=$IMAGE_TAG-arm64" \
+  -t "$image_name:debug-with-ice-$IMAGE_TAG-arm64" -f ice-rest-catalog/Dockerfile.debug-with-ice .
 
 push=false
 for arg in "$@"; do

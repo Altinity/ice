@@ -6,6 +6,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 # TODO: s/latest/nonroot, s/debug/debug-nonroot
 docker build --build-arg BASE_IMAGE_TAG=latest -t altinity/ice-rest-catalog:local -f ice-rest-catalog/Dockerfile .
-docker build --build-arg BASE_IMAGE_TAG=debug -t altinity/ice-rest-catalog:debug-local -f ice-rest-catalog/Dockerfile .
-docker build --build-arg BASE_IMAGE_TAG=debug -t altinity/ice-rest-catalog:debug-with-ice-local -f ice-rest-catalog/Dockerfile.with-ice .
+docker build --build-arg BASE_IMAGE_TAG=debug -t altinity/ice-rest-catalog:debug-local -f ice-rest-catalog/Dockerfile.debug .
+docker build --build-arg BASE_IMAGE_TAG=debug -t altinity/ice-rest-catalog:debug-with-ice-local -f ice-rest-catalog/Dockerfile.debug-with-ice .
 
