@@ -36,6 +36,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.client5.http.ssl.TlsSocketStrategy;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -374,12 +375,17 @@ public class HTTPClient extends BaseHTTPClient {
     return instance;
   }
 
-  static HttpClientConnectionManager configureConnectionManager(Map<String, String> properties) {
+  static HttpClientConnectionManager configureConnectionManager(
+      Map<String, String> properties, TlsSocketStrategy tlsSocketStrategy) {
     PoolingHttpClientConnectionManagerBuilder connectionManagerBuilder =
         PoolingHttpClientConnectionManagerBuilder.create();
     ConnectionConfig connectionConfig = configureConnectionConfig(properties);
     if (connectionConfig != null) {
       connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
+    }
+
+    if (tlsSocketStrategy != null) {
+      connectionManagerBuilder.setTlsSocketStrategy(tlsSocketStrategy);
     }
 
     return connectionManagerBuilder
@@ -427,6 +433,7 @@ public class HTTPClient extends BaseHTTPClient {
     private final Map<String, String> properties;
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private URI uri;
+    private TlsSocketStrategy tlsSocketStrategy;
     private ObjectMapper mapper = RESTObjectMapper.mapper();
     private HttpHost proxy;
     private CredentialsProvider proxyCredentialsProvider;
@@ -449,6 +456,11 @@ public class HTTPClient extends BaseHTTPClient {
     public Builder uri(URI baseUri) {
       Preconditions.checkNotNull(baseUri, "Invalid uri for http client: null");
       this.uri = baseUri;
+      return this;
+    }
+
+    public Builder withTlsSocketStrategy(TlsSocketStrategy tlsSocketStrategy) {
+      this.tlsSocketStrategy = tlsSocketStrategy;
       return this;
     }
 
@@ -508,7 +520,7 @@ public class HTTPClient extends BaseHTTPClient {
           mapper,
           interceptor,
           properties,
-          configureConnectionManager(properties),
+          configureConnectionManager(properties, tlsSocketStrategy),
           authSession);
     }
   }

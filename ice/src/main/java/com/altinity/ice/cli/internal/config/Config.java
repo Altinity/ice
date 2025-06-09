@@ -24,6 +24,9 @@ import org.apache.iceberg.aws.s3.S3FileIOProperties;
 public record Config(
     @JsonPropertyDescription("URL of Iceberg REST Catalog (http://localhost:5000 by default)")
         String uri,
+    @JsonPropertyDescription(
+            "PEM-encoded CA bundle (use base64: prefix to pass base64-encoded value)")
+        String caCrt,
     @JsonPropertyDescription("Bearer token to authorizer requests with") String bearerToken,
     @JsonPropertyDescription(
             "/path/to/dir where to store downloaded files when `ice insert`ing from http:// & https://")

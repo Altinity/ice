@@ -300,6 +300,28 @@
       </exclusions>
     </dependency>
     <dependency>
+      <groupId>org.apache.iceberg</groupId>
+      <artifactId>iceberg-common</artifactId>
+      <version>${iceberg.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents.client5</groupId>
+      <artifactId>httpclient5</artifactId>
+      <version>5.4.1</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>dnsjava</groupId>
       <artifactId>dnsjava</artifactId>
       <version>3.6.1</version>
