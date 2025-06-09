@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ice insert failing when both --force-table-auth and -p are set even if table already exists and -p is effectively no-op.
 - ice insert not including failed input URL.
 - LocalFileIO printing properties.
+- ice insert failing to insert parquet files with `uint32` & `uint64` columns.  
+NOTE: `uint64` is cast to int64, which may or may not be appropriate depending on the actual range of values.
 
 ## [0.2.0](https://github.com/altinity/ice/compare/v0.1.1...v0.2.0)
 
