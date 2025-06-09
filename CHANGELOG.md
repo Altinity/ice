@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - [S3 Table buckets](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-tables-buckets.html) support.
-- `ice scan`, `ice create-namespace', `ice delete-namespace' commands.
+- `ice scan`, `ice create-namespace', `ice delete-namespace` commands.
 - Ability to use `ice` with catalogs serving self-signed certificates (via `caCrt` config option).
 
 ### Changed
