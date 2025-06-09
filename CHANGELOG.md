@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ability to use `ice` with catalogs serving self-signed certificates (via `caCrt` config option).
 
 ### Changed
-- `debug*` images not require `java -jar` to launch ice/ice-rest-catalog.
+- `debug*` images to not require `java -jar` to launch ice/ice-rest-catalog.
 
 ### Fixed
 - ice-rest-catalog retrying operations regardless of whether errors are retryable or not. 
