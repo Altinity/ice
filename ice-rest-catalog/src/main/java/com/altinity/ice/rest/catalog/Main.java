@@ -34,6 +34,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -47,6 +48,7 @@ import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.handler.ShutdownHandler;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -83,7 +85,7 @@ public final class Main implements Callable<Integer> {
     return configFile;
   }
 
-  private Main() {}
+  public Main() {}
 
   private static Server createServer(
       String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
@@ -115,7 +117,8 @@ public final class Main implements Callable<Integer> {
 
     RESTCatalogHandler restCatalogAdapter;
     if (requireAuth) {
-      mux.insertHandler(createAuthorizationHandler(config.bearerTokens(), config));
+      var authHandler = createAuthorizationHandler(config.bearerTokens(), config);
+      mux.insertHandler(authHandler);
 
       restCatalogAdapter = new RESTCatalogAdapter(catalog);
       var loadTableConfig = config.toIcebergLoadTableConfig();
@@ -133,6 +136,25 @@ public final class Main implements Callable<Integer> {
             new RESTCatalogMiddlewareTableAWCredentials(
                 restCatalogAdapter, awsCredentialsProviders::get);
       }
+      // pick first available bearer token for shutdown
+      String shutdownToken =
+          Arrays.stream(config.bearerTokens())
+              .map(Config.Token::value)
+              .filter(Objects::nonNull)
+              .findFirst()
+              .orElseThrow(
+                  () -> new IllegalStateException("No bearer tokens configured for shutdown"));
+
+      var shutdownHandler = new ShutdownHandler(shutdownToken, false, false);
+      shutdownHandler.setHandler(mux);
+
+      var server = new Server();
+      overrideJettyDefaults(server);
+      server.setHandler(shutdownHandler);
+      var servletHolder = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter));
+      mux.addServlet(servletHolder, "/*");
+      return server;
+
     } else {
       restCatalogAdapter = new RESTCatalogAdapter(catalog);
       var loadTableConfig = config.toIcebergLoadTableConfig();
@@ -149,15 +171,15 @@ public final class Main implements Callable<Integer> {
             new RESTCatalogMiddlewareTableAWCredentials(
                 restCatalogAdapter, uid -> awsCredentialsProvider);
       }
+
+      var h = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter));
+      mux.addServlet(h, "/*");
+
+      var s = new Server();
+      overrideJettyDefaults(s);
+      s.setHandler(mux);
+      return s;
     }
-
-    var h = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter));
-    mux.addServlet(h, "/*");
-
-    var s = new Server();
-    overrideJettyDefaults(s);
-    s.setHandler(mux);
-    return s;
   }
 
   private static Map<String, AwsCredentialsProvider> createAwsCredentialsProviders(
