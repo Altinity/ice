@@ -5,3 +5,4 @@ target
 /ice-rest-catalog/pyiceberg-test/*.cached
 /release
 .devbox
+/.envrc

@@ -144,7 +144,7 @@
             ./mvnw verify
 
             # publish a new version
-            GITHUB_TOKEN=... VERSION=0.0.0-0 release --push
+            GITHUB_TOKEN=... VERSION=0.0.0-0 .bin/release --push
 
             # BONUS
 
@@ -192,6 +192,7 @@
                 <exclude>src/main/java/**/Route.java</exclude>
                 <exclude>src/main/java/**/iceberg/io/internal/*.java</exclude>
                 <exclude>src/main/java/**/iceberg/io/SchemeFileIO.java</exclude>
+                <exclude>src/main/java/org/apache/iceberg/**/*.java</exclude>
               </excludes>
               <strictCheck>true</strictCheck>
             </configuration>

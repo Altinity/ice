@@ -20,6 +20,7 @@ import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
+import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
@@ -471,7 +473,18 @@ public final class Main {
 
   private RESTCatalog loadCatalog(String configFile) throws IOException {
     Config config = Config.load(configFile);
-    RESTCatalog catalog = new RESTCatalog();
+
+    byte[] caCrt = null;
+    if (!Strings.isNullOrEmpty(config.caCrt())) {
+      String caCrtSrc = config.caCrt().trim();
+      if (caCrtSrc.startsWith("base64:")) {
+        caCrt = Base64.getDecoder().decode(Strings.removePrefix(caCrtSrc, "base64:"));
+      } else {
+        caCrt = caCrtSrc.getBytes();
+      }
+    }
+
+    RESTCatalog catalog = RESTCatalogFactory.create(caCrt);
     var icebergConfig = config.toIcebergConfig();
     logger.debug(
         "Iceberg configuration: {}",
