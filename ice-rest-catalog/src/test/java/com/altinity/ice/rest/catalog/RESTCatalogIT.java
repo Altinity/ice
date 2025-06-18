@@ -45,19 +45,31 @@ public class RESTCatalogIT {
     mainCommand = new Main();
 
     // Start the server in a separate thread
-    serverThread =
-        new Thread(
-            () -> {
-              try {
-                new CommandLine(mainCommand).execute(args);
-              } catch (Exception e) {
-                System.err.println("Error running server: " + e.getMessage());
-              }
-            });
+    serverThread = new Thread(() -> {
+      try {
+        new CommandLine(mainCommand).execute(args);
+      } catch (Exception e) {
+        System.err.println("Error running server: " + e.getMessage());
+      }
+    });
     serverThread.start();
 
     // Give the server time to start up
-    Thread.sleep(5000);
+    Thread.sleep(2000);
+
+    // Create namespace and table using Ice CLI
+    String namespace = "test_namespace";
+    String tableName = "test_table";
+
+    // Delete namespace before creating it
+    new CommandLine(new com.altinity.ice.cli.Main())
+        .execute("--config", "src/test/resources/ice-rest-cli.yaml", "delete-namespace", namespace);
+
+    // Create namespace
+    new CommandLine(new com.altinity.ice.cli.Main())
+        .execute("--config", "src/test/resources/ice-rest-cli.yaml", "create-namespace", namespace);
+
+
   }
 
   @AfterClass

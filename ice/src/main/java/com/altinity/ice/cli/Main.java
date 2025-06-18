@@ -75,7 +75,7 @@ public final class Main {
       scope = CommandLine.ScopeType.INHERIT)
   private String logLevel;
 
-  private Main() {}
+  public Main() {}
 
   @CommandLine.Command(name = "check", description = "Check configuration.")
   void check() throws IOException {
