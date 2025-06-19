@@ -114,6 +114,10 @@ public final class Main implements Callable<Integer> {
     // TODO: ShutdownHandler
 
     RESTCatalogHandler restCatalogAdapter;
+    String warehouse = icebergConfig.getOrDefault(CatalogProperties.WAREHOUSE_LOCATION, "");
+    boolean awsAuth =
+        warehouse.startsWith("s3://")
+            || warehouse.startsWith("arn:aws:s3tables:"); // FIXME: arn:aws-cn:s3tables
     if (requireAuth) {
       mux.insertHandler(createAuthorizationHandler(config.bearerTokens(), config));
 
@@ -124,9 +128,7 @@ public final class Main implements Callable<Integer> {
             new RESTCatalogMiddlewareTableConfig(restCatalogAdapter, loadTableConfig);
       }
 
-      if (icebergConfig
-          .getOrDefault(CatalogProperties.WAREHOUSE_LOCATION, "")
-          .startsWith("s3://")) {
+      if (awsAuth) {
         Map<String, AwsCredentialsProvider> awsCredentialsProviders =
             createAwsCredentialsProviders(config.bearerTokens(), config, icebergConfig);
         restCatalogAdapter =
@@ -141,9 +143,7 @@ public final class Main implements Callable<Integer> {
             new RESTCatalogMiddlewareTableConfig(restCatalogAdapter, loadTableConfig);
       }
 
-      if (icebergConfig
-          .getOrDefault(CatalogProperties.WAREHOUSE_LOCATION, "")
-          .startsWith("s3://")) {
+      if (awsAuth) {
         DefaultCredentialsProvider awsCredentialsProvider = DefaultCredentialsProvider.create();
         restCatalogAdapter =
             new RESTCatalogMiddlewareTableAWCredentials(
