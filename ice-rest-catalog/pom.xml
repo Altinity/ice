@@ -174,7 +174,7 @@
     <dependency>
       <groupId>software.amazon.s3tables</groupId>
       <artifactId>s3-tables-catalog-for-iceberg</artifactId>
-      <version>0.1.5</version>
+      <version>0.1.7</version>
       <exclusions>
         <exclusion>
           <groupId>org.apache.iceberg</groupId>
