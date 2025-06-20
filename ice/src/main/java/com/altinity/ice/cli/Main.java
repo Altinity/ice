@@ -430,10 +430,11 @@ public final class Main {
 
   @CommandLine.Command(name = "delete", description = "Delete Partition(s).")
   void deletePartition(
-      @CommandLine.Option(names = "--namespace", description = "Namespace name", required = true)
-          String namespace,
-      @CommandLine.Option(names = "--table", description = "Table name", required = true)
-          String tableName,
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
       @CommandLine.Option(
               names = {"--partition"},
               description =
@@ -452,7 +453,9 @@ public final class Main {
         PartitionFilter[] parts = mapper.readValue(partitionJson, PartitionFilter[].class);
         partitions = Arrays.asList(parts);
       }
-      DeletePartition.run(catalog, namespace, tableName, partitions, dryRun);
+      TableIdentifier tableId = TableIdentifier.parse(name);
+
+      DeletePartition.run(catalog, tableId, partitions, dryRun);
     } catch (URISyntaxException e) {
       throw new RuntimeException(e);
     }

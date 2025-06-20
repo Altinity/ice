@@ -85,8 +85,8 @@ public final class Main implements Callable<Integer> {
 
   private Main() {}
 
-  private static Server createServer(
-      String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
+  static Server createServer(
+    String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
     var s = createBaseServer(catalog, config, icebergConfig, true);
     ServerConnector connector = new ServerConnector(s);
     connector.setHost(host);
@@ -95,8 +95,8 @@ public final class Main implements Callable<Integer> {
     return s;
   }
 
-  private static Server createAdminServer(
-      String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
+  static Server createAdminServer(
+    String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
     var s = createBaseServer(catalog, config, icebergConfig, false);
     ServerConnector connector = new ServerConnector(s);
     connector.setHost(host);
@@ -227,7 +227,7 @@ public final class Main implements Callable<Integer> {
     return new RESTCatalogAuthorizationHandler(tokens, anonymousSession);
   }
 
-  private static Server createDebugServer(String host, int port) {
+  static Server createDebugServer(String host, int port) {
     var mux = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
     mux.insertHandler(new GzipHandler());
 
@@ -369,7 +369,7 @@ public final class Main implements Callable<Integer> {
     }
   }
 
-  private static Catalog newEctdCatalog(Map<String, String> config) {
+  static Catalog newEctdCatalog(Map<String, String> config) {
     // TODO: remove; params all verified by config
     String uri = config.getOrDefault(CatalogProperties.URI, "etcd:http://localhost:2379");
     Preconditions.checkArgument(

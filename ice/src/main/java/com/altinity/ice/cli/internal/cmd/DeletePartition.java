@@ -27,13 +27,12 @@ public final class DeletePartition {
 
   public static void run(
       RESTCatalog catalog,
-      String namespace,
-      String tableName,
+      TableIdentifier tableId,
       List<com.altinity.ice.cli.Main.PartitionFilter> partitions,
       boolean dryRun)
       throws IOException, URISyntaxException {
 
-    Table table = catalog.loadTable(TableIdentifier.of(namespace, tableName));
+    Table table = catalog.loadTable(tableId);
     TableScan scan = table.newScan();
     if (partitions != null && !partitions.isEmpty()) {
       org.apache.iceberg.expressions.Expression expr = null;
