@@ -86,7 +86,7 @@ public final class Main implements Callable<Integer> {
   private Main() {}
 
   static Server createServer(
-    String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
+      String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
     var s = createBaseServer(catalog, config, icebergConfig, true);
     ServerConnector connector = new ServerConnector(s);
     connector.setHost(host);
@@ -96,7 +96,7 @@ public final class Main implements Callable<Integer> {
   }
 
   static Server createAdminServer(
-    String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
+      String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
     var s = createBaseServer(catalog, config, icebergConfig, false);
     ServerConnector connector = new ServerConnector(s);
     connector.setHost(host);

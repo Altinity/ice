@@ -9,7 +9,6 @@
  */
 package com.altinity.ice.rest.catalog;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -20,8 +19,6 @@ import com.altinity.ice.rest.catalog.internal.etcd.EtcdCatalog;
 import com.google.common.net.HostAndPort;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Txn;
-import org.apache.iceberg.CatalogUtil;
-import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.inmemory.InMemoryFileIO;
 import org.eclipse.jetty.server.Server;
 import org.testcontainers.containers.GenericContainer;
@@ -30,7 +27,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import picocli.CommandLine;
 
-import static com.altinity.ice.rest.catalog.Main.*;
+import static com.altinity.ice.rest.catalog.Main.createAdminServer;
+import static com.altinity.ice.rest.catalog.Main.createServer;
 
 public class RESTCatalogIT {
 
@@ -124,7 +122,7 @@ public class RESTCatalogIT {
 
     // insert data
     new CommandLine(new com.altinity.ice.cli.Main())
-        .execute("--config", "src/test/resources/ice-rest-cli.yaml", "insert", table, 
+        .execute("--config", "src/test/resources/ice-rest-cli.yaml", "insert", table,
         "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet", "--partition='[{\"column\":\"tpep_pickup_datetime\",\"transform\":\"day\"}]'");
 
     // Scan command
@@ -138,8 +136,6 @@ public class RESTCatalogIT {
     // Delete namespace
     new CommandLine(new com.altinity.ice.cli.Main())
         .execute("--config", "src/test/resources/ice-rest-cli.yaml", "delete-namespace", "nyc");
-
-
   }
 
   @AfterClass
