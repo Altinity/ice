@@ -119,6 +119,10 @@ public class MaintenanceScheduler {
 
             table.rewriteManifests().rewriteIf(manifest -> true).commit();
             table.expireSnapshots().expireOlderThan(olderThanMillis).commit();
+
+            // Remove orphans.
+            OrphanFileScanner orphanFileScanner = new OrphanFileScanner(table);
+            orphanFileScanner.removeOrphanedFiles(olderThanMillis, false);
           }
         }
         logger.info("Maintenance operations completed for catalog: {}", catalog.name());
