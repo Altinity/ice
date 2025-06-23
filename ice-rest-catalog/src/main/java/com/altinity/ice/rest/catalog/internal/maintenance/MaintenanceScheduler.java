@@ -22,6 +22,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,8 +110,15 @@ public class MaintenanceScheduler {
           for (TableIdentifier tableIdent : tables) {
             long olderThanMillis =
                 System.currentTimeMillis() - TimeUnit.DAYS.toMillis(snapshotExpirationDays);
-            Table table = catalog.loadTable(tableIdent);
 
+            // This throws a Location does not exist error.
+            Table table = null;
+            try {
+              table = catalog.loadTable(tableIdent);
+            } catch (NotFoundException ne) {
+              logger.warn("Table {} location not found, skipping maintenance", tableIdent, ne);
+              continue;
+            }
             // Check if table has any snapshots before performing maintenance
             if (table.currentSnapshot() == null) {
               logger.warn("Table {} has no snapshots, skipping maintenance", tableIdent);
