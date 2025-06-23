@@ -15,7 +15,7 @@ s3:
 bearerTokens:
 - value: foo
 
-maintenanceSchedule: "every 2 mins" 
+maintenanceSchedule: "every 1 minutes" 
 
 anonymousAccess:
   enabled: true

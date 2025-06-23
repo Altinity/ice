@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.rest.catalog.internal.maintenance;
 
+import com.altinity.ice.cli.internal.s3.S3;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -18,18 +19,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.FileIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 
 public class OrphanFileScanner {
   private static final Logger LOG = LoggerFactory.getLogger(OrphanFileScanner.class);
@@ -58,42 +56,37 @@ public class OrphanFileScanner {
     return knownFiles;
   }
 
-
   public Set<String> findOrphanedFiles(String location, long olderThanMillis) throws IOException {
     Set<String> knownFiles = getAllKnownFiles();
 
-    FileIO fileIO = table.io();
-    if (!(fileIO instanceof HadoopFileIO)) {
-      throw new IllegalArgumentException("Only HadoopFileIO supported in this implementation");
-    }
+    String bucket = location.replace("s3://", "").split("/")[0];
+    String prefix = location.replace("s3://" + bucket + "/", "");
 
-    Configuration conf = ((HadoopFileIO) fileIO).conf();
-    Path rootPath = new Path(location);
-    FileSystem fs = rootPath.getFileSystem(conf);
+    S3Client s3 = S3.newClient(true);
 
-    RemoteIterator<LocatedFileStatus> files = fs.listFiles(rootPath, true);
+    ListObjectsV2Request listRequest =
+        ListObjectsV2Request.builder().bucket(bucket).prefix(prefix).build();
 
-    long cutoffTime = System.currentTimeMillis() - olderThanMillis;
+    Set<String> allFiles = new HashSet<>();
 
-    Set<String> orphanedFiles = new HashSet<>();
+    ListObjectsV2Response listResponse;
+    do {
+      listResponse = s3.listObjectsV2(listRequest);
+      listResponse.contents().forEach(obj -> allFiles.add("s3://" + bucket + "/" + obj.key()));
+      listRequest =
+          listRequest.toBuilder().continuationToken(listResponse.nextContinuationToken()).build();
+    } while (listResponse.isTruncated());
 
-    while (files.hasNext()) {
-      LocatedFileStatus status = files.next();
-      long modTime = status.getModificationTime();
+    // Set<String> orphanedFiles = new HashSet<>();
 
-      if (modTime < cutoffTime) {
-        String filePath = status.getPath().toString();
-        if (!knownFiles.contains(filePath)) {
-          orphanedFiles.add(filePath);
-        }
-      }
-    }
+    allFiles.remove(knownFiles);
 
-    return orphanedFiles;
+    return allFiles;
   }
 
   public void removeOrphanedFiles(long olderThanMillis, boolean dryRun) throws IOException {
     String location = table.location();
+    LOG.info("Looking for Orphaned files in location {}", location);
     Set<String> orphanedFiles = findOrphanedFiles(location, olderThanMillis);
 
     LOG.info("Found {} orphaned files at {}!", orphanedFiles.size(), location);
