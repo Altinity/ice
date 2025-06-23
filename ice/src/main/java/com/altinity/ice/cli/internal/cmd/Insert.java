@@ -21,6 +21,7 @@ import com.altinity.ice.cli.internal.s3.S3;
 import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -601,6 +602,9 @@ public final class Insert {
       case String s -> {
         LocalDateTime ldt = LocalDateTime.parse(s);
         return ldt.toInstant(ZoneOffset.UTC).toEpochMilli() * 1000L;
+      }
+      case LocalDate localDate -> {
+        return localDate.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() * 1000L;
       }
       case LocalDateTime localDateTime -> {
         return localDateTime.toInstant(ZoneOffset.UTC).toEpochMilli() * 1000L;
