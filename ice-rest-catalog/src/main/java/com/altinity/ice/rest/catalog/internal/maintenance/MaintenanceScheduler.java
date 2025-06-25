@@ -128,9 +128,21 @@ public class MaintenanceScheduler {
             table.rewriteManifests().rewriteIf(manifest -> true).commit();
             table.expireSnapshots().expireOlderThan(olderThanMillis).commit();
 
-            // Remove orphans.
-            OrphanFileScanner orphanFileScanner = new OrphanFileScanner(table);
-            orphanFileScanner.removeOrphanedFiles(olderThanMillis, false);
+            // Remove orphans only for S3-based tables
+            String tableLocation = table.location();
+            if (tableLocation != null && tableLocation.startsWith("s3://")) {
+              OrphanFileScanner orphanFileScanner = new OrphanFileScanner(table);
+              try {
+                orphanFileScanner.removeOrphanedFiles(olderThanMillis, false);
+              } catch (Exception e) {
+                logger.warn("Failed to remove orphan files for table {}", tableIdent, e);
+              }
+            } else {
+              logger.debug(
+                  "Skipping orphan file removal for non-S3 table: {} (location: {})",
+                  tableIdent,
+                  tableLocation);
+            }
           }
         }
         logger.info("Maintenance operations completed for catalog: {}", catalog.name());

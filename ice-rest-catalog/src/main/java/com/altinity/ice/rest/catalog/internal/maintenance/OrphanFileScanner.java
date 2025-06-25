@@ -9,7 +9,6 @@
  */
 package com.altinity.ice.rest.catalog.internal.maintenance;
 
-import com.altinity.ice.cli.internal.s3.S3;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -19,9 +18,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+
+import com.altinity.ice.cli.internal.s3.S3;
+import org.apache.iceberg.DataFile;
 import org.apache.iceberg.ManifestFile;
+import org.apache.iceberg.ManifestFiles;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +34,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 
 public class OrphanFileScanner {
-  private static final Logger LOG = LoggerFactory.getLogger(OrphanFileScanner.class);
+  private static final Logger logger = LoggerFactory.getLogger(OrphanFileScanner.class);
   private final Table table;
 
   public OrphanFileScanner(Table table) {
@@ -50,6 +54,14 @@ public class OrphanFileScanner {
       FileIO io = table.io();
       for (ManifestFile manifest : snapshot.dataManifests(io)) {
         knownFiles.add(manifest.path());
+        // Add data files inside each manifest
+        try (CloseableIterable<DataFile> files = ManifestFiles.read(manifest, table.io())) {
+          for (DataFile dataFile : files) {
+            knownFiles.add(dataFile.path().toString());
+          }
+        } catch (Exception e) {
+          logger.error("Error getting list of data files", e);
+        }
       }
     }
 
@@ -79,26 +91,27 @@ public class OrphanFileScanner {
 
     // Set<String> orphanedFiles = new HashSet<>();
 
-    allFiles.remove(knownFiles);
+    allFiles.removeAll(knownFiles);
 
     return allFiles;
   }
 
   public void removeOrphanedFiles(long olderThanMillis, boolean dryRun) throws IOException {
     String location = table.location();
-    LOG.info("Looking for Orphaned files in location {}", location);
+    logger.info("Looking for Orphaned files in location {}", location);
     Set<String> orphanedFiles = findOrphanedFiles(location, olderThanMillis);
 
-    LOG.info("Found {} orphaned files at {}!", orphanedFiles.size(), location);
+    logger.info("Found {} orphaned files at {}!", orphanedFiles.size(), location);
 
     if (orphanedFiles.isEmpty()) {
-      LOG.info("No orphaned files found at {}!", location);
+      logger.info("No orphaned files found at {}!", location);
       return;
     }
 
     if (dryRun) {
-      LOG.info("(Dry Run) Would delete {} orphaned files at {}!", orphanedFiles.size(), location);
-      orphanedFiles.forEach(f -> LOG.info("Orphaned file: {}", f));
+      logger.info(
+          "(Dry Run) Would delete {} orphaned files at {}!", orphanedFiles.size(), location);
+      orphanedFiles.forEach(f -> logger.info("Orphaned file: {}", f));
     } else {
       ExecutorService executor = Executors.newFixedThreadPool(8);
       List<Future<String>> futures =
@@ -111,7 +124,7 @@ public class OrphanFileScanner {
                               table.io().deleteFile(file);
                               return file;
                             } catch (Exception e) {
-                              LOG.warn("Failed to delete file {}", file, e);
+                              logger.warn("Failed to delete file {}", file, e);
                               return null;
                             }
                           }))
@@ -127,16 +140,14 @@ public class OrphanFileScanner {
             deletedFiles.add(result);
           }
         } catch (Exception e) {
-          LOG.error("Error during file deletion", e);
+          logger.error("Error during file deletion", e);
         }
       }
 
-      LOG.info("Deleted {} orphaned files at {}!", deletedFiles.size(), location);
+      logger.info("Deleted {} orphaned files at {}!", deletedFiles.size(), location);
       if (!deletedFiles.isEmpty()) {
-        deletedFiles.forEach(f -> LOG.info("Deleted: {}", f));
+        deletedFiles.forEach(f -> logger.info("Deleted: {}", f));
       }
-
-      executor.shutdownNow();
     }
   }
 }
