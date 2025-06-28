@@ -13,8 +13,8 @@ import ch.qos.logback.classic.Level;
 import com.altinity.ice.cli.internal.cmd.Check;
 import com.altinity.ice.cli.internal.cmd.CreateNamespace;
 import com.altinity.ice.cli.internal.cmd.CreateTable;
+import com.altinity.ice.cli.internal.cmd.Delete;
 import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
-import com.altinity.ice.cli.internal.cmd.DeletePartition;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.Insert;
@@ -428,8 +428,8 @@ public final class Main {
     }
   }
 
-  @CommandLine.Command(name = "delete", description = "Delete Partition(s).")
-  void deletePartition(
+  @CommandLine.Command(name = "delete", description = "Delete data from catalog.")
+  void delete(
       @CommandLine.Parameters(
               arity = "1",
               paramLabel = "<name>",
@@ -443,7 +443,8 @@ public final class Main {
           String partitionJson,
       @CommandLine.Option(
               names = "--dry-run",
-              description = "Log files that would be deleted without actually deleting them")
+              description = "Log files that would be deleted without actually deleting them",
+              defaultValue = "true")
           boolean dryRun)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
@@ -455,7 +456,7 @@ public final class Main {
       }
       TableIdentifier tableId = TableIdentifier.parse(name);
 
-      DeletePartition.run(catalog, tableId, partitions, dryRun);
+      Delete.run(catalog, tableId, partitions, dryRun);
     } catch (URISyntaxException e) {
       throw new RuntimeException(e);
     }

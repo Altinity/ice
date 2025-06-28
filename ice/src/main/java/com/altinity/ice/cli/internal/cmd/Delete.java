@@ -19,11 +19,11 @@ import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class DeletePartition {
+public final class Delete {
 
-  private static final Logger logger = LoggerFactory.getLogger(DeletePartition.class);
+  private static final Logger logger = LoggerFactory.getLogger(Delete.class);
 
-  private DeletePartition() {}
+  private Delete() {}
 
   public static void run(
       RESTCatalog catalog,
