@@ -10,12 +10,14 @@
 package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
+import com.altinity.ice.cli.internal.cmd.AddColumn;
 import com.altinity.ice.cli.internal.cmd.Check;
 import com.altinity.ice.cli.internal.cmd.CreateNamespace;
 import com.altinity.ice.cli.internal.cmd.CreateTable;
 import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
+import com.altinity.ice.cli.internal.cmd.DropColumn;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
@@ -423,6 +425,41 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       DeleteNamespace.run(catalog, Namespace.of(name.split("[.]")), ignoreNotFound);
+    }
+  }
+
+  @CommandLine.Command(name = "add-column", description = "Add a column to an existing table.")
+  void addColumn(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<column>",
+              description = "Column definition: name:type[:comment] (e.g. 'age:int:User age')")
+          String column)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+      TableIdentifier tableId = TableIdentifier.parse(name);
+      AddColumn.run(catalog, tableId, column);
+    }
+  }
+
+  @CommandLine.Command(name = "drop-column", description = "Drop a column from an existing table.")
+  void dropColumn(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Parameters(arity = "1", paramLabel = "<column>", description = "Column name")
+          String column)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+      TableIdentifier tableId = TableIdentifier.parse(name);
+      DropColumn.run(catalog, tableId, column);
     }
   }
 
