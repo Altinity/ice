@@ -11,6 +11,7 @@ package com.altinity.ice.cli.internal.cmd;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -58,6 +59,7 @@ public final class Scan {
       }
     }
     ObjectMapper mapper = json ? new ObjectMapper() : new ObjectMapper(new YAMLFactory());
+    mapper.registerModule(new JavaTimeModule());
     String output = mapper.writeValueAsString(records);
     System.out.println(output);
   }
