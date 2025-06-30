@@ -13,8 +13,13 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.iceberg.*;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.RewriteFiles;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,11 +52,13 @@ public final class Delete {
       }
       scan = scan.filter(expr);
     }
-    Iterable<FileScanTask> tasks = scan.planFiles();
+    CloseableIterable<FileScanTask> tasks = scan.planFiles();
     List<DataFile> filesToDelete = new ArrayList<>();
     for (FileScanTask task : tasks) {
       filesToDelete.add(task.file());
     }
+    tasks.close();
+
     if (!filesToDelete.isEmpty()) {
       if (dryRun) {
         logger.info("Dry run: The following files would be deleted:");
