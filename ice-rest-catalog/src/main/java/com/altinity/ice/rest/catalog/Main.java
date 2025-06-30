@@ -310,12 +310,13 @@ public final class Main implements Callable<Integer> {
     // TODO: ensure all http handlers are hooked in
     JvmMetrics.builder().register();
 
+    String catalogName = config.name();
     String catalogImpl = icebergConfig.get(CatalogProperties.CATALOG_IMPL);
     Catalog catalog;
     if (EtcdCatalog.class.getName().equals(catalogImpl)) {
-      catalog = newEctdCatalog(icebergConfig);
+      catalog = newEctdCatalog(catalogName, icebergConfig);
     } else {
-      catalog = CatalogUtil.buildIcebergCatalog("default", icebergConfig, null);
+      catalog = CatalogUtil.buildIcebergCatalog(catalogName, icebergConfig, null);
     }
 
     // Initialize and start the maintenance scheduler
@@ -369,7 +370,7 @@ public final class Main implements Callable<Integer> {
     }
   }
 
-  private static Catalog newEctdCatalog(Map<String, String> config) {
+  private static Catalog newEctdCatalog(String name, Map<String, String> config) {
     // TODO: remove; params all verified by config
     String uri = config.getOrDefault(CatalogProperties.URI, "etcd:http://localhost:2379");
     Preconditions.checkArgument(
@@ -388,8 +389,7 @@ public final class Main implements Callable<Integer> {
         CatalogProperties.FILE_IO_IMPL);
 
     var io = CatalogUtil.loadFileIO(ioImpl, config, null);
-    return new EtcdCatalog(
-        "default", Strings.removePrefix(uri, "etcd:"), inputWarehouseLocation, io);
+    return new EtcdCatalog(name, Strings.removePrefix(uri, "etcd:"), inputWarehouseLocation, io);
   }
 
   public static void main(String[] args) throws Exception {

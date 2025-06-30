@@ -41,6 +41,7 @@ public record Config(
     @JsonPropertyDescription("host:port (0.0.0.0:5001 by default)") String debugAddr,
     @JsonPropertyDescription("host:port, e.g. localhost:5002 (disabled by default)")
         String adminAddr,
+    @JsonPropertyDescription("Catalog name (defaults to \"default\")") String name,
     @JsonPropertyDescription("Catalog storage URI: jdbc:..., etcd:...") String uri,
     @JsonPropertyDescription("Path to warehouse, e.g. s3://..., file://...") String warehouse,
     @JsonPropertyDescription(
@@ -69,6 +70,7 @@ public record Config(
       String addr,
       String debugAddr,
       String adminAddr,
+      String name,
       @JsonProperty(required = true) String uri,
       @JsonProperty(required = true) String warehouse,
       String localFileIOBaseDir,
@@ -82,6 +84,7 @@ public record Config(
     this.addr = Strings.orDefault(addr, DEFAULT_ADDR);
     this.debugAddr = Strings.orDefault(debugAddr, DEFAULT_DEBUG_ADDR);
     this.adminAddr = Strings.orDefault(adminAddr, System.getenv("ICE_REST_CATALOG_ADMIN_ADDR"));
+    this.name = Strings.orDefault(name, "default");
     this.uri = uri;
     this.warehouse = warehouse;
     this.localFileIOBaseDir = localFileIOBaseDir;

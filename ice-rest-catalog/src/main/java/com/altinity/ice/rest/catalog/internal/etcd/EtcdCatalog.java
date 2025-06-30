@@ -52,6 +52,7 @@ import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.util.LocationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,8 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
 
   public EtcdCatalog(String name, String uri, String warehouseLocation, FileIO io) {
     this.catalogName = name;
+    Preconditions.checkArgument(
+        name != null && !name.isBlank() && !name.contains("/"), "Invalid catalog name");
     this.warehouseLocation = LocationUtil.stripTrailingSlash(warehouseLocation);
     var etcdClient =
         Client.builder().endpoints(uri.split(",")).keepaliveWithoutCalls(false).build();
@@ -124,8 +127,15 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
     return unwrap(kv.get(key, GetOption.builder().withCountOnly(true).build())).getCount() > 0;
   }
 
-  private static String namespaceKey(Namespace namespace) {
-    return NAMESPACE_PREFIX + namespaceToPath(namespace);
+  private String namespaceKey(Namespace namespace) {
+    return namespacePrefix() + namespaceToPath(namespace);
+  }
+
+  private String namespacePrefix() {
+    if ("default".equals(catalogName)) { // for backward-compatibility
+      return NAMESPACE_PREFIX;
+    }
+    return catalogName + "/" + NAMESPACE_PREFIX;
   }
 
   private static <T> T unwrapCommit(java.util.concurrent.CompletableFuture<T> x) {
@@ -195,9 +205,7 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
   public List<Namespace> listNamespaces(Namespace namespace) throws NoSuchNamespaceException {
     validateNamespace(namespace);
     String prefix = namespaceKey(namespace);
-    if (!namespace.isEmpty()) {
-      prefix += "/";
-    }
+    prefix = prefix.endsWith("/") ? prefix : prefix + "/";
     GetResponse res = unwrap(kv.get(byteSeq(prefix), GetOption.builder().isPrefix(true).build()));
     if (res.getKvs().isEmpty() && !namespace.isEmpty()) {
       if (!namespaceExists(namespace)) {
@@ -209,7 +217,7 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
             k ->
                 Namespace.of(
                     Strings.removePrefix(
-                            k.getKey().toString(StandardCharsets.UTF_8), NAMESPACE_PREFIX)
+                            k.getKey().toString(StandardCharsets.UTF_8), namespacePrefix())
                         .split("/")))
         .toList();
   }
@@ -330,9 +338,7 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
   public List<TableIdentifier> listTables(Namespace namespace) {
     validateNamespace(namespace);
     String prefix = tableKey(namespace);
-    if (!namespace.isEmpty()) {
-      prefix += "/";
-    }
+    prefix = prefix.endsWith("/") ? prefix : prefix + "/";
     GetResponse res = unwrap(kv.get(byteSeq(prefix), GetOption.builder().isPrefix(true).build()));
     if (res.getKvs().isEmpty() && !namespace.isEmpty()) {
       if (!namespaceExists(namespace)) {
@@ -343,17 +349,24 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
         .map(
             k ->
                 TableIdentifier.of(
-                    Strings.removePrefix(k.getKey().toString(StandardCharsets.UTF_8), TABLE_PREFIX)
+                    Strings.removePrefix(k.getKey().toString(StandardCharsets.UTF_8), tablePrefix())
                         .split("/")))
         .toList();
   }
 
-  private static String tableKey(Namespace namespace) {
-    return TABLE_PREFIX + namespaceToPath(namespace);
+  private String tableKey(Namespace namespace) {
+    return tablePrefix() + namespaceToPath(namespace);
   }
 
-  private static String tableKey(TableIdentifier identifier) {
-    return TABLE_PREFIX + tableIdentifierToPath(identifier);
+  private String tableKey(TableIdentifier identifier) {
+    return tablePrefix() + tableIdentifierToPath(identifier);
+  }
+
+  private String tablePrefix() {
+    if ("default".equals(catalogName)) { // for backward-compatibility
+      return TABLE_PREFIX;
+    }
+    return catalogName + "/" + TABLE_PREFIX;
   }
 
   private static String tableIdentifierToPath(TableIdentifier identifier) {
