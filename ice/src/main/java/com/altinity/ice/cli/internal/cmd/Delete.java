@@ -52,12 +52,16 @@ public final class Delete {
       }
       scan = scan.filter(expr);
     }
-    CloseableIterable<FileScanTask> tasks = scan.planFiles();
     List<DataFile> filesToDelete = new ArrayList<>();
-    for (FileScanTask task : tasks) {
-      filesToDelete.add(task.file());
+
+    try (CloseableIterable<FileScanTask> tasks = scan.planFiles()) {
+      for (FileScanTask task : tasks) {
+        filesToDelete.add(task.file());
+      }
+    } catch (Exception e) {
+      logger.error("Error getting files to delete: {}", e.getMessage());
+      throw e;
     }
-    tasks.close();
 
     if (!filesToDelete.isEmpty()) {
       if (dryRun) {
