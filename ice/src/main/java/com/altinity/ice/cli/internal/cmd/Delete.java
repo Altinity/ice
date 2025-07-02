@@ -59,7 +59,6 @@ public final class Delete {
         filesToDelete.add(task.file());
       }
     } catch (Exception e) {
-      logger.error("Error getting files to delete: {}", e.getMessage());
       throw e;
     }
 
