@@ -53,6 +53,7 @@ public record Config(
             "Maintenance schedule in https://github.com/shyiko/skedule?tab=readme-ov-file#format format, e.g. \"every day 00:00\". Empty schedule disables automatic maintenance (default)")
         String maintenanceSchedule,
     @JsonPropertyDescription("TTL for snapshots in days.") int snapshotTTLInDays,
+    @JsonPropertyDescription("TTL for orphan files in days.") int orphanFileExpirationDays,
     @JsonPropertyDescription(
             "(experimental) Extra properties to include in loadTable REST response.")
         Map<String, String> loadTableProperties,
@@ -77,6 +78,7 @@ public record Config(
       AnonymousAccess anonymousAccess,
       String maintenanceSchedule,
       int snapshotTTLInDays,
+      int orphanFileExpirationDays,
       Map<String, String> loadTableProperties,
       @JsonProperty("iceberg") Map<String, String> icebergProperties) {
     this.addr = Strings.orDefault(addr, DEFAULT_ADDR);
@@ -91,6 +93,7 @@ public record Config(
         Objects.requireNonNullElse(anonymousAccess, new AnonymousAccess(false, null));
     this.maintenanceSchedule = maintenanceSchedule;
     this.snapshotTTLInDays = snapshotTTLInDays;
+    this.orphanFileExpirationDays = orphanFileExpirationDays;
     this.loadTableProperties = Objects.requireNonNullElse(loadTableProperties, Map.of());
     this.icebergProperties = Objects.requireNonNullElse(icebergProperties, Map.of());
   }

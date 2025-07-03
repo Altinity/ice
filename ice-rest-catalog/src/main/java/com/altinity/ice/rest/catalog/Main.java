@@ -359,7 +359,10 @@ public final class Main implements Callable<Integer> {
     try {
       MaintenanceScheduler scheduler =
           new MaintenanceScheduler(
-              catalog, config.maintenanceSchedule(), config.snapshotTTLInDays());
+              catalog,
+              config.maintenanceSchedule(),
+              config.snapshotTTLInDays(),
+              config.orphanFileExpirationDays());
       scheduler.startScheduledMaintenance();
       logger.info(
           "Maintenance scheduler initialized with schedule: {}", config.maintenanceSchedule());

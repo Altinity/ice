@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.rest.catalog.internal.maintenance;
 
+import com.altinity.ice.internal.iceberg.io.SchemeFileIO;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -18,20 +19,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
-
-import com.altinity.ice.cli.internal.s3.S3;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.ManifestFiles;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.FileInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
-import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 
 public class OrphanFileScanner {
   private static final Logger logger = LoggerFactory.getLogger(OrphanFileScanner.class);
@@ -41,26 +41,39 @@ public class OrphanFileScanner {
     this.table = table;
   }
 
-  private Set<String> getAllKnownFiles() {
+  private Set<String> getAllKnownFiles() throws IOException {
     Set<String> knownFiles = new HashSet<>();
 
     for (Snapshot snapshot : table.snapshots()) {
-      // Manifest list file
       if (snapshot.manifestListLocation() != null) {
         knownFiles.add(snapshot.manifestListLocation());
       }
 
-      // Manifest files
       FileIO io = table.io();
+
+      TableOperations ops = ((BaseTable) table).operations();
+      TableMetadata meta = ops.current();
+
+      String currentMetadataFile = meta.metadataFileLocation();
+      // Current metadata json file
+      knownFiles.add(currentMetadataFile);
+
+      // All the previous metadata JSON(is there a chance there might be
+      // json files that are not physically present?.
+      for (TableMetadata.MetadataLogEntry previousFile : meta.previousFiles()) {
+        knownFiles.add(previousFile.file());
+      }
+
       for (ManifestFile manifest : snapshot.dataManifests(io)) {
         knownFiles.add(manifest.path());
+
         // Add data files inside each manifest
         try (CloseableIterable<DataFile> files = ManifestFiles.read(manifest, table.io())) {
           for (DataFile dataFile : files) {
             knownFiles.add(dataFile.path().toString());
           }
         } catch (Exception e) {
-          logger.error("Error getting list of data files", e);
+          throw e;
         }
       }
     }
@@ -71,25 +84,23 @@ public class OrphanFileScanner {
   public Set<String> findOrphanedFiles(String location, long olderThanMillis) throws IOException {
     Set<String> knownFiles = getAllKnownFiles();
 
-    String bucket = location.replace("s3://", "").split("/")[0];
-    String prefix = location.replace("s3://" + bucket + "/", "");
+    FileIO tableIO = table.io();
 
-    S3Client s3 = S3.newClient(true);
-
-    ListObjectsV2Request listRequest =
-        ListObjectsV2Request.builder().bucket(bucket).prefix(prefix).build();
+    SchemeFileIO schemeFileIO;
+    if (tableIO instanceof SchemeFileIO) {
+      schemeFileIO = (SchemeFileIO) tableIO;
+    } else {
+      throw new UnsupportedOperationException("SchemeFileIO is required for S3 locations");
+    }
 
     Set<String> allFiles = new HashSet<>();
 
-    ListObjectsV2Response listResponse;
-    do {
-      listResponse = s3.listObjectsV2(listRequest);
-      listResponse.contents().forEach(obj -> allFiles.add("s3://" + bucket + "/" + obj.key()));
-      listRequest =
-          listRequest.toBuilder().continuationToken(listResponse.nextContinuationToken()).build();
-    } while (listResponse.isTruncated());
-
-    // Set<String> orphanedFiles = new HashSet<>();
+    Iterable<FileInfo> fileInfos = schemeFileIO.listPrefix(location);
+    for (FileInfo fileInfo : fileInfos) {
+      if (fileInfo.createdAtMillis() > olderThanMillis) {
+        allFiles.add(fileInfo.location());
+      }
+    }
 
     allFiles.removeAll(knownFiles);
 
@@ -113,7 +124,10 @@ public class OrphanFileScanner {
           "(Dry Run) Would delete {} orphaned files at {}!", orphanedFiles.size(), location);
       orphanedFiles.forEach(f -> logger.info("Orphaned file: {}", f));
     } else {
-      ExecutorService executor = Executors.newFixedThreadPool(8);
+
+      int numThreads = Math.min(8, orphanedFiles.size());
+
+      ExecutorService executor = Executors.newFixedThreadPool(numThreads);
       List<Future<String>> futures =
           orphanedFiles.stream()
               .map(
@@ -141,6 +155,7 @@ public class OrphanFileScanner {
           }
         } catch (Exception e) {
           logger.error("Error during file deletion", e);
+          return;
         }
       }
 

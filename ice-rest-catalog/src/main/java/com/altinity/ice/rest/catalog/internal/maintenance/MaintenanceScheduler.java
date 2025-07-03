@@ -37,13 +37,16 @@ public class MaintenanceScheduler {
 
   private ScheduledFuture<?> currentTask;
   private final Integer snapshotExpirationDays;
+  private final Integer orphanFileExpirationDays;
 
-  public MaintenanceScheduler(Catalog catalog, String schedule, int snapshotExpirationDays) {
+  public MaintenanceScheduler(
+      Catalog catalog, String schedule, int snapshotExpirationDays, int orphanFileExpirationDays) {
     this.catalog = catalog;
     this.executor = new ScheduledThreadPoolExecutor(1);
     ((ScheduledThreadPoolExecutor) executor).setRemoveOnCancelPolicy(true);
     this.schedule = Schedule.parse(schedule);
     this.snapshotExpirationDays = snapshotExpirationDays;
+    this.orphanFileExpirationDays = orphanFileExpirationDays;
   }
 
   public void startScheduledMaintenance() {
@@ -128,12 +131,18 @@ public class MaintenanceScheduler {
             table.rewriteManifests().rewriteIf(manifest -> true).commit();
             table.expireSnapshots().expireOlderThan(olderThanMillis).commit();
 
+            if (orphanFileExpirationDays == 0) {
+              logger.info("Skipping orphan file removal for table {}", tableIdent);
+              continue;
+            }
+            long orphanCutOffMillis =
+                System.currentTimeMillis() - TimeUnit.DAYS.toMillis(orphanFileExpirationDays);
             // Remove orphans only for S3-based tables
             String tableLocation = table.location();
             if (tableLocation != null && tableLocation.startsWith("s3://")) {
               OrphanFileScanner orphanFileScanner = new OrphanFileScanner(table);
               try {
-                orphanFileScanner.removeOrphanedFiles(olderThanMillis, false);
+                orphanFileScanner.removeOrphanedFiles(orphanCutOffMillis, false);
               } catch (Exception e) {
                 logger.warn("Failed to remove orphan files for table {}", tableIdent, e);
               }
