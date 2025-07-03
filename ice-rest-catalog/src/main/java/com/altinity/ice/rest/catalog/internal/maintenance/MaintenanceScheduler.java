@@ -132,7 +132,9 @@ public class MaintenanceScheduler {
             table.expireSnapshots().expireOlderThan(olderThanMillis).commit();
 
             if (orphanFileExpirationDays == 0) {
-              logger.info("Skipping orphan file removal for table {}", tableIdent);
+              logger.info(
+                  "Skipping orphan file removal for table {} since orphanFileExpirationDays config was not set",
+                  tableIdent);
               continue;
             }
             long orphanCutOffMillis =
