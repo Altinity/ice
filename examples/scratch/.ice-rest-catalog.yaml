@@ -15,8 +15,8 @@ s3:
 bearerTokens:
 - value: foo
 
-maintenanceSchedule: "every 1 minutes" 
-
+maintenanceSchedule: "every 1 minutes"
+orphanFileExpirationDays: 1
 anonymousAccess:
   enabled: true
   accessConfig: {}

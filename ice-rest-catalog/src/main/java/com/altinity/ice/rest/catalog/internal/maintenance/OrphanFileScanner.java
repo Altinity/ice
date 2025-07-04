@@ -97,7 +97,7 @@ public class OrphanFileScanner {
 
     Iterable<FileInfo> fileInfos = schemeFileIO.listPrefix(location);
     for (FileInfo fileInfo : fileInfos) {
-      if (fileInfo.createdAtMillis() > olderThanMillis) {
+      if (fileInfo.createdAtMillis() < olderThanMillis) {
         allFiles.add(fileInfo.location());
       }
     }
@@ -113,6 +113,8 @@ public class OrphanFileScanner {
     Set<String> orphanedFiles = findOrphanedFiles(location, olderThanMillis);
 
     logger.info("Found {} orphaned files at {}!", orphanedFiles.size(), location);
+    // log all the orphaned files
+    orphanedFiles.forEach(f -> logger.info("Orphaned file: {}", f));
 
     if (orphanedFiles.isEmpty()) {
       logger.info("No orphaned files found at {}!", location);
