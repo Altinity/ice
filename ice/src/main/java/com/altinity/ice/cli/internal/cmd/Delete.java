@@ -58,8 +58,6 @@ public final class Delete {
       for (FileScanTask task : tasks) {
         filesToDelete.add(task.file());
       }
-    } catch (Exception e) {
-      throw e;
     }
 
     if (!filesToDelete.isEmpty()) {
