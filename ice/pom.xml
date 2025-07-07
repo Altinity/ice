@@ -563,5 +563,42 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>native</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>${native.maven.plugin.version}</version>
+            <extensions>true</extensions>
+            <executions>
+              <execution>
+                <id>build-native</id>
+                <goals>
+                  <goal>compile-no-fork</goal>
+                </goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+            <configuration>
+              <imageName>ice</imageName>
+              <mainClass>com.altinity.ice.cli.Main</mainClass>
+              <buildArgs>
+                <buildArg>--initialize-at-build-time=ch.qos.logback</buildArg>
+                <buildArg>-H:ReflectionConfigurationFiles=src/main/resources/reflection-config.json</buildArg>
+                <buildArg>--trace-class-initialization=ch.qos.logback.classic.Logger</buildArg>
+                <buildArg>--trace-object-instantiation=ch.qos.logback.core.AsyncAppenderBase$Worker</buildArg>
+                <buildArg>--trace-object-instantiation=ch.qos.logback.classic.Logger</buildArg>
+                <buildArg>--initialize-at-run-time=io.netty.channel.ChannelHandlerMask</buildArg>
+                <buildArg>--initialize-at-build-time=ch.qos.logback.classic.Logger</buildArg>
+                <buildArg>--initialize-at-build-time=com.altinity.ice.internal.logback.ColorAwarePatternLayout</buildArg>
+              </buildArgs>
+
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 </project>
