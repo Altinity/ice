@@ -131,12 +131,6 @@ public class MaintenanceScheduler {
             table.rewriteManifests().rewriteIf(manifest -> true).commit();
             table.expireSnapshots().expireOlderThan(olderThanMillis).commit();
 
-            if (orphanFileExpirationDays == 0) {
-              logger.info(
-                  "Skipping orphan file removal for table {} since orphanFileExpirationDays config was not set",
-                  tableIdent);
-              continue;
-            }
             long orphanCutOffMillis =
                 System.currentTimeMillis() - TimeUnit.DAYS.toMillis(orphanFileExpirationDays);
             // Remove orphans only for S3-based tables

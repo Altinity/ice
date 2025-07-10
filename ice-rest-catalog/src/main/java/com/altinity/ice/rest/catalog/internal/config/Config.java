@@ -64,6 +64,7 @@ public record Config(
 
   private static final String DEFAULT_ADDR = "0.0.0.0:5000";
   private static final String DEFAULT_DEBUG_ADDR = "0.0.0.0:5001";
+  private static final int DEFAULT_ORPHAN_FILE_EXPIRATION_DAYS = 10;
 
   @JsonCreator
   public Config(
@@ -93,7 +94,10 @@ public record Config(
         Objects.requireNonNullElse(anonymousAccess, new AnonymousAccess(false, null));
     this.maintenanceSchedule = maintenanceSchedule;
     this.snapshotTTLInDays = snapshotTTLInDays;
-    this.orphanFileExpirationDays = orphanFileExpirationDays;
+    this.orphanFileExpirationDays =
+        orphanFileExpirationDays == 0
+            ? DEFAULT_ORPHAN_FILE_EXPIRATION_DAYS
+            : orphanFileExpirationDays;
     this.loadTableProperties = Objects.requireNonNullElse(loadTableProperties, Map.of());
     this.icebergProperties = Objects.requireNonNullElse(icebergProperties, Map.of());
   }
