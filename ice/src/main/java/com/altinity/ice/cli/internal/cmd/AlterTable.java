@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -28,8 +29,8 @@ public class AlterTable {
   private AlterTable() {}
 
   public enum OperationType {
-    ADD("add"),
-    DROP("drop");
+    ADD("add column"),
+    DROP("drop column");
 
     private final String key;
 
@@ -51,6 +52,11 @@ public class AlterTable {
     }
   }
 
+  public record ColumnDefinition(
+      @JsonProperty("column_name") String columnName,
+      @JsonProperty("type") String type,
+      @JsonProperty("comment") String comment) {}
+
   public static void run(
       Catalog catalog, TableIdentifier tableId, List<Map<String, String>> operations)
       throws IOException {
@@ -68,10 +74,12 @@ public class AlterTable {
 
       switch (operationType) {
         case ADD:
-          String columnDefinition = operation.get(OperationType.ADD.getKey());
-          ColumnSpec columnSpec = parseColumnDefinition(columnDefinition);
-          updateSchema.addColumn(columnSpec.name, columnSpec.type, columnSpec.comment);
-          logger.info("Adding column '{}' to table: {}", columnSpec.name, tableId);
+          String columnDefinitionJson = operation.get(OperationType.ADD.getKey());
+          ColumnDefinition columnDef = parseColumnDefinitionJson(columnDefinitionJson);
+          Types.NestedField field =
+              parseColumnType(columnDef.columnName(), columnDef.type(), columnDef.comment());
+          updateSchema.addColumn(columnDef.columnName(), field.type(), columnDef.comment());
+          logger.info("Adding column '{}' to table: {}", columnDef.columnName(), tableId);
           break;
         case DROP:
           String columnName = operation.get(OperationType.DROP.getKey());
@@ -123,20 +131,26 @@ public class AlterTable {
     return OperationType.fromKey(key);
   }
 
-  private static ColumnSpec parseColumnDefinition(String columnDefinition) {
-    String[] parts = columnDefinition.split(":");
-    if (parts.length < 2) {
+  static ColumnDefinition parseColumnDefinitionJson(String columnDefinitionJson) {
+    try {
+      com.fasterxml.jackson.databind.ObjectMapper mapper =
+          new com.fasterxml.jackson.databind.ObjectMapper();
+      ColumnDefinition columnDef = mapper.readValue(columnDefinitionJson, ColumnDefinition.class);
+
+      if (columnDef.columnName() == null || columnDef.columnName().trim().isEmpty()) {
+        throw new IllegalArgumentException("column_name is required and cannot be empty");
+      }
+
+      if (columnDef.type() == null || columnDef.type().trim().isEmpty()) {
+        throw new IllegalArgumentException("type is required and cannot be empty");
+      }
+
+      return columnDef;
+    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
       throw new IllegalArgumentException(
-          "Invalid column definition format. Expected: name:type[:comment] (e.g. 'age:int:User age')");
+          "Invalid JSON format for column definition. Expected: {\"column_name\": \"name\", \"type\": \"int\", \"comment\": \"optional comment\"}. Error: "
+              + e.getMessage());
     }
-
-    String columnName = parts[0];
-    String columnType = parts[1];
-    String comment = parts.length > 2 ? parts[2] : null;
-
-    Types.NestedField field = parseColumnType(columnName, columnType, comment);
-
-    return new ColumnSpec(columnName, field.type(), comment);
   }
 
   private static Types.NestedField parseColumnType(String name, String type, String comment) {
@@ -184,17 +198,5 @@ public class AlterTable {
     }
 
     return field;
-  }
-
-  private static class ColumnSpec {
-    final String name;
-    final org.apache.iceberg.types.Type type;
-    final String comment;
-
-    ColumnSpec(String name, org.apache.iceberg.types.Type type, String comment) {
-      this.name = name;
-      this.type = type;
-      this.comment = comment;
-    }
   }
 }
