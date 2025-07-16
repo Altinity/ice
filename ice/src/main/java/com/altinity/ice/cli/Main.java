@@ -433,7 +433,7 @@ public final class Main {
   @CommandLine.Command(
       name = "alter-table",
       description =
-          "Alter table schema by adding or dropping columns. Supported operations: add column, drop column. Example: ice alter-table ns1.table1 --operations '[{\"add column\": \"{\\\"column_name\\\": \\\"age\\\", \\\"type\\\": \\\"int\\\", \\\"comment\\\": \\\"User age\\\"}\"}, {\"drop column\": \"col_name\"}]'")
+          "Alter table schema by adding or dropping columns. Supported operations: add column, drop column. Example: ice alter-table ns1.table1 --operations '[{\"operation\": \"add column\", \"column_name\": \"age\", \"type\": \"int\", \"comment\": \"user age\"}]'")
   void alterTable(
       @CommandLine.Parameters(
               arity = "1",
@@ -444,7 +444,7 @@ public final class Main {
               names = {"--operations"},
               required = true,
               description =
-                  "JSON array of operations: [{'add column': '{\"column_name\": \"age\", \"type\": \"int\", \"comment\": \"User age\"}'}, {'drop column': 'col_name'}]")
+                  "JSON array of operations: [{'operation': 'add column', 'column_name': 'age', 'type': 'int', 'comment': 'user age'}, {'operation': 'drop column', 'column_name': 'col_name'}]")
           String operationsJson)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
