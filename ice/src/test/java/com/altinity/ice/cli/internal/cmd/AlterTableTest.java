@@ -12,6 +12,8 @@ package com.altinity.ice.cli.internal.cmd;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.testng.annotations.Test;
 
 public class AlterTableTest {
@@ -19,8 +21,14 @@ public class AlterTableTest {
   @Test
   public void testParseColumnDefinitionJson() {
     // Test valid JSON with all fields
-    String validJson = "{\"column_name\": \"age\", \"type\": \"int\", \"comment\": \"User age\"}";
-    AlterTable.ColumnDefinition columnDef = AlterTable.parseColumnDefinitionJson(validJson);
+    String validJson =
+        "{\"operation\": \"add column\", \"column_name\": \"age\", \"type\": \"int\", \"comment\": \"User age\"}";
+    Map<String, String> operation = new HashMap<>();
+    operation.put("operation", "add column");
+    operation.put("column_name", "age");
+    operation.put("type", "int");
+    operation.put("comment", "User age");
+    AlterTable.ColumnDefinition columnDef = AlterTable.parseColumnDefinitionMap(operation);
 
     assertEquals(columnDef.columnName(), "age");
     assertEquals(columnDef.type(), "int");
@@ -30,8 +38,13 @@ public class AlterTableTest {
   @Test
   public void testParseColumnDefinitionJsonWithoutComment() {
     // Test valid JSON without comment
-    String validJson = "{\"column_name\": \"name\", \"type\": \"string\"}";
-    AlterTable.ColumnDefinition columnDef = AlterTable.parseColumnDefinitionJson(validJson);
+    String validJson =
+        "{\"operation\": \"add column\", \"column_name\": \"name\", \"type\": \"string\"}";
+    Map<String, String> operation = new HashMap<>();
+    operation.put("operation", "add column");
+    operation.put("column_name", "name");
+    operation.put("type", "string");
+    AlterTable.ColumnDefinition columnDef = AlterTable.parseColumnDefinitionMap(operation);
 
     assertEquals(columnDef.columnName(), "name");
     assertEquals(columnDef.type(), "string");
@@ -41,36 +54,61 @@ public class AlterTableTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonMissingColumnName() {
     // Test JSON missing column_name
-    String invalidJson = "{\"type\": \"int\", \"comment\": \"User age\"}";
-    AlterTable.parseColumnDefinitionJson(invalidJson);
+    String invalidJson =
+        "{\"operation\": \"add column\", \"type\": \"int\", \"comment\": \"User age\"}";
+    Map<String, String> operation = new HashMap<>();
+    operation.put("operation", "add column");
+    operation.put("type", "int");
+    operation.put("comment", "User age");
+    AlterTable.parseColumnDefinitionMap(operation);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonMissingType() {
     // Test JSON missing type
-    String invalidJson = "{\"column_name\": \"age\", \"comment\": \"User age\"}";
-    AlterTable.parseColumnDefinitionJson(invalidJson);
+    String invalidJson =
+        "{\"operation\": \"add column\", \"column_name\": \"age\", \"comment\": \"User age\"}";
+    Map<String, String> operation = new HashMap<>();
+    operation.put("operation", "add column");
+    operation.put("column_name", "age");
+    operation.put("comment", "User age");
+    AlterTable.parseColumnDefinitionMap(operation);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonEmptyColumnName() {
     // Test JSON with empty column_name
-    String invalidJson = "{\"column_name\": \"\", \"type\": \"int\"}";
-    AlterTable.parseColumnDefinitionJson(invalidJson);
+    String invalidJson =
+        "{\"operation\": \"add column\", \"column_name\": \"\", \"type\": \"int\"}";
+    Map<String, String> operation = new HashMap<>();
+    operation.put("operation", "add column");
+    operation.put("column_name", "");
+    operation.put("type", "int");
+    AlterTable.parseColumnDefinitionMap(operation);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonEmptyType() {
     // Test JSON with empty type
-    String invalidJson = "{\"column_name\": \"age\", \"type\": \"\"}";
-    AlterTable.parseColumnDefinitionJson(invalidJson);
+    String invalidJson =
+        "{\"operation\": \"add column\", \"column_name\": \"age\", \"type\": \"\"}";
+    Map<String, String> operation = new HashMap<>();
+    operation.put("operation", "add column");
+    operation.put("column_name", "age");
+    operation.put("type", "");
+    AlterTable.parseColumnDefinitionMap(operation);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonInvalidJson() {
-    // Test invalid JSON format
-    String invalidJson = "{\"column_name\": \"age\", \"type\": \"int\"";
-    AlterTable.parseColumnDefinitionJson(invalidJson);
+    // Test invalid JSON format (missing closing brace)
+    String invalidJson =
+        "{\"operation\": \"add column\", \"column_name\": \"age\", \"type\": \"int\"";
+    Map<String, String> operation = new HashMap<>();
+    operation.put("operation2", "add column");
+    operation.put("column_name", "age");
+    operation.put("type", "int");
+    AlterTable.parseColumnDefinitionMap(operation);
   }
 
   @Test
@@ -82,5 +120,19 @@ public class AlterTableTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testOperationTypeFromKeyInvalid() {
     AlterTable.OperationType.fromKey("invalid");
+  }
+
+  @Test
+  public void testParseColumnDefinitionMapForDropColumn() {
+    // Test drop column operation - only needs column_name
+    Map<String, String> operation = new HashMap<>();
+    operation.put("operation", "drop column");
+    operation.put("column_name", "age");
+    AlterTable.ColumnDefinition columnDef = AlterTable.parseColumnDefinitionMap(operation);
+
+    assertEquals(columnDef.operation(), "drop column");
+    assertEquals(columnDef.columnName(), "age");
+    assertNull(columnDef.type());
+    assertNull(columnDef.comment());
   }
 }

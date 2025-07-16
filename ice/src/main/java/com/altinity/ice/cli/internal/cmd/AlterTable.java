@@ -53,6 +53,7 @@ public class AlterTable {
   }
 
   public record ColumnDefinition(
+      @JsonProperty("operation") String operation,
       @JsonProperty("column_name") String columnName,
       @JsonProperty("type") String type,
       @JsonProperty("comment") String comment) {}
@@ -68,28 +69,26 @@ public class AlterTable {
     UpdateSchema updateSchema = transaction.updateSchema();
 
     for (Map<String, String> operation : operations) {
-      validateOperation(operation);
 
-      OperationType operationType = getOperationType(operation);
+      // get the operation type
+      ColumnDefinition columnDef = parseColumnDefinitionMap(operation);
+      OperationType operationType = OperationType.fromKey(columnDef.operation());
 
       switch (operationType) {
         case ADD:
-          String columnDefinitionJson = operation.get(OperationType.ADD.getKey());
-          ColumnDefinition columnDef = parseColumnDefinitionJson(columnDefinitionJson);
           Types.NestedField field =
               parseColumnType(columnDef.columnName(), columnDef.type(), columnDef.comment());
           updateSchema.addColumn(columnDef.columnName(), field.type(), columnDef.comment());
           logger.info("Adding column '{}' to table: {}", columnDef.columnName(), tableId);
           break;
         case DROP:
-          String columnName = operation.get(OperationType.DROP.getKey());
           // Validate that the column exists
-          if (table.schema().findField(columnName) == null) {
+          if (table.schema().findField(columnDef.columnName()) == null) {
             throw new IllegalArgumentException(
-                "Column '" + columnName + "' does not exist in table: " + tableId);
+                "Column '" + columnDef.columnName() + "' does not exist in table: " + tableId);
           }
-          updateSchema.deleteColumn(columnName);
-          logger.info("Dropping column '{}' from table: {}", columnName, tableId);
+          updateSchema.deleteColumn(columnDef.columnName());
+          logger.info("Dropping column '{}' from table: {}", columnDef.columnName(), tableId);
           break;
         default:
           throw new IllegalArgumentException("Unsupported operation type: " + operationType);
@@ -131,25 +130,33 @@ public class AlterTable {
     return OperationType.fromKey(key);
   }
 
-  static ColumnDefinition parseColumnDefinitionJson(String columnDefinitionJson) {
+  static ColumnDefinition parseColumnDefinitionMap(Map<String, String> operationMap) {
     try {
-      com.fasterxml.jackson.databind.ObjectMapper mapper =
-          new com.fasterxml.jackson.databind.ObjectMapper();
-      ColumnDefinition columnDef = mapper.readValue(columnDefinitionJson, ColumnDefinition.class);
+      String operation = operationMap.get("operation");
+      String columnName = operationMap.get("column_name");
+      String type = operationMap.get("type");
+      String comment = operationMap.get("comment");
 
-      if (columnDef.columnName() == null || columnDef.columnName().trim().isEmpty()) {
+      if (operation == null || operation.trim().isEmpty()) {
+        throw new IllegalArgumentException("operation is required and cannot be empty");
+      }
+
+      if (columnName == null || columnName.trim().isEmpty()) {
         throw new IllegalArgumentException("column_name is required and cannot be empty");
       }
 
-      if (columnDef.type() == null || columnDef.type().trim().isEmpty()) {
-        throw new IllegalArgumentException("type is required and cannot be empty");
+      // For drop column operations, type is not required
+      OperationType operationType = OperationType.fromKey(operation);
+      if (operationType == OperationType.ADD) {
+        if (type == null || type.trim().isEmpty()) {
+          throw new IllegalArgumentException(
+              "type is required and cannot be empty for add column operations");
+        }
       }
 
-      return columnDef;
-    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-      throw new IllegalArgumentException(
-          "Invalid JSON format for column definition. Expected: {\"column_name\": \"name\", \"type\": \"int\", \"comment\": \"optional comment\"}. Error: "
-              + e.getMessage());
+      return new ColumnDefinition(operation, columnName, type, comment);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Invalid column definition: " + e.getMessage());
     }
   }
 

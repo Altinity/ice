@@ -56,6 +56,12 @@ ice delete nyc.taxis --dry-run=false
 # inspect
 ice describe
 
+# Alter table (add column)
+ice alter-table flowers.iris --operations '[{"operation": "add column", "column_name": "age", "type": "int", "comment": "user age"}]'
+
+# Alter table (drop column)
+alter-table flowers.iris --operations '[{"operation": "drop column", "column_name": "age"}]'
+
 # open ClickHouse shell, then try SQL below 
 clickhouse local
 ```
@@ -77,7 +83,7 @@ CREATE DATABASE ice
     storage_endpoint = 'http://localhost:9000', 
     warehouse = 's3://bucket1';
 
--- inspect
+-- inspect  
 SHOW DATABASES;
 SHOW TABLES FROM ice;
 SHOW CREATE TABLE ice.`nyc.taxis`;
