@@ -13,7 +13,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateSchema;
@@ -25,6 +24,12 @@ import org.slf4j.LoggerFactory;
 
 public class AlterTable {
   private static final Logger logger = LoggerFactory.getLogger(AlterTable.class);
+
+  // Static constants for column definition keys
+  private static final String OPERATION_KEY = "operation";
+  private static final String COLUMN_NAME_KEY = "column_name";
+  private static final String TYPE_KEY = "type";
+  private static final String COMMENT_KEY = "comment";
 
   private AlterTable() {}
 
@@ -101,48 +106,19 @@ public class AlterTable {
     logger.info("Successfully applied {} operations to table: {}", operations.size(), tableId);
   }
 
-  private static void validateOperation(Map<String, String> operation) {
-    if (operation == null || operation.isEmpty()) {
-      throw new IllegalArgumentException("Operation cannot be null or empty");
-    }
-
-    Set<String> keys = operation.keySet();
-    if (keys.size() != 1) {
-      throw new IllegalArgumentException(
-          "Each operation must contain exactly one key. Found keys: " + keys);
-    }
-
-    String key = keys.iterator().next();
-    try {
-      OperationType.fromKey(key);
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException(
-          "Invalid operation. Supported operations: "
-              + java.util.Arrays.stream(OperationType.values())
-                  .map(OperationType::getKey)
-                  .reduce((a, b) -> a + ", " + b)
-                  .orElse("none"));
-    }
-  }
-
-  private static OperationType getOperationType(Map<String, String> operation) {
-    String key = operation.keySet().iterator().next();
-    return OperationType.fromKey(key);
-  }
-
   static ColumnDefinition parseColumnDefinitionMap(Map<String, String> operationMap) {
     try {
-      String operation = operationMap.get("operation");
-      String columnName = operationMap.get("column_name");
-      String type = operationMap.get("type");
-      String comment = operationMap.get("comment");
+      String operation = operationMap.get(OPERATION_KEY);
+      String columnName = operationMap.get(COLUMN_NAME_KEY);
+      String type = operationMap.get(TYPE_KEY);
+      String comment = operationMap.get(COMMENT_KEY);
 
       if (operation == null || operation.trim().isEmpty()) {
-        throw new IllegalArgumentException("operation is required and cannot be empty");
+        throw new IllegalArgumentException(OPERATION_KEY + " is required and cannot be empty");
       }
 
       if (columnName == null || columnName.trim().isEmpty()) {
-        throw new IllegalArgumentException("column_name is required and cannot be empty");
+        throw new IllegalArgumentException(COLUMN_NAME_KEY + " is required and cannot be empty");
       }
 
       // For drop column operations, type is not required
@@ -150,7 +126,11 @@ public class AlterTable {
       if (operationType == OperationType.ADD) {
         if (type == null || type.trim().isEmpty()) {
           throw new IllegalArgumentException(
-              "type is required and cannot be empty for add column operations");
+              TYPE_KEY + " is required and cannot be empty for add column operations");
+        }
+        if (comment == null || comment.trim().isEmpty()) {
+          throw new IllegalArgumentException(
+              COMMENT_KEY + " is required and cannot be empty for add column operations");
         }
       }
 
