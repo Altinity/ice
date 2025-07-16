@@ -20,9 +20,7 @@ public class AlterTableTest {
 
   @Test
   public void testParseColumnDefinitionJson() {
-    // Test valid JSON with all fields
-    String validJson =
-        "{\"operation\": \"add column\", \"column_name\": \"age\", \"type\": \"int\", \"comment\": \"User age\"}";
+
     Map<String, String> operation = new HashMap<>();
     operation.put("operation", "add column");
     operation.put("column_name", "age");
@@ -35,11 +33,9 @@ public class AlterTableTest {
     assertEquals(columnDef.comment(), "User age");
   }
 
-  @Test
+  @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonWithoutComment() {
-    // Test valid JSON without comment
-    String validJson =
-        "{\"operation\": \"add column\", \"column_name\": \"name\", \"type\": \"string\"}";
+
     Map<String, String> operation = new HashMap<>();
     operation.put("operation", "add column");
     operation.put("column_name", "name");
@@ -53,9 +49,7 @@ public class AlterTableTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonMissingColumnName() {
-    // Test JSON missing column_name
-    String invalidJson =
-        "{\"operation\": \"add column\", \"type\": \"int\", \"comment\": \"User age\"}";
+
     Map<String, String> operation = new HashMap<>();
     operation.put("operation", "add column");
     operation.put("type", "int");
@@ -65,9 +59,7 @@ public class AlterTableTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonMissingType() {
-    // Test JSON missing type
-    String invalidJson =
-        "{\"operation\": \"add column\", \"column_name\": \"age\", \"comment\": \"User age\"}";
+
     Map<String, String> operation = new HashMap<>();
     operation.put("operation", "add column");
     operation.put("column_name", "age");
@@ -77,9 +69,7 @@ public class AlterTableTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonEmptyColumnName() {
-    // Test JSON with empty column_name
-    String invalidJson =
-        "{\"operation\": \"add column\", \"column_name\": \"\", \"type\": \"int\"}";
+
     Map<String, String> operation = new HashMap<>();
     operation.put("operation", "add column");
     operation.put("column_name", "");
@@ -89,9 +79,7 @@ public class AlterTableTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonEmptyType() {
-    // Test JSON with empty type
-    String invalidJson =
-        "{\"operation\": \"add column\", \"column_name\": \"age\", \"type\": \"\"}";
+
     Map<String, String> operation = new HashMap<>();
     operation.put("operation", "add column");
     operation.put("column_name", "age");
@@ -101,9 +89,7 @@ public class AlterTableTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseColumnDefinitionJsonInvalidJson() {
-    // Test invalid JSON format (missing closing brace)
-    String invalidJson =
-        "{\"operation\": \"add column\", \"column_name\": \"age\", \"type\": \"int\"";
+
     Map<String, String> operation = new HashMap<>();
     operation.put("operation2", "add column");
     operation.put("column_name", "age");
@@ -124,6 +110,7 @@ public class AlterTableTest {
 
   @Test
   public void testParseColumnDefinitionMapForDropColumn() {
+
     // Test drop column operation - only needs column_name
     Map<String, String> operation = new HashMap<>();
     operation.put("operation", "drop column");
