@@ -410,7 +410,7 @@ public final class Insert {
       throw new BadRequestException(
           file + " cannot be added to catalog without copy"); // TODO: explain
     }
-    
+
     long dataFileSizeInBytes;
 
     var start = System.currentTimeMillis();
@@ -421,12 +421,12 @@ public final class Insert {
       }
       dataFileSizeInBytes = inputFile.getLength();
       // check if partition spec is defined.
-      if(tableSpec.isPartitioned()) {
+      if (tableSpec.isPartitioned()) {
         // For partitioned tables with no-copy, we need to create DataFile objects
         // that reference the original file with the table's partition spec
         MetricsConfig metricsConfig = MetricsConfig.forTable(table);
         Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
-        return createNoCopyPartitionedDataFiles(file, tableSchema, tableSpec, tableOrderSpec, inputFile, metrics);
+        return createNoCopyPartitionedDataFiles(file, tableSpec, inputFile, metrics);
       }
     } else if (options.s3CopyObject()) {
       if (!dataFile.startsWith("s3://") || !table.location().startsWith("s3://")) {
@@ -502,41 +502,33 @@ public final class Insert {
     return Collections.singletonList(dataFileObj);
   }
 
-    /**
-   * Creates DataFile objects for no-copy scenarios with partitioning.
-   * This function uses the PartitionSpec and SortOrder objects directly
-   * to create DataFile objects with partition metadata without copying the actual data.
+  /**
+   * Creates DataFile objects for no-copy scenarios with partitioning. This function uses the
+   * PartitionSpec and SortOrder objects directly to create DataFile objects with partition metadata
+   * without copying the actual data.
    */
   private static List<DataFile> createNoCopyPartitionedDataFiles(
-      String file,
-      Schema tableSchema,
-      PartitionSpec tableSpec,
-      SortOrder tableOrderSpec,
-      InputFile inputFile,
-      Metrics metrics) throws IOException {
-    
+      String file, PartitionSpec tableSpec, InputFile inputFile, Metrics metrics) {
+
     List<DataFile> dataFiles = new ArrayList<>();
-    
+
     // For no-copy with partitioning, we create a DataFile that references the original file
     // The partition information will be determined by the table's partition spec
     // and the actual partition values will be computed when the file is read
-    
-    DataFile dataFile = DataFiles.builder(tableSpec)
-        .withPath(file)
-        .withFormat(FileFormat.PARQUET)
-        .withFileSizeInBytes(inputFile.getLength())
-        .withMetrics(metrics)
-        .build();
-    
+
+    DataFile dataFile =
+        DataFiles.builder(tableSpec)
+            .withPath(file)
+            .withFormat(FileFormat.PARQUET)
+            .withFileSizeInBytes(inputFile.getLength())
+            .withMetrics(metrics)
+            .build();
+
     dataFiles.add(dataFile);
     logger.info("{}: created data file for no-copy with partition spec: {}", file, tableSpec);
-    
+
     return dataFiles;
   }
-  
-
-  
-
 
   private static List<DataFile> copyParquetWithPartition(
       String file,
