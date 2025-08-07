@@ -426,7 +426,7 @@ public final class Insert {
         // that reference the original file with the table's partition spec
         MetricsConfig metricsConfig = MetricsConfig.forTable(table);
         Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
-        return createNoCopyPartitionedDataFiles(file, tableSpec, inputFile, metrics);
+        return createNoCopyPartitionedDataFiles(dataFile, tableSpec, inputFile, metrics);
       }
     } else if (options.s3CopyObject()) {
       if (!dataFile.startsWith("s3://") || !table.location().startsWith("s3://")) {
@@ -503,31 +503,122 @@ public final class Insert {
   }
 
   /**
-   * Creates DataFile objects for no-copy scenarios with partitioning. This function uses the
-   * PartitionSpec and SortOrder objects directly to create DataFile objects with partition metadata
-   * without copying the actual data.
+   * Creates DataFile objects for no-copy scenarios with partitioning. This function extracts
+   * partition keys from the InputFile and creates DataFile objects with partition metadata.
    */
   private static List<DataFile> createNoCopyPartitionedDataFiles(
       String file, PartitionSpec tableSpec, InputFile inputFile, Metrics metrics) {
 
     List<DataFile> dataFiles = new ArrayList<>();
 
-    // For no-copy with partitioning, we create a DataFile that references the original file
-    // The partition information will be determined by the table's partition spec
-    // and the actual partition values will be computed when the file is read
+    try {
+      // Extract partition keys from the InputFile
+      PartitionKey partitionKey = extractPartitionKeyFromFile(inputFile, tableSpec);
 
-    DataFile dataFile =
-        DataFiles.builder(tableSpec)
-            .withPath(file)
-            .withFormat(FileFormat.PARQUET)
-            .withFileSizeInBytes(inputFile.getLength())
-            .withMetrics(metrics)
-            .build();
+      // Validate that we have a valid partition key
+      if (partitionKey != null && tableSpec.fields().size() > 0) {
+        DataFile dataFile =
+            DataFiles.builder(tableSpec)
+                .withPartition(partitionKey)
+                .withPath(file)
+                .withFormat(FileFormat.PARQUET)
+                .withFileSizeInBytes(inputFile.getLength())
+                .withMetrics(metrics)
+                .build();
 
-    dataFiles.add(dataFile);
-    logger.info("{}: created data file for no-copy with partition spec: {}", file, tableSpec);
+        dataFiles.add(dataFile);
+        logger.info("{}: created partitioned data file with partition key: {}", file, partitionKey);
+      } else {
+        throw new IOException("Invalid partition key extracted from file");
+      }
+
+    } catch (Exception e) {
+      logger.warn(
+          "{}: could not extract partition key from file, creating unpartitioned data file",
+          file,
+          e);
+
+      // Fallback to unpartitioned data file
+      DataFile dataFile =
+          DataFiles.builder(tableSpec)
+              .withPath(file)
+              .withFormat(FileFormat.PARQUET)
+              .withFileSizeInBytes(inputFile.getLength())
+              .withMetrics(metrics)
+              .build();
+
+      dataFiles.add(dataFile);
+    }
 
     return dataFiles;
+  }
+
+  /** Extracts partition key from InputFile by reading a sample of records. */
+  private static PartitionKey extractPartitionKeyFromFile(
+      InputFile inputFile, PartitionSpec tableSpec) throws IOException {
+    // Read the first record to extract partition values
+    Parquet.ReadBuilder readBuilder =
+        Parquet.read(inputFile)
+            .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSpec.schema(), s))
+            .project(tableSpec.schema());
+
+    try (CloseableIterable<Record> records = readBuilder.build()) {
+      for (Record record : records) {
+        // Create partition key from the first record
+        PartitionKey partitionKey = new PartitionKey(tableSpec, tableSpec.schema());
+
+        logger.debug(
+            "Extracting partition key from record with {} partition fields",
+            tableSpec.fields().size());
+
+        for (PartitionField field : tableSpec.fields()) {
+          try {
+            String fieldName = tableSpec.schema().findField(field.sourceId()).name();
+            Object value = record.getField(fieldName);
+
+            logger.debug(
+                "Field: {}, SourceId: {}, Value: {}", field.name(), field.sourceId(), value);
+
+            if (value != null) {
+              // Convert value based on partition transform
+              Object convertedValue = convertValueForPartition(value, field);
+              partitionKey.set(field.sourceId(), convertedValue);
+              logger.debug("Set partition value for field {}: {}", field.name(), convertedValue);
+            }
+          } catch (Exception e) {
+            logger.warn(
+                "Could not extract partition value for field {}: {}", field.name(), e.getMessage());
+            // Continue with other fields instead of failing completely
+          }
+        }
+
+        return partitionKey;
+      }
+    }
+
+    throw new IOException("No records found in file to extract partition key");
+  }
+
+  /** Converts a field value to the appropriate type for partition key based on transform. */
+  private static Object convertValueForPartition(Object value, PartitionField field) {
+    String transformName = field.transform().toString();
+
+    switch (transformName) {
+      case "identity":
+        return value;
+      case "day":
+      case "month":
+      case "hour":
+        // For time-based partitions, convert to micros
+        try {
+          return toPartitionMicros(value);
+        } catch (Exception e) {
+          logger.warn("Could not convert value '{}' for field '{}' to micros", value, field.name());
+          return value;
+        }
+      default:
+        return value;
+    }
   }
 
   private static List<DataFile> copyParquetWithPartition(
