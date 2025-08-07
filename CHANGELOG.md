@@ -5,7 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/altinity/ice/compare/v0.4.0...master)
+## [Unreleased](https://github.com/altinity/ice/compare/v0.5.0...master)
+
+## [0.5.0](https://github.com/altinity/ice/compare/v0.4.0...v0.5.0)
+
+### Added
+- ice: Support for `ice insert` in watch mode. See [examples/s3watch](examples/s3watch) for details.
+- ice-rest-catalog: `MANIFEST_COMPACTION`, `DATA_COMPACTION`, `SNAPSHOT_CLEANUP` and `ORPHAN_CLEANUP` maintenance routines. These
+can be enabled either via ice-rest-catalog.yaml/maintenance section or performed ad-hoc via `ice-rest-catalog perform-maintenance`. 
+- ice: `ice delete` command.
+
+### Changed
+- ice: `ice delete-table` not to delete any data unless `--purge` is specified.
+- ice-rest-catalog: catalog maintenance config section. `snapshotTTLInDays` moved to `maintenance.snapshotTTLInDays`.
+
+### Fixed
+- ice: Partitioning metadata missing when data is inserted with `--no-copy` or `--s3-copy-object`.
+- ice: `NULLS_FIRST`/`NULLS_LAST` being ignored when sorting.
+- ice: Path construction in `localfileio`.  
 
 ## [0.4.0](https://github.com/altinity/ice/compare/v0.3.1...v0.4.0)
 

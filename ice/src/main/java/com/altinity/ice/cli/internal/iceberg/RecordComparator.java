@@ -10,6 +10,7 @@
 package com.altinity.ice.cli.internal.iceberg;
 
 import java.util.Comparator;
+import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.SortDirection;
 import org.apache.iceberg.SortField;
@@ -38,12 +39,13 @@ public class RecordComparator implements Comparator<Record> {
 
       if (v1 == null && v2 == null) continue;
 
-      SortDirection direction = sf.field.direction();
-      if (v1 == null) return direction == SortDirection.ASC ? -1 : 1;
-      if (v2 == null) return direction == SortDirection.ASC ? 1 : -1;
+      NullOrder nullOrder = sf.field.nullOrder();
+      if (v1 == null) return nullOrder == NullOrder.NULLS_FIRST ? -1 : 1;
+      if (v2 == null) return nullOrder == NullOrder.NULLS_FIRST ? 1 : -1;
 
       int cmp = v1.compareTo(v2);
       if (cmp != 0) {
+        SortDirection direction = sf.field.direction();
         return direction == SortDirection.ASC ? cmp : -cmp;
       }
     }

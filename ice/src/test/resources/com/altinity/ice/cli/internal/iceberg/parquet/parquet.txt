@@ -1,0 +1,20 @@
+*.parquet in this directory generated with
+
+```sql
+CREATE TABLE t (
+  `t` Date,
+  `seq` UInt32,
+  `v` String,
+) ENGINE = MergeTree
+ORDER BY (t, seq);
+
+INSERT INTO t VALUES ('2019-01-01', 2, 'x') ('2019-01-01', 1, 'x');
+
+SELECT * FROM t INTO OUTFILE 'sample-001.parquet' FORMAT Parquet;
+
+TRUNCATE TABLE t;
+
+INSERT INTO t VALUES ('2019-01-01', 2, 'x') ('2019-01-02', 1, 'x');
+
+SELECT * FROM t INTO OUTFILE 'sample-002.parquet' FORMAT Parquet;
+```

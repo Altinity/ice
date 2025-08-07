@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.10.7/.schema/devbox.schema.json",
+  "packages": [
+    "awscli2@latest",
+    "terraform@1.12.2",
+    "jdk-headless@21.0.7+6"
+  ],
+  "env": {
+    "AT": "ice:examples/s3watch"
+  },
+  "shell": {
+    "init_hook": [
+      "export PATH=$(pwd):$(pwd)/.devbox/bin:$PATH",
+      "[ -f .devbox/bin/clickhouse ] || (curl https://clickhouse.com/ | sh && mv clickhouse .devbox/bin/)"
+    ]
+  }
+}
