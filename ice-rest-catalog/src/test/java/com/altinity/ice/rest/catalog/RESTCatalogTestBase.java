@@ -14,11 +14,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.altinity.ice.rest.catalog.internal.config.Config;
-import org.apache.iceberg.CatalogProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.iceberg.catalog.Catalog;
-import org.apache.iceberg.rest.RESTCatalog;
 import org.testcontainers.containers.GenericContainer;
 import org.eclipse.jetty.server.Server;
 import org.testng.annotations.AfterClass;
@@ -40,7 +38,6 @@ import static com.altinity.ice.rest.catalog.Main.createServer;
 public abstract class RESTCatalogTestBase {
 
   protected static final Logger logger = LoggerFactory.getLogger(RESTCatalogTestBase.class);
-  protected RESTCatalog restCatalog;
   protected Server server;
   
   @SuppressWarnings("rawtypes")
@@ -111,24 +108,11 @@ public abstract class RESTCatalogTestBase {
       Thread.sleep(100);
     }
     
-    // Create REST client to test the server - use base URL without /v1/config
-    Map<String, String> restClientProps = new HashMap<>();
-    restClientProps.put(CatalogProperties.URI, "http://localhost:8080");
-    
-    restCatalog = new RESTCatalog();
-    restCatalog.initialize("rest-catalog", restClientProps);
+    // Server is ready for CLI commands
   }
 
   @AfterClass
   public void tearDown() {
-    // Close the REST catalog client
-    if (restCatalog != null) {
-      try {
-        restCatalog.close();
-      } catch (Exception e) {
-        logger.error("Error closing REST catalog: {}", e.getMessage(), e);
-      }
-    }
     
     // Stop the REST catalog server
     if (server != null) {
