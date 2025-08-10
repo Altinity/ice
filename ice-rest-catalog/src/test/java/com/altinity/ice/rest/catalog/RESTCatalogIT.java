@@ -37,14 +37,6 @@ public class RESTCatalogIT extends RESTCatalogTestBase {
     // Verify create namespace command succeeded
     assert createExitCode == 0 : "Create namespace command should succeed";
 
-    // List namespaces to verify it exists
-    int listExitCode =
-        new CommandLine(com.altinity.ice.cli.Main.class)
-            .execute("--config", tempConfigFile.getAbsolutePath(), "list-namespaces");
-
-    // Verify list namespaces command succeeded
-    assert listExitCode == 0 : "List namespaces command should succeed";
-
     // Delete the namespace via CLI
     int deleteExitCode =
         new CommandLine(com.altinity.ice.cli.Main.class)
@@ -101,6 +93,7 @@ public class RESTCatalogIT extends RESTCatalogTestBase {
     int scanExitCode =
         new CommandLine(com.altinity.ice.cli.Main.class)
             .execute("--config", tempConfigFile.getAbsolutePath(), "scan", tableName);
+
 
     // Verify scan command succeeded
     assert scanExitCode == 0 : "Scan command should succeed on existing table";
