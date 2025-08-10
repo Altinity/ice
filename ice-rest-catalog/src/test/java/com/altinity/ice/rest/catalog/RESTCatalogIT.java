@@ -73,18 +73,45 @@ public class RESTCatalogIT extends RESTCatalogTestBase {
 
     assert createNsExitCode == 0 : "Create namespace command should succeed";
 
-    // Note: For this test, we'll test scan on a non-existent table to verify CLI behavior
-    // In a real scenario, the table would be created first
+    // Create table first using insert command with --create-table flag
+    // Use existing iris parquet file
+    String testParquetPath = "examples/localfileio/iris.parquet";
+    File testParquetFile = new File(testParquetPath);
+    if (!testParquetFile.exists()) {
+      // Try alternative path
+      testParquetFile = new File("../examples/localfileio/iris.parquet");
+    }
+    assert testParquetFile.exists()
+        : "Test parquet file should exist at " + testParquetFile.getAbsolutePath();
 
-    // Test CLI scan command (may fail gracefully on non-existent table)
+    // Create table and insert data
+    int insertExitCode =
+        new CommandLine(com.altinity.ice.cli.Main.class)
+            .execute(
+                "--config",
+                tempConfigFile.getAbsolutePath(),
+                "insert",
+                "--create-table",
+                tableName,
+                testParquetFile.getAbsolutePath());
+
+    assert insertExitCode == 0 : "Insert command should succeed to create table with data";
+
+    // Test CLI scan command on the table with data
     int scanExitCode =
         new CommandLine(com.altinity.ice.cli.Main.class)
             .execute("--config", tempConfigFile.getAbsolutePath(), "scan", tableName);
 
-    // Note: Scan on non-existent table may return non-zero exit code, which is expected
-    logger.info("ICE CLI scan command completed with exit code: {}", scanExitCode);
+    // Verify scan command succeeded
+    assert scanExitCode == 0 : "Scan command should succeed on existing table";
 
-    // Cleanup namespace
+    logger.info("ICE CLI scan command test successful on table with data");
+
+    // Cleanup - delete table first, then namespace
+    int deleteTableExitCode =
+        new CommandLine(com.altinity.ice.cli.Main.class)
+            .execute("--config", tempConfigFile.getAbsolutePath(), "delete-table", tableName);
+
     int deleteNsExitCode =
         new CommandLine(com.altinity.ice.cli.Main.class)
             .execute(
