@@ -42,13 +42,15 @@ public class RESTCatalogInsertIT extends RESTCatalogTestBase {
     assert testParquetFile.exists()
         : "Test parquet file should exist at " + testParquetFile.getAbsolutePath();
 
-    // Test CLI insert command with parquet file (this will create the table)
+    // Test CLI insert command with parquet file (using --create-table to create table if not
+    // exists)
     int exitCode =
         new CommandLine(com.altinity.ice.cli.Main.class)
             .execute(
                 "--config",
                 tempConfigFile.getAbsolutePath(),
                 "insert",
+                "--create-table",
                 tableName,
                 testParquetFile.getAbsolutePath());
 
@@ -101,13 +103,15 @@ public class RESTCatalogInsertIT extends RESTCatalogTestBase {
     assert testParquetFile.exists()
         : "Test parquet file should exist at " + testParquetFile.getAbsolutePath();
 
-    // Test CLI insert command with partitioning
+    // Test CLI insert command with partitioning (using --create-table to create table if not
+    // exists)
     int exitCode =
         new CommandLine(com.altinity.ice.cli.Main.class)
             .execute(
                 "--config",
                 tempConfigFile.getAbsolutePath(),
                 "insert",
+                "--create-table",
                 tableName,
                 testParquetFile.getAbsolutePath(),
                 "--partition=[{\"column\":\"variety\",\"transform\":\"identity\"}]");
