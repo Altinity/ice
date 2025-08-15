@@ -22,14 +22,17 @@ public final class DeleteTable {
 
   private DeleteTable() {}
 
-  public static void run(RESTCatalog catalog, TableIdentifier nsTable, boolean ignoreNotFound)
+  public static void run(
+      RESTCatalog catalog, TableIdentifier nsTable, boolean ignoreNotFound, boolean purge)
       throws IOException {
-    var purge = true; // FIXME
+    logger.info("Deleting table: {}", nsTable);
+
     if (!catalog.dropTable(nsTable, purge)) {
       if (!ignoreNotFound) {
         throw new NotFoundException(String.format("Table %s not found", nsTable));
       }
       logger.warn("Table {} not found", nsTable);
     }
+    logger.info("Deleted table: {} successfully", nsTable);
   }
 }

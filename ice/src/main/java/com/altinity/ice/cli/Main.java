@@ -387,10 +387,15 @@ public final class Main {
       @CommandLine.Option(
               names = {"-p"},
               description = "Ignore not found")
-          boolean ignoreNotFound)
+          boolean ignoreNotFound,
+      @CommandLine.Option(
+              names = {"--purge"},
+              description = "Purge table data completely (default: false)",
+              defaultValue = "false")
+          boolean purge)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
-      DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound);
+      DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound, purge);
     }
   }
 
