@@ -85,7 +85,7 @@ public final class Main implements Callable<Integer> {
 
   private Main() {}
 
-  private static Server createServer(
+  public static Server createServer(
       String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
     var s = createBaseServer(catalog, config, icebergConfig, true);
     ServerConnector connector = new ServerConnector(s);
