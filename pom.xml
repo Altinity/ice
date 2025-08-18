@@ -22,6 +22,9 @@
     <jackson.version>2.18.2</jackson.version>
     <slf4j.version>2.0.17</slf4j.version>
     <logback.version>1.5.18</logback.version>
+    <prometheus.version>1.3.6</prometheus.version>
+    <jetty.version>11.0.25</jetty.version>
+    <jakarta.version>6.1.0</jakarta.version>
     <!-- versions:test -->
     <testng.version>7.9.0</testng.version>
     <assertj.version>3.27.2</assertj.version>

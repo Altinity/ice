@@ -18,15 +18,18 @@ import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.Insert;
+import com.altinity.ice.cli.internal.cmd.InsertWatch;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
+import com.altinity.ice.internal.jetty.DebugServer;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -36,9 +39,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
+import org.apache.curator.shaded.com.google.common.net.HostAndPort;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.eclipse.jetty.server.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.AutoComplete;
@@ -271,10 +276,26 @@ public final class Main {
                   "Sort order, e.g. [{\"column\":\"name\", \"desc\":false, \"nullFirst\":false}]")
           String sortOrderJson,
       @CommandLine.Option(
+              names = {"--assume-sorted"},
+              description = "Skip data sorting. Assume it's already sorted.")
+          boolean assumeSorted,
+      @CommandLine.Option(
               names = {"--thread-count"},
               description = "Number of threads to use for inserting data",
               defaultValue = "-1")
-          int threadCount)
+          int threadCount,
+      @CommandLine.Option(
+              names = {"--watch"},
+              description = "Event queue. Supported: AWS SQS")
+          String watch,
+      @CommandLine.Option(
+              names = {"--watch-fire-once"},
+              description = "")
+          boolean watchFireOnce,
+      @CommandLine.Option(
+              names = {"--watch-debug-addr"},
+              description = "")
+          String watchDebugAddr)
       throws IOException, InterruptedException {
     if (s3NoSignRequest && s3CopyObject) {
       throw new UnsupportedOperationException(
@@ -305,7 +326,9 @@ public final class Main {
       }
 
       TableIdentifier tableId = TableIdentifier.parse(name);
-      if (createTableIfNotExists) {
+      boolean watchMode = !Strings.isNullOrEmpty(watch);
+
+      if (createTableIfNotExists && !watchMode) {
         CreateTable.run(
             catalog,
             tableId,
@@ -315,23 +338,46 @@ public final class Main {
             s3NoSignRequest,
             partitions,
             sortOrders);
+      } // delayed in watch mode
+
+      Insert.Options options =
+          Insert.Options.builder()
+              .dataFileNamingStrategy(dataFileNamingStrategy)
+              .skipDuplicates(skipDuplicates)
+              .noCommit(noCommit)
+              .noCopy(noCopy)
+              .forceNoCopy(forceNoCopy)
+              .forceTableAuth(forceTableAuth)
+              .s3NoSignRequest(s3NoSignRequest)
+              .s3CopyObject(s3CopyObject)
+              .assumeSorted(assumeSorted)
+              .retryListFile(retryList)
+              .partitionList(partitions)
+              .sortOrderList(sortOrders)
+              .threadCount(
+                  threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount)
+              .build();
+
+      if (!watchMode) {
+        Insert.run(catalog, tableId, dataFiles, options);
+      } else {
+        if (!Strings.isNullOrEmpty(watchDebugAddr)) {
+          JvmMetrics.builder().register();
+
+          HostAndPort debugHostAndPort = HostAndPort.fromString(watchDebugAddr);
+          Server debugServer =
+              DebugServer.create(debugHostAndPort.getHost(), debugHostAndPort.getPort());
+          try {
+            debugServer.start();
+          } catch (Exception e) {
+            throw new RuntimeException(e); // TODO: find a better one
+          }
+          logger.info("Serving http://{}/{metrics,healtz,livez,readyz}", debugHostAndPort);
+        }
+
+        InsertWatch.run(
+            catalog, tableId, dataFiles, watch, watchFireOnce, createTableIfNotExists, options);
       }
-      Insert.run(
-          catalog,
-          tableId,
-          dataFiles,
-          dataFileNamingStrategy,
-          skipDuplicates,
-          noCommit,
-          noCopy,
-          forceNoCopy,
-          forceTableAuth,
-          s3NoSignRequest,
-          s3CopyObject,
-          retryList,
-          partitions,
-          sortOrders,
-          threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
     }
   }
 
@@ -387,10 +433,14 @@ public final class Main {
       @CommandLine.Option(
               names = {"-p"},
               description = "Ignore not found")
-          boolean ignoreNotFound)
+          boolean ignoreNotFound,
+      @CommandLine.Option(
+              names = {"--purge"},
+              description = "Delete data")
+          boolean purge)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
-      DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound);
+      DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound, purge);
     }
   }
 
