@@ -62,20 +62,17 @@ public final class Delete {
 
     if (!filesToDelete.isEmpty()) {
       if (dryRun) {
-        logger.info("Dry run: The following files would be deleted:");
         for (DataFile file : filesToDelete) {
-          logger.info("  {}", file.path());
+          logger.info("To be deleted: {}", file.location());
         }
       } else {
         RewriteFiles rewrite = table.newRewrite();
         for (DataFile deleteFile : filesToDelete) {
+          logger.info("Deleting {}", deleteFile.location());
           rewrite.deleteFile(deleteFile);
         }
         rewrite.commit();
-        logger.info("Partition(s) deleted.");
       }
-    } else {
-      logger.info("No files found for the partition(s).");
     }
   }
 }

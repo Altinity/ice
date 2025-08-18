@@ -493,10 +493,14 @@ public final class Main {
           String partitionJson,
       @CommandLine.Option(
               names = "--dry-run",
-              description = "Log files that would be deleted without actually deleting them",
-              defaultValue = "true")
-          boolean dryRun)
+              description =
+                  "Log files that would be deleted without actually deleting them (true by default)")
+          Boolean dryRun)
       throws IOException {
+    if (dryRun == null) {
+      dryRun = true;
+    }
+
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
       List<PartitionFilter> partitions = new ArrayList<>();
       if (partitionJson != null && !partitionJson.isEmpty()) {
