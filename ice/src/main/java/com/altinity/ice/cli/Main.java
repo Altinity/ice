@@ -285,6 +285,11 @@ public final class Main {
               defaultValue = "-1")
           int threadCount,
       @CommandLine.Option(
+              names = {"--column-type-mapping-override"},
+              description =
+                  "JSON array of column type mapping overrides, e.g. [{\"column_name\": \"db_time\", \"type\": \"DateTime64('America/Chicago',6)\"}, {\"column_name\": \"user_id\", \"type\": \"UInt64\"}]")
+          String columnTypeMappingJson,
+      @CommandLine.Option(
               names = {"--watch"},
               description = "Event queue. Supported: AWS SQS")
           String watch,
@@ -356,6 +361,7 @@ public final class Main {
               .sortOrderList(sortOrders)
               .threadCount(
                   threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount)
+              .columnTypeMappingJson(columnTypeMappingJson)
               .build();
 
       if (!watchMode) {

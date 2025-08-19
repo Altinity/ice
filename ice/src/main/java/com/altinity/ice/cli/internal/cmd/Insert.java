@@ -22,15 +22,9 @@ import com.altinity.ice.cli.internal.s3.S3;
 import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +47,6 @@ import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.Metrics;
 import org.apache.iceberg.MetricsConfig;
-import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionKey;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.ReplaceSortOrder;
@@ -149,6 +142,14 @@ public final class Insert {
 
         Schema tableSchema = table.schema();
 
+        // Initialize column type mapping
+        TypeMapping typeMapping;
+        try {
+          typeMapping = new TypeMapping(options.columnTypeMappingJson());
+        } catch (Exception e) {
+          throw new BadRequestException("Invalid column type mapping JSON: " + e.getMessage());
+        }
+
         Set<String> tableDataFiles;
         try (var plan = table.newScan().planFiles()) {
           tableDataFiles =
@@ -214,7 +215,8 @@ public final class Insert {
                               dstDataFileSource,
                               tableSchemaCopy,
                               options.dataFileNamingStrategy,
-                              file);
+                              file,
+                              typeMapping);
                         } catch (Exception e) {
                           if (retryLog != null) {
                             logger.error(
@@ -352,7 +354,8 @@ public final class Insert {
       DataFileNamingStrategy dstDataFileSource,
       Schema tableSchema,
       DataFileNamingStrategy.Name dataFileNamingStrategy,
-      String file)
+      String file,
+      TypeMapping typeMapping)
       throws IOException {
     logger.info("{}: processing", file);
     logger.info("{}: jvm: {}", file, Stats.gather());
@@ -484,7 +487,8 @@ public final class Insert {
               .schema(tableSchema);
       logger.info("{}: copying to {}", file, dstDataFile);
       // file size may have changed due to different compression, etc.
-      dataFileSizeInBytes = copy(readBuilder, writeBuilder);
+      dataFileSizeInBytes =
+          copyWithTransformation(readBuilder, writeBuilder, tableSchema, typeMapping);
       dataFile = dstDataFile;
     }
     logger.info(
@@ -683,35 +687,33 @@ public final class Insert {
   }
 
   private static Object transformColumnValue(Object value, String targetType) {
-    return switch (targetType) {
-      case "UInt64" -> {
+    switch (targetType) {
+      case "UInt64":
         // Convert to BigDecimal for decimal(20,0) storage
         if (value instanceof Long) {
-          yield new BigDecimal(Long.toUnsignedString((Long) value));
+          return new BigDecimal(Long.toUnsignedString((Long) value));
         }
-        yield value;
-      }
-      case "UInt32" -> {
+        return value;
+      case "UInt32":
         // Convert to Long for Iceberg storage
         if (value instanceof Integer) {
-          yield Integer.toUnsignedLong((Integer) value);
+          return Integer.toUnsignedLong((Integer) value);
         }
-        yield value;
-      }
-      case "UInt16" -> {
+        return value;
+      case "UInt16":
         // Convert to Integer for Iceberg storage
         if (value instanceof Short) {
-          yield Short.toUnsignedInt((Short) value);
+          return Short.toUnsignedInt((Short) value);
         }
-        yield value;
-      }
-      case String s when s.startsWith("DateTime64(") -> {
-        // Handle DateTime64 types - convert to appropriate timestamp
-        // For now, just pass through the value as Iceberg will handle timestamp conversion
-        yield value;
-      }
-      default -> value; // No transformation needed
-    };
+        return value;
+      default:
+        if (targetType.startsWith("DateTime64(")) {
+          // Handle DateTime64 types - convert to appropriate timestamp
+          // For now, just pass through the value as Iceberg will handle timestamp conversion
+          return value;
+        }
+        return value; // No transformation needed
+    }
   }
 
   private static long copy(Parquet.ReadBuilder rb, Parquet.WriteBuilder wb) throws IOException {
@@ -812,7 +814,8 @@ public final class Insert {
       @Nullable String retryListFile,
       @Nullable List<Main.IcePartition> partitionList,
       @Nullable List<Main.IceSortOrder> sortOrderList,
-      int threadCount) {
+      int threadCount,
+      @Nullable String columnTypeMappingJson) {
 
     public static Builder builder() {
       return new Builder();
@@ -832,6 +835,7 @@ public final class Insert {
       List<Main.IcePartition> partitionList = List.of();
       List<Main.IceSortOrder> sortOrderList = List.of();
       private int threadCount = Runtime.getRuntime().availableProcessors();
+      String columnTypeMappingJson;
 
       private Builder() {}
 
@@ -900,6 +904,11 @@ public final class Insert {
         return this;
       }
 
+      public Builder columnTypeMappingJson(String columnTypeMappingJson) {
+        this.columnTypeMappingJson = columnTypeMappingJson;
+        return this;
+      }
+
       public Options build() {
         return new Options(
             dataFileNamingStrategy,
@@ -914,7 +923,8 @@ public final class Insert {
             retryListFile,
             partitionList,
             sortOrderList,
-            threadCount);
+            threadCount,
+            columnTypeMappingJson);
       }
     }
   }
