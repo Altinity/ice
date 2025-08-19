@@ -22,7 +22,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -284,14 +283,8 @@ public record Config(
     }
 
     if (warehouse.startsWith("file://")) {
-      if (!m.containsKey(LocalFileIO.LOCALFILEIO_PROP_BASEDIR)) {
-        // FIXME: wrong thing to do if warehouse is absolute
-        m.put(LocalFileIO.LOCALFILEIO_PROP_BASEDIR, new File(".").getAbsolutePath());
-      }
-      var warehouseLocation =
-          Strings.removePrefix(m.get(CatalogProperties.WAREHOUSE_LOCATION), "file://");
-      File d = Paths.get(m.get(LocalFileIO.LOCALFILEIO_PROP_BASEDIR), warehouseLocation).toFile();
-      ;
+      String workdir = LocalFileIO.resolveWorkdir(warehouse, localFileIOBaseDir);
+      File d = LocalFileIO.resolveWarehousePath(warehouse, workdir).toFile();
       // TODO: move it out of here; toIcebergConfig() should not have side-effects
       if (!d.isDirectory() && !d.mkdirs()) {
         throw new IOException("Unable to create " + d);
