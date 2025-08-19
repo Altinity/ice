@@ -35,7 +35,7 @@ public final class Strings {
 
   public static String removeSuffix(String text, String suffix) {
     if (text.endsWith(suffix)) {
-      return removeSuffix(text, text.substring(0, text.length() - suffix.length()));
+      return text.substring(0, text.length() - suffix.length());
     }
     return text;
   }

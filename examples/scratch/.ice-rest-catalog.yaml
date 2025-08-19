@@ -3,7 +3,10 @@ uri: jdbc:sqlite:file:data/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchrono
 # To use etcd instead of sqlite, start etcd with `etcd --data-dir=data/etcd`, then uncomment the line below
 #uri: etcd:http://localhost:2379
 
-warehouse: s3://bucket1
+warehouse: file://tmp/path/to/warehouse
+localFileIOBaseDir: /
+
+#warehouse: s3://bucket1
 
 s3:
   endpoint: http://localhost:9000

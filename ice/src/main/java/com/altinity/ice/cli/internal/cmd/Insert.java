@@ -102,42 +102,13 @@ public final class Insert {
 
   // TODO: refactor
   public static void run(
-      RESTCatalog catalog,
-      TableIdentifier nsTable,
-      String[] files,
-      DataFileNamingStrategy.Name dataFileNamingStrategy,
-      boolean skipDuplicates,
-      boolean noCommit,
-      boolean noCopy,
-      boolean forceNoCopy,
-      boolean forceTableAuth,
-      boolean s3NoSignRequest,
-      boolean s3CopyObject,
-      @Nullable String retryListFile,
-      @Nullable List<Main.IcePartition> partitionList,
-      @Nullable List<Main.IceSortOrder> sortOrderList,
-      int threadCount,
-      @Nullable String columnTypeMappingJson)
+      RESTCatalog catalog, TableIdentifier nsTable, String[] files, Options options)
       throws IOException, InterruptedException {
     if (files.length == 0) {
       // no work to be done
       return;
     }
-    Options options =
-        Options.builder()
-            .skipDuplicates(skipDuplicates)
-            .noCommit(noCommit)
-            .noCopy(noCopy)
-            .forceNoCopy(forceNoCopy)
-            .forceTableAuth(forceTableAuth)
-            .s3NoSignRequest(s3NoSignRequest)
-            .s3CopyObject(s3CopyObject)
-            .threadCount(threadCount)
-            .build();
 
-    // FIXME: refactor: move to builder
-    final Options finalOptions =
-        options.forceNoCopy() ? options.toBuilder().noCopy(true).build() : options;
     Table table = catalog.loadTable(nsTable);
 
     // Create transaction and pass it to updatePartitionAndSortOrderMetadata
@@ -145,14 +116,14 @@ public final class Insert {
 
     try (FileIO tableIO = table.io()) {
       final Supplier<S3Client> s3ClientSupplier;
-      if (finalOptions.forceTableAuth()) {
+      if (options.forceTableAuth()) {
         if (!(tableIO instanceof S3FileIO)) {
           throw new UnsupportedOperationException(
               "--force-table-auth is currently only supported for s3:// tables");
         }
         s3ClientSupplier = ((S3FileIO) tableIO)::client;
       } else {
-        s3ClientSupplier = () -> S3.newClient(finalOptions.s3NoSignRequest());
+        s3ClientSupplier = () -> S3.newClient(options.s3NoSignRequest());
       }
       Lazy<S3Client> s3ClientLazy = new Lazy<>(s3ClientSupplier);
       try {
@@ -178,14 +149,6 @@ public final class Insert {
 
         Schema tableSchema = table.schema();
 
-        // Initialize column type mapping
-        TypeMapping typeMapping;
-        try {
-          typeMapping = new TypeMapping(columnTypeMappingJson);
-        } catch (Exception e) {
-          throw new BadRequestException("Invalid column type mapping JSON: " + e.getMessage());
-        }
-
         Set<String> tableDataFiles;
         try (var plan = table.newScan().planFiles()) {
           tableDataFiles =
@@ -197,15 +160,16 @@ public final class Insert {
         var tableEmpty = tableDataFiles.isEmpty();
         // TODO: move to update-table
         var tablePartitionSpec =
-            syncTablePartitionSpec(txn, table, tableSchema, tableEmpty, partitionList);
-        var tableSortOrder = syncTableSortOrder(txn, table, tableSchema, tableEmpty, sortOrderList);
+            syncTablePartitionSpec(txn, table, tableSchema, tableEmpty, options.partitionList);
+        var tableSortOrder =
+            syncTableSortOrder(txn, table, tableSchema, tableEmpty, options.sortOrderList);
         if (tablePartitionSpec.isPartitioned() || tableSortOrder.isSorted()) {
           updateWriteDistributionModeIfNotSet(txn, table);
         }
 
         String dstPath = DataFileNamingStrategy.defaultDataLocation(table);
         DataFileNamingStrategy dstDataFileSource =
-            switch (dataFileNamingStrategy) {
+            switch (options.dataFileNamingStrategy) {
               case DEFAULT ->
                   new DataFileNamingStrategy.Default(dstPath, System.currentTimeMillis() + "-");
               case PRESERVE_ORIGINAL -> new DataFileNamingStrategy.PreserveOriginal(dstPath);
@@ -216,12 +180,12 @@ public final class Insert {
 
         try (FileIO inputIO = Input.newIO(filesExpanded.getFirst(), table, s3ClientLazy);
             RetryLog retryLog =
-                retryListFile != null && !retryListFile.isEmpty()
-                    ? new RetryLog(retryListFile)
+                options.retryListFile != null && !options.retryListFile.isEmpty()
+                    ? new RetryLog(options.retryListFile)
                     : null) {
           boolean atLeastOneFileAppended = false;
 
-          int numThreads = Math.min(finalOptions.threadCount(), filesExpanded.size());
+          int numThreads = Math.min(options.threadCount(), filesExpanded.size());
           ExecutorService executor = Executors.newFixedThreadPool(numThreads);
           try {
             var futures = new ArrayList<Future<List<DataFile>>>();
@@ -245,13 +209,12 @@ public final class Insert {
                               tableIO,
                               inputIO,
                               tableDataFiles,
-                              finalOptions,
+                              options,
                               s3ClientLazy,
                               dstDataFileSource,
                               tableSchemaCopy,
-                              dataFileNamingStrategy,
-                              file,
-                              typeMapping);
+                              options.dataFileNamingStrategy,
+                              file);
                         } catch (Exception e) {
                           if (retryLog != null) {
                             logger.error(
@@ -283,7 +246,7 @@ public final class Insert {
             executor.awaitTermination(1, TimeUnit.MINUTES);
           }
 
-          if (!finalOptions.noCommit()) {
+          if (!options.noCommit()) {
             // TODO: log
             if (atLeastOneFileAppended) {
               appendOp.commit();
@@ -293,9 +256,10 @@ public final class Insert {
             if (retryLog != null) {
               retryLog.commit();
             }
-
-            // Commit transaction.
-            txn.commitTransaction();
+            if (atLeastOneFileAppended) {
+              // Commit transaction.
+              txn.commitTransaction();
+            }
           } else {
             logger.warn("Table commit skipped (--no-commit)");
           }
@@ -378,8 +342,8 @@ public final class Insert {
   private static List<DataFile> processFile(
       RESTCatalog catalog,
       Table table,
-      PartitionSpec tableSpec,
-      SortOrder tableOrderSpec,
+      PartitionSpec partitionSpec,
+      SortOrder sortOrder,
       FileIO tableIO,
       FileIO inputIO,
       Set<String> tableDataFiles,
@@ -388,8 +352,7 @@ public final class Insert {
       DataFileNamingStrategy dstDataFileSource,
       Schema tableSchema,
       DataFileNamingStrategy.Name dataFileNamingStrategy,
-      String file,
-      TypeMapping typeMapping)
+      String file)
       throws IOException {
     logger.info("{}: processing", file);
     logger.info("{}: jvm: {}", file, Stats.gather());
@@ -409,6 +372,35 @@ public final class Insert {
 
     InputFile inputFile = Input.newFile(file, catalog, inputIO == null ? tableIO : inputIO);
     ParquetMetadata metadata = Metadata.read(inputFile);
+
+    boolean sorted = options.assumeSorted;
+    if (!sorted && sortOrder.isSorted()) {
+      sorted = Sorting.isSorted(inputFile, tableSchema, sortOrder);
+      if (!sorted) {
+        if (options.noCopy || options.s3CopyObject) {
+          throw new BadRequestException(
+              String.format("%s does not appear to be sorted", inputFile.location()));
+        }
+        logger.warn(
+            "{} does not appear to be sorted. Falling back to full scan (slow)",
+            inputFile.location());
+      }
+    }
+
+    PartitionKey partitionKey = null;
+    if (partitionSpec.isPartitioned()) {
+      partitionKey = Partitioning.inferPartitionKey(metadata, partitionSpec);
+      if (partitionKey == null) {
+        if (options.noCopy || options.s3CopyObject) {
+          throw new BadRequestException(
+              String.format(
+                  "Cannot infer partition key of %s from the metadata", inputFile.location()));
+        }
+        logger.warn(
+            "{} does not appear to be partitioned. Falling back to full scan (slow)",
+            inputFile.location());
+      }
+    }
 
     MessageType type = metadata.getFileMetaData().getSchema();
     Schema fileSchema = ParquetSchemaUtil.convert(type); // nameMapping applied (when present)
@@ -453,21 +445,23 @@ public final class Insert {
       s3ClientLazy.getValue().copyObject(copyReq);
       dataFileSizeInBytes = inputFile.getLength();
       dataFile = dstDataFile;
-    } else if (tableSpec.isPartitioned()) {
-      return copyParquetWithPartition(
-          file, tableSchema, tableSpec, tableOrderSpec, tableIO, inputFile, dstDataFileSource);
-    } else if (tableOrderSpec.isSorted()) {
+    } else if (partitionSpec.isPartitioned() && partitionKey == null) {
+      return copyPartitionedAndSorted(
+          file, tableSchema, partitionSpec, sortOrder, tableIO, inputFile, dstDataFileSource);
+    } else if (sortOrder.isSorted() && !sorted) {
       return Collections.singletonList(
-          copyParquetWithSortOrder(
+          copySorted(
               file,
-              Strings.replacePrefix(dstDataFileSource.get(file), "s3://", "s3a://"),
+              dstDataFileSource.get(file),
               tableSchema,
-              tableSpec,
-              tableOrderSpec,
+              partitionSpec,
+              sortOrder,
               tableIO,
               inputFile,
-              dataFileNamingStrategy));
+              dataFileNamingStrategy,
+              partitionKey));
     } else {
+      // Table isn't partitioned or sorted. Copy as is.
       String dstDataFile = dstDataFileSource.get(file);
       if (checkNotExists.apply(dstDataFile)) {
         return Collections.emptyList();
@@ -475,13 +469,14 @@ public final class Insert {
       OutputFile outputFile =
           tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
       // TODO: support transferTo below (note that compression, etc. might be different)
-      // try (var d = outputFile.create()) { try (var s = inputFile.newStream()) {
-      // s.transferTo(d); }}
+      // try (var d = outputFile.create()) {
+      //   try (var s = inputFile.newStream()) { s.transferTo(d); }
+      // }
       Parquet.ReadBuilder readBuilder =
           Parquet.read(inputFile)
               .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
-              .project(tableSchema); // TODO: ?
-      // TODO: reuseContainers?
+              .project(tableSchema)
+              .reuseContainers();
       Parquet.WriteBuilder writeBuilder =
           Parquet.write(outputFile)
               .overwrite(dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL)
@@ -489,8 +484,7 @@ public final class Insert {
               .schema(tableSchema);
       logger.info("{}: copying to {}", file, dstDataFile);
       // file size may have changed due to different compression, etc.
-      dataFileSizeInBytes =
-          copyWithTransformation(readBuilder, writeBuilder, tableSchema, typeMapping);
+      dataFileSizeInBytes = copy(readBuilder, writeBuilder);
       dataFile = dstDataFile;
     }
     logger.info(
@@ -498,96 +492,60 @@ public final class Insert {
     MetricsConfig metricsConfig = MetricsConfig.forTable(table);
     Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
     DataFile dataFileObj =
-        new DataFiles.Builder(tableSpec)
+        new DataFiles.Builder(partitionSpec)
             .withPath(dataFile)
             .withFormat("PARQUET")
             .withFileSizeInBytes(dataFileSizeInBytes)
             .withMetrics(metrics)
+            .withPartition(partitionKey)
             .build();
     return Collections.singletonList(dataFileObj);
   }
 
-  private static List<DataFile> copyParquetWithPartition(
+  private static List<DataFile> copyPartitionedAndSorted(
       String file,
       Schema tableSchema,
-      PartitionSpec tableSpec,
-      SortOrder tableOrderSpec,
+      PartitionSpec partitionSpec,
+      SortOrder sortOrder,
       FileIO tableIO,
       InputFile inputFile,
       DataFileNamingStrategy dstDataFileSource)
       throws IOException {
-    logger.info("{}: partitioning{}", file, tableOrderSpec.isSorted() ? "+sorting" : "");
+    logger.info("{}: partitioning{}", file, sortOrder.isSorted() ? "+sorting" : "");
 
-    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(tableSchema, tableSpec);
+    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(tableSchema, partitionSpec);
 
-    PartitionKey partitionKeyMold = new PartitionKey(tableSpec, tableSchema);
-    Map<PartitionKey, List<Record>> partitionedRecords = new HashMap<>();
-
-    Parquet.ReadBuilder readBuilder =
-        Parquet.read(inputFile)
-            .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
-            .project(tableSchema);
-
-    try (CloseableIterable<Record> records = readBuilder.build()) {
-      for (Record record : records) {
-        Record partitionRecord = GenericRecord.create(tableSchema);
-        for (Types.NestedField field : tableSchema.columns()) {
-          partitionRecord.setField(field.name(), record.getField(field.name()));
-        }
-        for (PartitionField field : tableSpec.fields()) {
-          String fieldName = tableSchema.findField(field.sourceId()).name();
-          Object value = partitionRecord.getField(fieldName);
-          if (value != null) {
-            String transformName = field.transform().toString();
-            switch (transformName) {
-              case "day", "month", "hour":
-                long micros = toPartitionMicros(value);
-                partitionRecord.setField(fieldName, micros);
-                break;
-              case "identity":
-                break;
-              default:
-                throw new UnsupportedOperationException(
-                    "unexpected transform value: " + transformName);
-            }
-          }
-        }
-
-        // Partition based on converted values
-        partitionKeyMold.partition(partitionRecord);
-        PartitionKey partitionKey = partitionKeyMold.copy();
-
-        // Store the original record (without converted timestamp fields)
-        partitionedRecords.computeIfAbsent(partitionKey, k -> new ArrayList<>()).add(record);
-      }
-    }
-
-    List<DataFile> dataFiles = new ArrayList<>();
+    // FIXME: stream to reduce memory usage
+    Map<PartitionKey, List<Record>> partitionedRecords =
+        Partitioning.partition(inputFile, tableSchema, partitionSpec);
 
     // Create a comparator based on table.sortOrder()
     RecordComparator comparator =
-        tableOrderSpec.isSorted() ? new RecordComparator(tableOrderSpec, tableSchema) : null;
+        sortOrder.isSorted() ? new RecordComparator(sortOrder, tableSchema) : null;
+
+    List<DataFile> dataFiles = new ArrayList<>(partitionedRecords.size());
 
     // Write sorted records for each partition
     for (Map.Entry<PartitionKey, List<Record>> entry : partitionedRecords.entrySet()) {
       PartitionKey partKey = entry.getKey();
       List<Record> records = entry.getValue();
+      entry.setValue(List.of()); // allow "records" to be gc-ed once w're done with them
 
       // Sort records within the partition
       if (comparator != null) {
         records.sort(comparator);
       }
 
-      String dstDataFile = dstDataFileSource.get(tableSpec, partKey, file);
-      OutputFile outFile =
+      String dstDataFile = dstDataFileSource.get(partitionSpec, partKey, file);
+      OutputFile outputFile =
           tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
 
       long fileSizeInBytes;
       Metrics metrics;
       try (FileAppender<Record> appender =
-          appenderFactory.newAppender(outFile, FileFormat.PARQUET)) {
-        for (Record rec : records) {
-          appender.add(rec);
+          appenderFactory.newAppender(outputFile, FileFormat.PARQUET)) {
+        for (Record record : records) {
+          appender.add(record);
         }
         appender.close();
         fileSizeInBytes = appender.length();
@@ -596,59 +554,35 @@ public final class Insert {
 
       logger.info("{}: adding data file: {}", file, dstDataFile);
       dataFiles.add(
-          DataFiles.builder(tableSpec)
-              .withPath(outFile.location())
+          DataFiles.builder(partitionSpec)
+              .withPath(outputFile.location())
               .withFileSizeInBytes(fileSizeInBytes)
-              .withPartition(partKey)
               .withFormat(FileFormat.PARQUET)
               .withMetrics(metrics)
+              .withPartition(partKey)
               .build());
     }
 
     return dataFiles;
   }
 
-  public static long toPartitionMicros(Object tsValue) {
-    switch (tsValue) {
-      case Long l -> {
-        return l;
-      }
-      case String s -> {
-        LocalDateTime ldt = LocalDateTime.parse(s);
-        return ldt.toInstant(ZoneOffset.UTC).toEpochMilli() * 1000L;
-      }
-      case LocalDate localDate -> {
-        return localDate.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() * 1000L;
-      }
-      case LocalDateTime localDateTime -> {
-        return localDateTime.toInstant(ZoneOffset.UTC).toEpochMilli() * 1000L;
-      }
-      case OffsetDateTime offsetDateTime -> {
-        return offsetDateTime.toInstant().toEpochMilli() * 1000L;
-      }
-      case Instant instant -> {
-        return instant.toEpochMilli() * 1000L;
-      }
-      default ->
-          throw new UnsupportedOperationException("unexpected value type: " + tsValue.getClass());
-    }
-  }
-
-  private static DataFile copyParquetWithSortOrder(
+  private static DataFile copySorted(
       String file,
       String dstDataFile,
       Schema tableSchema,
-      PartitionSpec tableSpec,
-      SortOrder tableOrderSpec,
+      PartitionSpec partitionSpec,
+      SortOrder sortOrder,
       FileIO tableIO,
       InputFile inputFile,
-      DataFileNamingStrategy.Name dataFileNamingStrategy)
+      DataFileNamingStrategy.Name dataFileNamingStrategy,
+      PartitionKey partitionKey)
       throws IOException {
     logger.info("{}: copying (sorted) to {}", file, dstDataFile);
 
     long start = System.currentTimeMillis();
 
-    OutputFile outputFile = tableIO.newOutputFile(dstDataFile);
+    OutputFile outputFile =
+        tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
 
     Parquet.ReadBuilder readBuilder =
         Parquet.read(inputFile)
@@ -664,8 +598,8 @@ public final class Insert {
     }
 
     // Sort
-    if (!tableOrderSpec.isUnsorted()) {
-      records.sort(new RecordComparator(tableOrderSpec, tableSchema));
+    if (!sortOrder.isUnsorted()) {
+      records.sort(new RecordComparator(sortOrder, tableSchema));
     }
 
     // Write sorted records to outputFile
@@ -692,11 +626,12 @@ public final class Insert {
         file,
         (System.currentTimeMillis() - start) / 1000);
 
-    return new DataFiles.Builder(tableSpec)
-        .withPath(dstDataFile)
+    return new DataFiles.Builder(partitionSpec)
+        .withPath(outputFile.location())
         .withFormat("PARQUET")
         .withFileSizeInBytes(fileSizeInBytes)
         .withMetrics(metrics)
+        .withPartition(partitionKey)
         .build();
   }
 
@@ -865,6 +800,7 @@ public final class Insert {
   }
 
   public record Options(
+      DataFileNamingStrategy.Name dataFileNamingStrategy,
       boolean skipDuplicates,
       boolean noCommit,
       boolean noCopy,
@@ -872,25 +808,18 @@ public final class Insert {
       boolean forceTableAuth,
       boolean s3NoSignRequest,
       boolean s3CopyObject,
+      boolean assumeSorted,
+      @Nullable String retryListFile,
+      @Nullable List<Main.IcePartition> partitionList,
+      @Nullable List<Main.IceSortOrder> sortOrderList,
       int threadCount) {
 
     public static Builder builder() {
       return new Builder();
     }
 
-    public Builder toBuilder() {
-      return builder()
-          .skipDuplicates(skipDuplicates)
-          .noCommit(noCommit)
-          .noCopy(noCopy)
-          .forceNoCopy(forceNoCopy)
-          .forceTableAuth(forceTableAuth)
-          .s3NoSignRequest(s3NoSignRequest)
-          .s3CopyObject(s3CopyObject)
-          .threadCount(threadCount);
-    }
-
     public static final class Builder {
+      DataFileNamingStrategy.Name dataFileNamingStrategy;
       private boolean skipDuplicates;
       private boolean noCommit;
       private boolean noCopy;
@@ -898,9 +827,18 @@ public final class Insert {
       private boolean forceTableAuth;
       private boolean s3NoSignRequest;
       private boolean s3CopyObject;
+      private boolean assumeSorted;
+      String retryListFile;
+      List<Main.IcePartition> partitionList = List.of();
+      List<Main.IceSortOrder> sortOrderList = List.of();
       private int threadCount = Runtime.getRuntime().availableProcessors();
 
       private Builder() {}
+
+      public Builder dataFileNamingStrategy(DataFileNamingStrategy.Name dataFileNamingStrategy) {
+        this.dataFileNamingStrategy = dataFileNamingStrategy;
+        return this;
+      }
 
       public Builder skipDuplicates(boolean skipDuplicates) {
         this.skipDuplicates = skipDuplicates;
@@ -937,6 +875,26 @@ public final class Insert {
         return this;
       }
 
+      public Builder assumeSorted(boolean assumeSorted) {
+        this.assumeSorted = assumeSorted;
+        return this;
+      }
+
+      public Builder retryListFile(String retryListFile) {
+        this.retryListFile = retryListFile;
+        return this;
+      }
+
+      public Builder partitionList(List<Main.IcePartition> partitionList) {
+        this.partitionList = partitionList;
+        return this;
+      }
+
+      public Builder sortOrderList(List<Main.IceSortOrder> sortOrderList) {
+        this.sortOrderList = sortOrderList;
+        return this;
+      }
+
       public Builder threadCount(int threadCount) {
         this.threadCount = threadCount;
         return this;
@@ -944,13 +902,18 @@ public final class Insert {
 
       public Options build() {
         return new Options(
+            dataFileNamingStrategy,
             skipDuplicates,
             noCommit,
-            noCopy,
+            forceNoCopy || noCopy,
             forceNoCopy,
             forceTableAuth,
             s3NoSignRequest,
             s3CopyObject,
+            assumeSorted,
+            retryListFile,
+            partitionList,
+            sortOrderList,
             threadCount);
       }
     }
