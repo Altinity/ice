@@ -274,7 +274,12 @@ public final class Main {
               names = {"--thread-count"},
               description = "Number of threads to use for inserting data",
               defaultValue = "-1")
-          int threadCount)
+          int threadCount,
+      @CommandLine.Option(
+              names = {"--column-type-mapping-override"},
+              description =
+                  "JSON array of column type mapping overrides, e.g. [{\"column_name\": \"db_time\", \"type\": \"DateTime64('America/Chicago',6)\"}, {\"column_name\": \"user_id\", \"type\": \"UInt64\"}]")
+          String columnTypeMappingJson)
       throws IOException, InterruptedException {
     if (s3NoSignRequest && s3CopyObject) {
       throw new UnsupportedOperationException(
@@ -331,7 +336,8 @@ public final class Main {
           retryList,
           partitions,
           sortOrders,
-          threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
+          threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount,
+          columnTypeMappingJson);
     }
   }
 

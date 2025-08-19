@@ -16,10 +16,12 @@ import com.altinity.ice.cli.internal.iceberg.Sorting;
 import com.altinity.ice.cli.internal.iceberg.io.Input;
 import com.altinity.ice.cli.internal.iceberg.parquet.Metadata;
 import com.altinity.ice.cli.internal.jvm.Stats;
+import com.altinity.ice.cli.internal.mapping.TypeMapping;
 import com.altinity.ice.cli.internal.retry.RetryLog;
 import com.altinity.ice.cli.internal.s3.S3;
 import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -114,7 +116,8 @@ public final class Insert {
       @Nullable String retryListFile,
       @Nullable List<Main.IcePartition> partitionList,
       @Nullable List<Main.IceSortOrder> sortOrderList,
-      int threadCount)
+      int threadCount,
+      @Nullable String columnTypeMappingJson)
       throws IOException, InterruptedException {
     if (files.length == 0) {
       // no work to be done
@@ -174,6 +177,14 @@ public final class Insert {
         }
 
         Schema tableSchema = table.schema();
+
+        // Initialize column type mapping
+        TypeMapping typeMapping;
+        try {
+          typeMapping = new TypeMapping(columnTypeMappingJson);
+        } catch (Exception e) {
+          throw new BadRequestException("Invalid column type mapping JSON: " + e.getMessage());
+        }
 
         Set<String> tableDataFiles;
         try (var plan = table.newScan().planFiles()) {
@@ -239,7 +250,8 @@ public final class Insert {
                               dstDataFileSource,
                               tableSchemaCopy,
                               dataFileNamingStrategy,
-                              file);
+                              file,
+                              typeMapping);
                         } catch (Exception e) {
                           if (retryLog != null) {
                             logger.error(
@@ -376,7 +388,8 @@ public final class Insert {
       DataFileNamingStrategy dstDataFileSource,
       Schema tableSchema,
       DataFileNamingStrategy.Name dataFileNamingStrategy,
-      String file)
+      String file,
+      TypeMapping typeMapping)
       throws IOException {
     logger.info("{}: processing", file);
     logger.info("{}: jvm: {}", file, Stats.gather());
@@ -476,7 +489,8 @@ public final class Insert {
               .schema(tableSchema);
       logger.info("{}: copying to {}", file, dstDataFile);
       // file size may have changed due to different compression, etc.
-      dataFileSizeInBytes = copy(readBuilder, writeBuilder);
+      dataFileSizeInBytes =
+          copyWithTransformation(readBuilder, writeBuilder, tableSchema, typeMapping);
       dataFile = dstDataFile;
     }
     logger.info(
@@ -708,6 +722,63 @@ public final class Insert {
     return sameSchema;
   }
 
+  private static Record transformRecord(
+      Record inputRecord, Schema schema, TypeMapping typeMapping) {
+    Record outputRecord = GenericRecord.create(schema);
+
+    for (Types.NestedField field : schema.columns()) {
+      String fieldName = field.name();
+      Object value = inputRecord.getField(fieldName);
+
+      if (value != null) {
+        // Check if this column has a type mapping override
+        if (typeMapping.hasColumnMapping(fieldName)) {
+          String targetType = typeMapping.getColumnType(fieldName);
+          Object transformedValue = transformColumnValue(value, targetType);
+          outputRecord.setField(fieldName, transformedValue);
+        } else {
+          outputRecord.setField(fieldName, value);
+        }
+      } else {
+        outputRecord.setField(fieldName, value);
+      }
+    }
+
+    return outputRecord;
+  }
+
+  private static Object transformColumnValue(Object value, String targetType) {
+    return switch (targetType) {
+      case "UInt64" -> {
+        // Convert to BigDecimal for decimal(20,0) storage
+        if (value instanceof Long) {
+          yield new BigDecimal(Long.toUnsignedString((Long) value));
+        }
+        yield value;
+      }
+      case "UInt32" -> {
+        // Convert to Long for Iceberg storage
+        if (value instanceof Integer) {
+          yield Integer.toUnsignedLong((Integer) value);
+        }
+        yield value;
+      }
+      case "UInt16" -> {
+        // Convert to Integer for Iceberg storage
+        if (value instanceof Short) {
+          yield Short.toUnsignedInt((Short) value);
+        }
+        yield value;
+      }
+      case String s when s.startsWith("DateTime64(") -> {
+        // Handle DateTime64 types - convert to appropriate timestamp
+        // For now, just pass through the value as Iceberg will handle timestamp conversion
+        yield value;
+      }
+      default -> value; // No transformation needed
+    };
+  }
+
   private static long copy(Parquet.ReadBuilder rb, Parquet.WriteBuilder wb) throws IOException {
     try (CloseableIterable<Record> parquetReader = rb.build()) {
       // not using try-with-resources because we need to close() for writer.length()
@@ -715,6 +786,27 @@ public final class Insert {
       try {
         writer = wb.build();
         writer.addAll(parquetReader);
+      } finally {
+        if (writer != null) {
+          writer.close();
+        }
+      }
+      return writer.length();
+    }
+  }
+
+  private static long copyWithTransformation(
+      Parquet.ReadBuilder rb, Parquet.WriteBuilder wb, Schema schema, TypeMapping typeMapping)
+      throws IOException {
+    try (CloseableIterable<Record> parquetReader = rb.build()) {
+      // not using try-with-resources because we need to close() for writer.length()
+      FileAppender<Record> writer = null;
+      try {
+        writer = wb.build();
+        for (Record record : parquetReader) {
+          Record transformedRecord = transformRecord(record, schema, typeMapping);
+          writer.add(transformedRecord);
+        }
       } finally {
         if (writer != null) {
           writer.close();
