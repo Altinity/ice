@@ -10,6 +10,7 @@
 package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
+import com.altinity.ice.cli.internal.cmd.AlterTable;
 import com.altinity.ice.cli.internal.cmd.Check;
 import com.altinity.ice.cli.internal.cmd.CreateNamespace;
 import com.altinity.ice.cli.internal.cmd.CreateTable;
@@ -37,6 +38,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.apache.curator.shaded.com.google.common.net.HostAndPort;
@@ -475,6 +477,36 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       DeleteNamespace.run(catalog, Namespace.of(name.split("[.]")), ignoreNotFound);
+    }
+  }
+
+  @CommandLine.Command(
+      name = "alter-table",
+      description =
+          "Alter table schema by adding or dropping columns. Supported operations: add column, drop column. Example: ice alter-table ns1.table1 --operations '[{\"operation\": \"add column\", \"column_name\": \"age\", \"type\": \"int\", \"comment\": \"user age\"}]'")
+  void alterTable(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"--operations"},
+              required = true,
+              description =
+                  "JSON array of operations: [{'operation': 'add column', 'column_name': 'age', 'type': 'int', 'comment': 'user age'}, {'operation': 'drop column', 'column_name': 'col_name'}]")
+          String operationsJson)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+      TableIdentifier tableId = TableIdentifier.parse(name);
+
+      ObjectMapper mapper = newObjectMapper();
+      List<Map<String, String>> operations =
+          mapper.readValue(
+              operationsJson,
+              mapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+
+      AlterTable.run(catalog, tableId, operations);
     }
   }
 

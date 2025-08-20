@@ -53,6 +53,12 @@ ice insert flowers.iris_no_copy --no-copy s3://bucket1/flowers/iris_no_copy/iris
 # inspect
 ice describe
 
+# Alter table (add column)
+ice alter-table flowers.iris --operations '[{"operation": "add column", "column_name": "age", "type": "int", "comment": "user age"}]'
+
+# Alter table (drop column)
+ice alter-table flowers.iris --operations '[{"operation": "drop column", "column_name": "age"}]'
+
 # open ClickHouse shell, then try SQL below 
 clickhouse local
 ```
