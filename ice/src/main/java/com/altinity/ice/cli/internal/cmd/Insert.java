@@ -365,15 +365,19 @@ public final class Insert {
 
     boolean sorted = options.assumeSorted;
     if (!sorted && sortOrder.isSorted()) {
-      sorted = Sorting.isSorted(inputFile, tableSchema, sortOrder);
+      var sortCheck = Sorting.checkSorted(inputFile, tableSchema, sortOrder);
+      sorted = sortCheck.ok();
       if (!sorted) {
         if (options.noCopy || options.s3CopyObject) {
           throw new BadRequestException(
-              String.format("%s does not appear to be sorted", inputFile.location()));
+              String.format(
+                  "%s does not appear to be sorted: %s",
+                  inputFile.location(), sortCheck.toUnsortedDiffString()));
         }
         logger.warn(
-            "{} does not appear to be sorted. Falling back to full scan (slow)",
-            inputFile.location());
+            "{} does not appear to be sorted ({}). Falling back to full scan (slow)",
+            inputFile.location(),
+            sortCheck.toUnsortedDiffString());
       }
     }
 

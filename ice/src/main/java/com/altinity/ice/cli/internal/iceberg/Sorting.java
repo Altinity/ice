@@ -13,6 +13,7 @@ import com.altinity.ice.cli.Main;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.SortDirection;
@@ -48,16 +49,79 @@ public final class Sorting {
     }
   }
 
-  // TODO: check metadata first to avoid full scan when unsorted
-  public static boolean isSorted(InputFile inputFile, Schema tableSchema, SortOrder sortOrder)
-      throws IOException {
-    if (sortOrder.isUnsorted()) {
-      return false;
+  public record SortCheckResult(
+      boolean ok,
+      List<Types.NestedField> projection,
+      int unsortedColumnIndex,
+      @Nullable Record unsortedPrev,
+      @Nullable Record unsortedNext) {
+
+    public SortCheckResult(boolean ok) {
+      this(ok, List.of(), -1, null, null);
     }
 
+    @Override
+    public String toString() {
+      if (ok) {
+        return "sorted";
+      }
+      if (projection.isEmpty()) {
+        return "unsorted";
+      }
+      return String.format("unsorted: %s", toUnsortedDiffString());
+    }
+
+    public String toUnsortedDiffString() {
+      StringBuilder r1 = new StringBuilder("{");
+      StringBuilder r2 = new StringBuilder("{");
+      int i = 0, e = projection.size() - 1;
+      for (Types.NestedField field : projection) {
+        String columnName = field.name();
+        r1.append(
+            String.format(
+                i == unsortedColumnIndex ? "*%s:%s" : "%s:%s",
+                columnName,
+                unsortedPrev.getField(columnName)));
+        r2.append(
+            String.format(
+                i == unsortedColumnIndex ? "*%s:%s" : "%s:%s",
+                columnName,
+                unsortedNext.getField(columnName)));
+        if (i != e) {
+          r1.append(", ");
+          r2.append(", ");
+        }
+        i++;
+      }
+      r1.append("}");
+      r2.append("}");
+      return String.format("expected %s to be before %s", r2, r1);
+    }
+  }
+
+  public static boolean isSorted(InputFile inputFile, Schema tableSchema, SortOrder sortOrder)
+      throws IOException {
+    return checkSorted(inputFile, tableSchema, sortOrder).ok;
+  }
+
+  // TODO: check metadata first to avoid full scan when unsorted
+  public static SortCheckResult checkSorted(
+      InputFile inputFile, Schema tableSchema, SortOrder sortOrder) throws IOException {
+    if (sortOrder.isUnsorted()) {
+      return new SortCheckResult(false);
+    }
+
+    // TODO:
+    // https://javadoc.io/doc/org.apache.parquet/parquet-format/2.4.0/org/apache/parquet/format/RowGroup.html sorting_columns
+    /*
+        FileMetaData fileMetaData = org.apache.parquet.format.Util.readFileMetaData(null);
+        for (RowGroup rowGroup : fileMetaData.row_groups) {
+          rowGroup.sorting_columns....
+        }
+    */
+
     List<SortField> sortOrderFields = sortOrder.fields();
-    List<org.apache.iceberg.types.Types.NestedField> projection = new ArrayList<>();
-    List<String> columnNames = new ArrayList<>();
+    List<Types.NestedField> projection = new ArrayList<>();
 
     // Project sortOrder fields over table schema.
     for (SortField sortField : sortOrderFields) {
@@ -68,24 +132,25 @@ public final class Sorting {
       }
       Types.NestedField field = tableSchema.findField(sortField.sourceId());
       projection.add(field);
-      columnNames.add(name);
     }
     Schema projectedSchema = new Schema(projection);
 
-    try (CloseableIterable<org.apache.iceberg.data.Record> records =
+    try (CloseableIterable<Record> records =
         Parquet.read(inputFile)
             .createReaderFunc(s -> GenericParquetReaders.buildReader(projectedSchema, s))
             .project(projectedSchema)
             .build()) {
 
-      CloseableIterator<org.apache.iceberg.data.Record> iter = records.iterator();
+      CloseableIterator<Record> iter = records.iterator();
       if (iter.hasNext()) {
-        org.apache.iceberg.data.Record prev = iter.next();
+        Record prev = iter.next();
+        nextRecord:
         while (iter.hasNext()) {
           Record curr = iter.next();
+
           for (int i = 0; i < sortOrderFields.size(); i++) {
             SortField sortField = sortOrderFields.get(i);
-            String columnName = columnNames.get(i);
+            String columnName = projection.get(i).name();
             boolean asc = sortField.direction() == SortDirection.ASC;
 
             Object left = prev.getField(columnName);
@@ -98,19 +163,25 @@ public final class Sorting {
             if (left == null || right == null) {
               boolean nullsLast = sortField.nullOrder() == NullOrder.NULLS_LAST;
               if ((left != null && !nullsLast) || (right != null && nullsLast)) {
-                return false;
+                return new SortCheckResult(false, projection, i, prev, curr);
               }
-              continue;
+              // record is sorted
+              continue nextRecord;
             }
 
             int cmp = ((Comparable<Object>) left).compareTo(right);
-            if (cmp > 0 && asc || cmp < 0 && !asc) {
-              return false;
+            if (cmp != 0) {
+              if (cmp > 0 && asc || cmp < 0 && !asc) {
+                return new SortCheckResult(false, projection, i, prev, curr);
+              }
+              // record is sorted
+              continue nextRecord;
             }
           }
+          prev = curr;
         }
       }
     }
-    return true;
+    return new SortCheckResult(true);
   }
 }
