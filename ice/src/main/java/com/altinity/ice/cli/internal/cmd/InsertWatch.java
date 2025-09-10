@@ -187,16 +187,16 @@ public class InsertWatch {
         String bucketName = record.at("/s3/bucket/name").asText();
         String objectKey = record.at("/s3/object/key").asText();
         var target = String.format("s3://%s/%s", bucketName, objectKey);
-        switch (eventName) {
-          case "ObjectCreated:Put":
-            // TODO: exclude metadata/data dirs by default
-            if (matchers.stream().anyMatch(matcher -> matcher.test(target))) {
-              r.add(target);
-            }
-          default:
-            if (logger.isTraceEnabled()) {
-              logger.trace("Message skipped: {} {}", eventName, target);
-            }
+        // s3:ObjectCreated:{Put,Post,Copy,CompleteMultipartUpload}
+        if (eventName.startsWith("ObjectCreated:")) {
+          // TODO: exclude metadata/data dirs by default
+          if (matchers.stream().anyMatch(matcher -> matcher.test(target))) {
+            r.add(target);
+          }
+        } else {
+          if (logger.isTraceEnabled()) {
+            logger.trace("Message skipped: {} {}", eventName, target);
+          }
         }
       }
     }
