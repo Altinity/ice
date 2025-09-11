@@ -523,9 +523,10 @@ public final class Main {
     return loadCatalog(this.configFile());
   }
 
-  private ObjectMapper newObjectMapper() {
+  private static ObjectMapper newObjectMapper() {
     ObjectMapper om = new ObjectMapper(new YAMLFactory());
     om.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+    om.configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, true);
     return om;
   }
 
