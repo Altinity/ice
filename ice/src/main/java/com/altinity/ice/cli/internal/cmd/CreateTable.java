@@ -29,14 +29,17 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.mapping.MappingUtil;
 import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.mapping.NameMappingParser;
 import org.apache.iceberg.parquet.ParquetSchemaUtil;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.utils.Lazy;
 
 public final class CreateTable {
@@ -69,7 +72,15 @@ public final class CreateTable {
     }
     try (var inputIO = Input.newIO(schemaFile, null, s3ClientLazy)) {
       InputFile inputFile = Input.newFile(schemaFile, catalog, inputIO);
-      MessageType type = Metadata.read(inputFile).getFileMetaData().getSchema();
+
+      ParquetMetadata metadata;
+      try {
+        metadata = Metadata.read(inputFile);
+      } catch (NoSuchKeyException e) { // S3FileInput
+        throw new NotFoundException(inputFile.location(), e);
+      } // rethrow NotFoundException
+
+      MessageType type = metadata.getFileMetaData().getSchema();
       Schema fileSchema = ParquetSchemaUtil.convert(type);
       try {
         Map<String, String> props = null;

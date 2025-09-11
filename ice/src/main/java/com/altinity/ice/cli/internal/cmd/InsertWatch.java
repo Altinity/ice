@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,16 +123,27 @@ public class InsertWatch {
               if (!createTableIfNotExists) {
                 throw e;
               }
-              CreateTable.run(
-                catalog,
-                nsTable,
-                insertBatch.iterator().next(),
-                null,
-                true,
-                options.s3NoSignRequest(),
-                null,
-                null);
-              Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
+              boolean retryInsert = true;
+              try {
+                CreateTable.run(
+                    catalog,
+                    nsTable,
+                    insertBatch.iterator().next(),
+                    null,
+                    true,
+                    options.s3NoSignRequest(),
+                    null,
+                    null);
+              } catch (NotFoundException nfe) {
+                if (!options.ignoreNotFound()) {
+                  throw nfe;
+                }
+                logger.info("Table not created ({} don't exist)", insertBatch);
+                retryInsert = false;
+              }
+              if (retryInsert) {
+                Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
+              }
             }
           }
 

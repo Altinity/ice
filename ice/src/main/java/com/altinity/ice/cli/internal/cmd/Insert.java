@@ -83,6 +83,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.utils.Lazy;
 
 public final class Insert {
@@ -364,9 +365,14 @@ public final class Insert {
     InputFile inputFile = Input.newFile(file, catalog, inputIO == null ? tableIO : inputIO);
     ParquetMetadata metadata;
     try {
-      metadata = Metadata.read(inputFile);
+      try {
+        metadata = Metadata.read(inputFile);
+      } catch (NoSuchKeyException e) { // S3FileInput
+        throw new NotFoundException(inputFile.location(), e);
+      }
     } catch (NotFoundException e) {
       if (options.ignoreNotFound) {
+        logger.info("{}: not found (skipping)", file);
         return List.of();
       }
       throw e;
