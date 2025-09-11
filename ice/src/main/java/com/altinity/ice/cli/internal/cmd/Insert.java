@@ -61,6 +61,7 @@ import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileAppender;
 import org.apache.iceberg.io.FileIO;
@@ -92,7 +93,7 @@ public final class Insert {
   // TODO: refactor
   public static void run(
       RESTCatalog catalog, TableIdentifier nsTable, String[] files, Options options)
-      throws IOException, InterruptedException {
+      throws NoSuchTableException, IOException, InterruptedException {
     if (files.length == 0) {
       // no work to be done
       return;

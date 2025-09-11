@@ -22,6 +22,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,8 +84,6 @@ public class InsertWatch {
           // TODO: implement
         };
 
-    boolean createTableExecuted = false;
-
     //noinspection LoopConditionNotUpdatedInsideLoop
     do {
       List<Message> batch = new LinkedList<>();
@@ -117,22 +116,23 @@ public class InsertWatch {
           if (!insertBatch.isEmpty()) {
             logger.info("Inserting {}", insertBatch);
 
-            if (createTableIfNotExists && !createTableExecuted) {
-              if (!catalog.tableExists(nsTable)) {
-                CreateTable.run(
-                    catalog,
-                    nsTable,
-                    insertBatch.iterator().next(),
-                    null,
-                    true,
-                    options.s3NoSignRequest(),
-                    null,
-                    null);
+            try {
+              Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
+            } catch (NoSuchTableException e) {
+              if (!createTableIfNotExists) {
+                throw e;
               }
-              createTableExecuted = true;
+              CreateTable.run(
+                catalog,
+                nsTable,
+                insertBatch.iterator().next(),
+                null,
+                true,
+                options.s3NoSignRequest(),
+                null,
+                null);
+              Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
             }
-
-            Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
           }
 
           confirmProcessed(sqs, sqsQueueURL, batch);
