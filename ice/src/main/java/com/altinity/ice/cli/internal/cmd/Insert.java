@@ -15,7 +15,6 @@ import com.altinity.ice.cli.internal.iceberg.RecordComparator;
 import com.altinity.ice.cli.internal.iceberg.Sorting;
 import com.altinity.ice.cli.internal.iceberg.io.Input;
 import com.altinity.ice.cli.internal.iceberg.parquet.Metadata;
-import com.altinity.ice.cli.internal.jvm.Stats;
 import com.altinity.ice.cli.internal.retry.RetryLog;
 import com.altinity.ice.cli.internal.s3.S3;
 import com.altinity.ice.internal.strings.Strings;
@@ -345,7 +344,7 @@ public final class Insert {
       String file)
       throws IOException {
     logger.info("{}: processing", file);
-    logger.info("{}: jvm: {}", file, Stats.gather());
+    // TODO: move logger.info("{}: jvm: {}", file, Stats.gather()); to a separate thread
 
     Function<String, Boolean> checkNotExists =
         dataFile -> {
