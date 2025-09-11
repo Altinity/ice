@@ -12,10 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - ice --watch to ignore deleted files.
 - ice --watch to recreate table if deleted and --create-table/-p is set.
-- org.apache.parquet.CorruptStatistics warn to exclude stacktrace.
+- org.apache.parquet.CorruptStatistics warnings to exclude stacktrace.
 
 ## Fixed
-- ice YAML/JSON inputs parsing to fail in presence of trailing tokens.
+- ice YAML/JSON inputs parsing ignoring trailing tokens.
 
 ### Removed
 - jvm stats logging.
