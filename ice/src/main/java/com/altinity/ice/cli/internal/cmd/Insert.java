@@ -62,6 +62,7 @@ import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileAppender;
 import org.apache.iceberg.io.FileIO;
@@ -361,7 +362,15 @@ public final class Insert {
         };
 
     InputFile inputFile = Input.newFile(file, catalog, inputIO == null ? tableIO : inputIO);
-    ParquetMetadata metadata = Metadata.read(inputFile);
+    ParquetMetadata metadata;
+    try {
+      metadata = Metadata.read(inputFile);
+    } catch (NotFoundException e) {
+      if (options.ignoreNotFound) {
+        return List.of();
+      }
+      throw e;
+    }
 
     boolean sorted = options.assumeSorted;
     if (!sorted && sortOrder.isSorted()) {
@@ -724,6 +733,7 @@ public final class Insert {
       boolean s3NoSignRequest,
       boolean s3CopyObject,
       boolean assumeSorted,
+      boolean ignoreNotFound,
       @Nullable String retryListFile,
       @Nullable List<Main.IcePartition> partitionList,
       @Nullable List<Main.IceSortOrder> sortOrderList,
@@ -743,6 +753,7 @@ public final class Insert {
       private boolean s3NoSignRequest;
       private boolean s3CopyObject;
       private boolean assumeSorted;
+      private boolean ignoreNotFound;
       String retryListFile;
       List<Main.IcePartition> partitionList = List.of();
       List<Main.IceSortOrder> sortOrderList = List.of();
@@ -795,6 +806,11 @@ public final class Insert {
         return this;
       }
 
+      public Builder ignoreNotFound(boolean ignoreNotFound) {
+        this.ignoreNotFound = ignoreNotFound;
+        return this;
+      }
+
       public Builder retryListFile(String retryListFile) {
         this.retryListFile = retryListFile;
         return this;
@@ -826,6 +842,7 @@ public final class Insert {
             s3NoSignRequest,
             s3CopyObject,
             assumeSorted,
+            ignoreNotFound,
             retryListFile,
             partitionList,
             sortOrderList,

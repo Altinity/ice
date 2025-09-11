@@ -351,6 +351,7 @@ public final class Main {
               .s3NoSignRequest(s3NoSignRequest)
               .s3CopyObject(s3CopyObject)
               .assumeSorted(assumeSorted)
+              .ignoreNotFound(watchMode)
               .retryListFile(retryList)
               .partitionList(partitions)
               .sortOrderList(sortOrders)
