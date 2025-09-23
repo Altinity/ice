@@ -17,12 +17,13 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Stream;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
+import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.ManifestFiles;
 import org.apache.iceberg.PartitionStatisticsFile;
 import org.apache.iceberg.Snapshot;
@@ -36,6 +37,7 @@ import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.FileInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 public record OrphanCleanup(long olderThanMillis, Matcher whitelist, boolean dryRun)
     implements MaintenanceJob {
@@ -141,23 +143,27 @@ public record OrphanCleanup(long olderThanMillis, Matcher whitelist, boolean dry
       for (Snapshot snapshot : meta.snapshots()) {
         knownFiles.add(snapshot.manifestListLocation());
 
-        Stream.concat(
-                snapshot.dataManifests(tableIO).stream(),
-                snapshot.deleteManifests(tableIO).stream())
-            .forEach(
-                manifest -> {
-                  knownFiles.add(manifest.path());
+        List<ManifestFile> manifests;
+        try {
+          manifests = snapshot.allManifests(tableIO);
+        } catch (NotFoundException | NoSuchKeyException e) {
+          // deleted
+          continue;
+        }
 
-                  try (CloseableIterable<DataFile> files = ManifestFiles.read(manifest, tableIO)) {
-                    for (DataFile file : files) {
-                      knownFiles.add(file.location());
-                    }
-                  } catch (NotFoundException e) {
-                    // ignore
-                  } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                  }
-                });
+        manifests.forEach(
+            manifest -> {
+              knownFiles.add(manifest.path());
+              try (CloseableIterable<DataFile> files = ManifestFiles.read(manifest, tableIO)) {
+                for (DataFile file : files) {
+                  knownFiles.add(file.location());
+                }
+              } catch (NotFoundException | NoSuchKeyException e) {
+                // deleted
+              } catch (IOException e) {
+                throw new UncheckedIOException(e);
+              }
+            });
       }
 
       for (StatisticsFile statsFile : meta.statisticsFiles()) {
