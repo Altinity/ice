@@ -368,7 +368,7 @@ public final class Insert {
       try {
         metadata = Metadata.read(inputFile);
       } catch (NoSuchKeyException e) { // S3FileInput
-        throw new NotFoundException(inputFile.location(), e);
+        throw new NotFoundException(e, "%s", inputFile.location());
       }
     } catch (NotFoundException e) {
       if (options.ignoreNotFound) {
