@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/altinity/ice/compare/v0.7.0...master)
 
+## [0.7.1](https://github.com/altinity/ice/compare/v0.7.0...v0.7.1)
+
+### Fixed
+- ice: ClassCastException when reading metrics for enum columns. 
+
 ## [0.7.0](https://github.com/altinity/ice/compare/v0.6.2...v0.7.0)
 
 ### Changed
