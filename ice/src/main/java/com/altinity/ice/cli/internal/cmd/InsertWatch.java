@@ -14,6 +14,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
@@ -197,7 +199,8 @@ public class InsertWatch {
       for (JsonNode record : root.path("Records")) {
         String eventName = record.path("eventName").asText();
         String bucketName = record.at("/s3/bucket/name").asText();
-        String objectKey = record.at("/s3/object/key").asText();
+        String objectKey =
+            URLDecoder.decode(record.at("/s3/object/key").asText(), StandardCharsets.UTF_8);
         var target = String.format("s3://%s/%s", bucketName, objectKey);
         // s3:ObjectCreated:{Put,Post,Copy,CompleteMultipartUpload}
         if (eventName.startsWith("ObjectCreated:")) {
