@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/altinity/ice/compare/v0.7.3...master)
+## [Unreleased](https://github.com/altinity/ice/compare/v0.8.0...master)
+
+## [0.8.0](https://github.com/altinity/ice/compare/v0.7.3...v0.8.0)
+
+### Added
+- ice: Support for using `ice --copy-object` on files over 5 GiB in size.  
+
+### Fixed
+- ice --watch not url decoding object keys from SQS messages.
+- ice: metrics generated for time/timestamp* columns with millisecond precision ([#61](https://github.com/Altinity/ice/pull/61)).
+- ice: NPE while evaluating s3 wildcard expressions against minio ([#60](https://github.com/Altinity/ice/pull/60)).
 
 ## [0.7.3](https://github.com/altinity/ice/compare/v0.7.2...v0.7.3)
 
