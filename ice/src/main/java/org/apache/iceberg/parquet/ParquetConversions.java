@@ -28,6 +28,7 @@ import java.util.function.Function;
 import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.types.Type;
 import org.apache.parquet.io.api.Binary;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.LogicalTypeAnnotation.DecimalLogicalTypeAnnotation;
 import org.apache.parquet.schema.PrimitiveType;
 
@@ -45,10 +46,17 @@ class ParquetConversions {
       case LONG:
       case TIME:
       case TIMESTAMP:
+        // time & timestamp/timestamptz are stored in microseconds
+        // https://iceberg.apache.org/spec/#parquet
+        var millis =
+            (parquetType.getLogicalTypeAnnotation()
+                    instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation t
+                && t.getUnit() == LogicalTypeAnnotation.TimeUnit.MILLIS);
         if (parquetType.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT32) { // uint32
-          return (Literal<T>) Literal.of(Long.valueOf((Integer) value));
+          long v = ((Integer) value).longValue();
+          return (Literal<T>) Literal.of(millis ? v * 1000L : v);
         }
-        return (Literal<T>) Literal.of((Long) value);
+        return (Literal<T>) Literal.of(millis ? (Long) value * 1000L : (Long) value);
       case FLOAT:
         return (Literal<T>) Literal.of((Float) value);
       case DOUBLE:
