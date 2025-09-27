@@ -118,8 +118,7 @@ public final class Insert {
         }
         if (!(underlyingTableIO instanceof S3FileIO)) {
           throw new UnsupportedOperationException(
-              "--force-table-auth is currently only supported for s3:// tables"
-                  + tableIO.getClass());
+              "--force-table-auth is currently only supported for s3:// tables");
         }
         s3ClientSupplier = ((S3FileIO) underlyingTableIO)::client;
       } else {
