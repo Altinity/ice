@@ -39,6 +39,7 @@ import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.internal.crossregion.S3CrossRegionSyncClient;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.utils.Lazy;
 
@@ -60,7 +61,8 @@ public final class CreateTable {
       return;
     }
 
-    Lazy<S3Client> s3ClientLazy = new Lazy<>(() -> S3.newClient(s3NoSignRequest));
+    Lazy<S3Client> s3ClientLazy =
+        new Lazy<>(() -> new S3CrossRegionSyncClient(S3.newClient(s3NoSignRequest)));
 
     if (schemaFile.startsWith("s3://") && schemaFile.contains("*")) {
       var b = S3.bucketPath(schemaFile);

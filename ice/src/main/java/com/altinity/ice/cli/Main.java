@@ -246,9 +246,14 @@ public final class Main {
       @CommandLine.Option(
               names = "--s3-copy-object",
               description =
-                  "Avoid download/upload by using https://docs.aws.amazon.com/AmazonS3/latest/API/API_CopyObject.html for copying S3 objects."
+                  "Avoid download/upload by using https://docs.aws.amazon.com/AmazonS3/latest/API/API_CopyObject.html or https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html for copying S3 objects."
                       + " Note that AWS does not support copying objects anonymously (i.e. you can't use this flag to copy objects from public buckets like https://registry.opendata.aws/aws-public-blockchain/).")
           boolean s3CopyObject,
+      @CommandLine.Option(
+              names = "--s3-multipart-upload-thread-count",
+              description = "Number of threads to use for uploading multiparts.",
+              defaultValue = "4")
+          int s3MultipartUploadThreadCount,
       @CommandLine.Option(names = "--no-commit", description = "Skip transaction commit")
           boolean noCommit,
       @CommandLine.Option(
@@ -350,6 +355,7 @@ public final class Main {
               .forceTableAuth(forceTableAuth)
               .s3NoSignRequest(s3NoSignRequest)
               .s3CopyObject(s3CopyObject)
+              .s3MultipartUploadThreadCount(s3MultipartUploadThreadCount)
               .assumeSorted(assumeSorted)
               .ignoreNotFound(watchMode)
               .retryListFile(retryList)

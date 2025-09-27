@@ -16,7 +16,9 @@ import com.altinity.ice.cli.internal.iceberg.Sorting;
 import com.altinity.ice.cli.internal.iceberg.io.Input;
 import com.altinity.ice.cli.internal.iceberg.parquet.Metadata;
 import com.altinity.ice.cli.internal.retry.RetryLog;
+import com.altinity.ice.cli.internal.s3.CopyObjectMultipart;
 import com.altinity.ice.cli.internal.s3.S3;
+import com.altinity.ice.internal.iceberg.io.SchemeFileIO;
 import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -82,6 +84,7 @@ import org.apache.parquet.schema.MessageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.internal.crossregion.S3CrossRegionSyncClient;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.utils.Lazy;
@@ -109,15 +112,21 @@ public final class Insert {
     try (FileIO tableIO = table.io()) {
       final Supplier<S3Client> s3ClientSupplier;
       if (options.forceTableAuth()) {
-        if (!(tableIO instanceof S3FileIO)) {
-          throw new UnsupportedOperationException(
-              "--force-table-auth is currently only supported for s3:// tables");
+        FileIO underlyingTableIO = tableIO;
+        if (tableIO instanceof SchemeFileIO x) {
+          underlyingTableIO = x.io(table.location());
         }
-        s3ClientSupplier = ((S3FileIO) tableIO)::client;
+        if (!(underlyingTableIO instanceof S3FileIO)) {
+          throw new UnsupportedOperationException(
+              "--force-table-auth is currently only supported for s3:// tables"
+                  + tableIO.getClass());
+        }
+        s3ClientSupplier = ((S3FileIO) underlyingTableIO)::client;
       } else {
         s3ClientSupplier = () -> S3.newClient(options.s3NoSignRequest());
       }
-      Lazy<S3Client> s3ClientLazy = new Lazy<>(s3ClientSupplier);
+      Lazy<S3Client> s3ClientLazy =
+          new Lazy<>(() -> new S3CrossRegionSyncClient(s3ClientSupplier.get()));
       try {
         var filesExpanded =
             Arrays.stream(files)
@@ -442,7 +451,7 @@ public final class Insert {
       }
       S3.BucketPath src = S3.bucketPath(dataFile);
       S3.BucketPath dst = S3.bucketPath(dstDataFile);
-      logger.info("{}: fast copying to {}", file, dstDataFile);
+      logger.info("{}: performing S3 server-side copy to {}", file, dstDataFile);
       CopyObjectRequest copyReq =
           CopyObjectRequest.builder()
               .sourceBucket(src.bucket())
@@ -450,7 +459,12 @@ public final class Insert {
               .destinationBucket(dst.bucket())
               .destinationKey(dst.path())
               .build();
-      s3ClientLazy.getValue().copyObject(copyReq);
+      CopyObjectMultipart.run(
+          s3ClientLazy.getValue(),
+          copyReq,
+          CopyObjectMultipart.Options.builder()
+              .s3MultipartUploadThreadCount(options.s3MultipartUploadThreadCount)
+              .build());
       dataFileSizeInBytes = inputFile.getLength();
       dataFile = dstDataFile;
     } else if (partitionSpec.isPartitioned() && partitionKey == null) {
@@ -738,6 +752,7 @@ public final class Insert {
       boolean forceTableAuth,
       boolean s3NoSignRequest,
       boolean s3CopyObject,
+      int s3MultipartUploadThreadCount,
       boolean assumeSorted,
       boolean ignoreNotFound,
       @Nullable String retryListFile,
@@ -750,7 +765,7 @@ public final class Insert {
     }
 
     public static final class Builder {
-      DataFileNamingStrategy.Name dataFileNamingStrategy;
+      private DataFileNamingStrategy.Name dataFileNamingStrategy;
       private boolean skipDuplicates;
       private boolean noCommit;
       private boolean noCopy;
@@ -758,11 +773,12 @@ public final class Insert {
       private boolean forceTableAuth;
       private boolean s3NoSignRequest;
       private boolean s3CopyObject;
+      private int s3MultipartUploadThreadCount;
       private boolean assumeSorted;
       private boolean ignoreNotFound;
-      String retryListFile;
-      List<Main.IcePartition> partitionList = List.of();
-      List<Main.IceSortOrder> sortOrderList = List.of();
+      private String retryListFile;
+      private List<Main.IcePartition> partitionList = List.of();
+      private List<Main.IceSortOrder> sortOrderList = List.of();
       private int threadCount = Runtime.getRuntime().availableProcessors();
 
       private Builder() {}
@@ -807,6 +823,11 @@ public final class Insert {
         return this;
       }
 
+      public Builder s3MultipartUploadThreadCount(int s3MultipartUploadThreadCount) {
+        this.s3MultipartUploadThreadCount = s3MultipartUploadThreadCount;
+        return this;
+      }
+
       public Builder assumeSorted(boolean assumeSorted) {
         this.assumeSorted = assumeSorted;
         return this;
@@ -847,6 +868,7 @@ public final class Insert {
             forceTableAuth,
             s3NoSignRequest,
             s3CopyObject,
+            s3MultipartUploadThreadCount,
             assumeSorted,
             ignoreNotFound,
             retryListFile,
