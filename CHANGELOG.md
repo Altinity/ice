@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.8.0](https://github.com/altinity/ice/compare/v0.7.3...v0.8.0)
 
 ### Added
-- ice: Support for using `ice --copy-object` on files over 5 GiB in size.  
+- ice: Support for using `ice --s3-copy-object` on files over 5 GiB in size.  
 
 ### Fixed
 - ice --watch not url decoding object keys from SQS messages.
