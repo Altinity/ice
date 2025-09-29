@@ -134,7 +134,9 @@ public class ParquetUtil {
 
         Statistics stats = column.getStatistics();
         if (stats != null && !stats.isEmpty()) {
-          increment(nullValueCounts, fieldId, stats.getNumNulls());
+          if (stats.isNumNullsSet()) {
+            increment(nullValueCounts, fieldId, stats.getNumNulls());
+          }
 
           // when there are metrics gathered by Iceberg for a column, we should use those instead
           // of the ones from Parquet
