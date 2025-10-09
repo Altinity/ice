@@ -11,7 +11,6 @@ package com.altinity.ice.rest.catalog.internal.maintenance;
 
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.iceberg.RecordComparator;
-import com.altinity.ice.cli.internal.iceberg.parquet.Metadata;
 import com.altinity.ice.internal.iceberg.io.SchemeFileIO;
 import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
@@ -23,7 +22,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.stream.Stream;
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
@@ -48,11 +46,9 @@ import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.FileInfo;
 import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.parquet.Parquet;
-import org.apache.iceberg.parquet.ParquetUtil;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.Iterators;
 import org.apache.iceberg.relocated.com.google.common.collect.PeekingIterator;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,25 +166,29 @@ public record DataCompaction(
     OutputFile outputFile =
         tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
 
+    MetricsConfig metricsConfig = MetricsConfig.forTable(table);
+
     Parquet.WriteBuilder writeBuilder =
         Parquet.write(outputFile)
             .overwrite(false)
             .createWriterFunc(GenericParquetWriter::buildWriter)
+            .metricsConfig(metricsConfig)
             .schema(tableSchema);
 
-    long dataFileSizeInBytes = 0;
+    long dataFileSizeInBytes;
+    Metrics metrics;
 
     if (sortOrder.isSorted()) {
       // k-way merge sort
 
       List<CloseableIterable<Record>> inputs = new ArrayList<>(dataFiles.size());
       for (DataFile dataFile : dataFiles) {
-        Parquet.ReadBuilder readBuilder =
+        Parquet.ReadBuilder rb =
             Parquet.read(tableIO.newInputFile(dataFile.location()))
                 .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
                 .project(tableSchema)
                 .reuseContainers();
-        inputs.add(readBuilder.build());
+        inputs.add(rb.build());
       }
       List<PeekingIterator<Record>> iterators =
           inputs.stream().map(CloseableIterable::iterator).map(Iterators::peekingIterator).toList();
@@ -202,29 +202,20 @@ public record DataCompaction(
         if (it.hasNext()) heap.add(it);
       }
 
-      FileAppender<Record> writer = null;
-      try {
-        writer = writeBuilder.build();
-
+      try (FileAppender<Record> writer = writeBuilder.build()) {
         while (!heap.isEmpty()) {
           PeekingIterator<Record> it = heap.poll();
           Record next = it.next();
           writer.add(next);
           if (it.hasNext()) heap.add(it);
         }
-      } finally {
-        if (writer != null) {
-          writer.close();
-        }
+        writer.close();
+
+        dataFileSizeInBytes = writer.length();
+        metrics = writer.metrics();
       }
-
-      dataFileSizeInBytes = writer.length();
     } else {
-
-      FileAppender<Record> writer = null;
-      try {
-        writer = writeBuilder.build();
-
+      try (FileAppender<Record> writer = writeBuilder.build()) {
         for (DataFile dataFile : dataFiles) {
           Parquet.ReadBuilder rb =
               Parquet.read(tableIO.newInputFile(dataFile.location()))
@@ -236,20 +227,15 @@ public record DataCompaction(
             writer.addAll(r);
           }
         }
-      } finally {
-        if (writer != null) {
-          writer.close();
-        }
+        writer.close();
+
+        dataFileSizeInBytes = writer.length();
+        metrics = writer.metrics();
       }
-      dataFileSizeInBytes = writer.length();
     }
 
     AppendFiles appendOp = tx.newAppend();
 
-    ParquetMetadata metadata = Metadata.read(outputFile.toInputFile());
-
-    MetricsConfig metricsConfig = MetricsConfig.forTable(table);
-    Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
     DataFile dataFileObj =
         new DataFiles.Builder(tableSpec)
             .withPath(outputFile.location())

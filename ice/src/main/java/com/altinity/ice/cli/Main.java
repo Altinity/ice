@@ -10,6 +10,7 @@
 package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
+import com.altinity.ice.cli.internal.cmd.AlterTable;
 import com.altinity.ice.cli.internal.cmd.Check;
 import com.altinity.ice.cli.internal.cmd.CreateNamespace;
 import com.altinity.ice.cli.internal.cmd.CreateTable;
@@ -208,6 +209,40 @@ public final class Main {
     }
   }
 
+  @CommandLine.Command(name = "alter-table", description = "Alter table.")
+  void alterTable(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<updates>",
+              description =
+                  """
+                  List of table modifications,
+                  e.g. [{"op":"drop_column","name":"foo"}]
+
+                  Supported operations:
+                    - add_column      (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional))
+                    - alter_column    (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types))
+                    - rename_column   (params: "name", "new_name")
+                    - drop_column     (params: "name")
+                    - set_tblproperty (params: "key", "value" (set to null to remove table property))
+                    - rename_to       (params: "new_name")
+                  """)
+          String updatesJson)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+      TableIdentifier tableId = TableIdentifier.parse(name);
+
+      ObjectMapper mapper = newObjectMapper();
+      AlterTable.Update[] updates = mapper.readValue(updatesJson, AlterTable.Update[].class);
+      AlterTable.run(catalog, tableId, Arrays.stream(updates).toList());
+    }
+  }
+
   @CommandLine.Command(name = "insert", description = "Write data to catalog.")
   void insert(
       @CommandLine.Parameters(
@@ -263,6 +298,8 @@ public final class Main {
           Insert.DataFileNamingStrategy.Name dataFileNamingStrategy,
       @CommandLine.Option(names = "--skip-duplicates", description = "Skip duplicates")
           boolean skipDuplicates,
+      @CommandLine.Option(names = "--force-duplicates", description = "Force insert duplicates")
+          boolean forceDuplicates,
       @CommandLine.Option(
               names = {"--retry-list"},
               description =
@@ -349,6 +386,7 @@ public final class Main {
           Insert.Options.builder()
               .dataFileNamingStrategy(dataFileNamingStrategy)
               .skipDuplicates(skipDuplicates)
+              .forceDuplicates(forceDuplicates)
               .noCommit(noCommit)
               .noCopy(noCopy)
               .forceNoCopy(forceNoCopy)

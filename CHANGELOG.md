@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/altinity/ice/compare/v0.8.1...master)
 
+### Added
+- `ice alter-table` command. 
+- `ice insert --force-duplicates` CLI flag.
+- `ice describe` output to include nested metrics.
+
+### Changed
+- `ice insert` to accept files with compatible schema: subset of table schema and/or with primitive type promotions listed in
+[Schema Evolution](https://iceberg.apache.org/spec/#schema-evolution) (previously file schema had to match exactly).
+
+### Fixed
+- Calculation of nested metrics.
+
 ## [0.8.1](https://github.com/altinity/ice/compare/v0.8.0...v0.8.1)
 
 ### Fixed

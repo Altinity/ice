@@ -13,6 +13,7 @@ import com.altinity.ice.cli.Main;
 import com.altinity.ice.cli.internal.iceberg.Partitioning;
 import com.altinity.ice.cli.internal.iceberg.Sorting;
 import com.altinity.ice.cli.internal.iceberg.io.Input;
+import com.altinity.ice.cli.internal.iceberg.parquet.MessageTypeToSchema;
 import com.altinity.ice.cli.internal.iceberg.parquet.Metadata;
 import com.altinity.ice.cli.internal.s3.S3;
 import java.io.IOException;
@@ -83,20 +84,25 @@ public final class CreateTable {
       } // rethrow NotFoundException
 
       MessageType type = metadata.getFileMetaData().getSchema();
-      Schema fileSchema = ParquetSchemaUtil.convert(type);
+      Schema initialSchema = MessageTypeToSchema.convertInitial(type);
+
+      if (ParquetSchemaUtil.hasIds(type)
+          && !initialSchema.sameSchema(MessageTypeToSchema.convert(type))) {
+        // https://github.com/apache/iceberg/blob/16fa673782233eb2b692d463deb8be3e52c5f378/core/src/main/java/org/apache/iceberg/TableMetadata.java#L117-L120
+        throw new BadRequestException(
+            "parquet file contains field ids that cannot be transferred over to a new table");
+      }
+
       try {
-        Map<String, String> props = null;
-        if (!ParquetSchemaUtil.hasIds(type)) {
-          // force name-based resolution instead of position-based resolution
-          NameMapping mapping = MappingUtil.create(fileSchema);
-          String mappingJson = NameMappingParser.toJson(mapping);
-          props = Map.of(TableProperties.DEFAULT_NAME_MAPPING, mappingJson);
-        }
+        // force name-based resolution instead of position-based resolution
+        NameMapping mapping = MappingUtil.create(initialSchema);
+        String mappingJson = NameMappingParser.toJson(mapping);
+        var props = Map.of(TableProperties.DEFAULT_NAME_MAPPING, mappingJson);
 
         PartitionSpec partitionSpec =
             partitionList == null
                 ? PartitionSpec.unpartitioned()
-                : Partitioning.newPartitionSpec(fileSchema, partitionList);
+                : Partitioning.newPartitionSpec(initialSchema, partitionList);
 
         if (ignoreAlreadyExists) { // -p
           createNamespace(catalog, nsTable.namespace());
@@ -104,7 +110,8 @@ public final class CreateTable {
 
         // if we don't set location, it's automatically set to $warehouse/$namespace/$table
         Transaction tx =
-            catalog.newCreateTableTransaction(nsTable, fileSchema, partitionSpec, location, props);
+            catalog.newCreateTableTransaction(
+                nsTable, initialSchema, partitionSpec, location, props);
 
         if (sortOrderList != null && !sortOrderList.isEmpty()) {
           ReplaceSortOrder op = tx.replaceSortOrder();

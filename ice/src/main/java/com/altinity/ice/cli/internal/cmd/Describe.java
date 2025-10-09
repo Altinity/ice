@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Snapshot;
@@ -123,52 +124,85 @@ public final class Describe {
       throws IOException {
     List<Table.Metrics> metricsList = new ArrayList<>();
     TableScan scan = table.newScan().includeColumnStats();
-    CloseableIterable<FileScanTask> tasks = scan.planFiles();
+    try (CloseableIterable<FileScanTask> tasks = scan.planFiles()) {
+      for (FileScanTask task : tasks) {
+        DataFile dataFile = task.file();
+        List<Table.ColumnMetrics> columnMetrics = new ArrayList<>();
 
-    for (FileScanTask task : tasks) {
-      DataFile dataFile = task.file();
-      List<Table.ColumnMetrics> columnMetrics = new ArrayList<>();
+        Map<Integer, Long> valueCounts = dataFile.valueCounts();
+        Map<Integer, Long> nullCounts = dataFile.nullValueCounts();
+        Map<Integer, ByteBuffer> lowerBounds = dataFile.lowerBounds();
+        Map<Integer, ByteBuffer> upperBounds = dataFile.upperBounds();
 
-      Map<Integer, Long> valueCounts = dataFile.valueCounts();
-      Map<Integer, Long> nullCounts = dataFile.nullValueCounts();
-      Map<Integer, ByteBuffer> lowerBounds = dataFile.lowerBounds();
-      Map<Integer, ByteBuffer> upperBounds = dataFile.upperBounds();
-
-      if (valueCounts == null && nullCounts == null && lowerBounds == null && upperBounds == null) {
-        continue;
-      }
-
-      for (Types.NestedField field : table.schema().columns()) {
-        int id = field.fieldId();
-        String lowerBound = null;
-        String upperBound = null;
-
-        if (lowerBounds != null) {
-          ByteBuffer lower = lowerBounds.get(id);
-          lowerBound =
-              lower != null ? Conversions.fromByteBuffer(field.type(), lower).toString() : null;
-        }
-        if (upperBounds != null) {
-          ByteBuffer upper = upperBounds.get(id);
-          upperBound =
-              upper != null ? Conversions.fromByteBuffer(field.type(), upper).toString() : null;
+        if (valueCounts == null
+            && nullCounts == null
+            && lowerBounds == null
+            && upperBounds == null) {
+          continue;
         }
 
-        columnMetrics.add(
-            new Table.ColumnMetrics(
-                field.name(),
-                valueCounts != null ? valueCounts.get(id) : null,
-                nullCounts != null ? nullCounts.get(id) : null,
-                lowerBound,
-                upperBound));
-      }
+        gatherNestedTableMetrics(
+            table.schema().columns(),
+            valueCounts,
+            nullCounts,
+            lowerBounds,
+            upperBounds,
+            columnMetrics);
 
-      metricsList.add(
-          new Table.Metrics(dataFile.location(), dataFile.recordCount(), columnMetrics));
+        metricsList.add(
+            new Table.Metrics(dataFile.location(), dataFile.recordCount(), columnMetrics));
+      }
     }
-
-    tasks.close();
     return metricsList;
+  }
+
+  private static void gatherNestedTableMetrics(
+      List<Types.NestedField> fields,
+      @Nullable Map<Integer, Long> valueCounts,
+      @Nullable Map<Integer, Long> nullCounts,
+      @Nullable Map<Integer, ByteBuffer> lowerBounds,
+      @Nullable Map<Integer, ByteBuffer> upperBounds,
+      List<Table.ColumnMetrics> result) {
+    for (Types.NestedField field : fields) {
+      int id = field.fieldId();
+
+      String lowerBound = null;
+      if (lowerBounds != null) {
+        ByteBuffer lower = lowerBounds.get(id);
+        if (lower != null) {
+          lowerBound = Conversions.fromByteBuffer(field.type(), lower).toString();
+        }
+      }
+
+      String upperBound = null;
+      if (upperBounds != null) {
+        ByteBuffer upper = upperBounds.get(id);
+        if (upper != null) {
+          upperBound = Conversions.fromByteBuffer(field.type(), upper).toString();
+        }
+      }
+
+      List<Table.ColumnMetrics> nested = new ArrayList<>();
+
+      if (field.type().isStructType()) {
+        gatherNestedTableMetrics(
+            field.type().asStructType().fields(),
+            valueCounts,
+            nullCounts,
+            lowerBounds,
+            upperBounds,
+            nested);
+      }
+
+      result.add(
+          new Table.ColumnMetrics(
+              field.name(),
+              valueCounts != null ? valueCounts.get(id) : null,
+              nullCounts != null ? nullCounts.get(id) : null,
+              lowerBound,
+              upperBound,
+              nested));
+    }
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -204,6 +238,11 @@ public final class Describe {
     record Metrics(String file, long recordCount, List<Table.ColumnMetrics> columns) {}
 
     record ColumnMetrics(
-        String name, Long valueCount, Long nullCount, String lowerBound, String upperBound) {}
+        String name,
+        Long valueCount,
+        Long nullCount,
+        String lowerBound,
+        String upperBound,
+        List<ColumnMetrics> nested) {}
   }
 }

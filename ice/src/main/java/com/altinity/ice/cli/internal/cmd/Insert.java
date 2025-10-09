@@ -12,8 +12,10 @@ package com.altinity.ice.cli.internal.cmd;
 import com.altinity.ice.cli.Main;
 import com.altinity.ice.cli.internal.iceberg.Partitioning;
 import com.altinity.ice.cli.internal.iceberg.RecordComparator;
+import com.altinity.ice.cli.internal.iceberg.SchemaEvolution;
 import com.altinity.ice.cli.internal.iceberg.Sorting;
 import com.altinity.ice.cli.internal.iceberg.io.Input;
+import com.altinity.ice.cli.internal.iceberg.parquet.MessageTypeToSchema;
 import com.altinity.ice.cli.internal.iceberg.parquet.Metadata;
 import com.altinity.ice.cli.internal.retry.RetryLog;
 import com.altinity.ice.cli.internal.s3.CopyObjectMultipart;
@@ -57,7 +59,6 @@ import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.data.GenericAppenderFactory;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
@@ -70,15 +71,11 @@ import org.apache.iceberg.io.FileAppender;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.io.OutputFile;
-import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.mapping.NameMappingParser;
 import org.apache.iceberg.parquet.Parquet;
-import org.apache.iceberg.parquet.ParquetSchemaUtil;
 import org.apache.iceberg.parquet.ParquetUtil;
 import org.apache.iceberg.rest.RESTCatalog;
-import org.apache.iceberg.types.TypeUtil;
-import org.apache.iceberg.types.Types;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 import org.slf4j.Logger;
@@ -339,6 +336,7 @@ public final class Insert {
     }
   }
 
+  // TODO: refactor
   private static List<DataFile> processFile(
       RESTCatalog catalog,
       Table table,
@@ -364,8 +362,10 @@ public final class Insert {
               logger.info("{}: duplicate (skipping)", file);
               return true;
             }
-            throw new AlreadyExistsException(
-                String.format("%s is already referenced by the table", dataFile));
+            if (!options.forceDuplicates) {
+              throw new AlreadyExistsException(
+                  String.format("%s is already referenced by the table", dataFile));
+            }
           }
           return false;
         };
@@ -420,18 +420,31 @@ public final class Insert {
     }
 
     MessageType type = metadata.getFileMetaData().getSchema();
-    Schema fileSchema = ParquetSchemaUtil.convert(type); // nameMapping applied (when present)
-    if (!sameSchema(table, fileSchema)) {
+    Map<String, String> tableProps = table.properties();
+    String nameMappingString = tableProps.get(TableProperties.DEFAULT_NAME_MAPPING);
+    NameMapping nameMapping =
+        !Strings.isNullOrEmpty(nameMappingString)
+            ? NameMappingParser.fromJson(nameMappingString)
+            : null;
+    Schema fileSchema = MessageTypeToSchema.convert(type, nameMapping);
+
+    if (!SchemaEvolution.isSubset(fileSchema, table.schema())) {
       throw new BadRequestException(
-          String.format("%s's schema doesn't match table's schema", file));
+          String.format(
+              "%s's schema doesn't match table's schema:\nfile:  %s\ntable: %s",
+              file, sprintTable(fileSchema), sprintTable(table.schema())));
     }
     var noCopyPossible = file.startsWith(table.location()) || options.forceNoCopy();
     // TODO: check before uploading anything
     if (options.noCopy() && !noCopyPossible) {
       throw new BadRequestException(
-          file + " cannot be added to catalog without copy"); // TODO: explain
+          file
+              + " cannot be added to catalog without copy (file is located outside table.location and --force-no-copy isn't set)");
     }
     long dataFileSizeInBytes;
+
+    MetricsConfig metricsConfig = MetricsConfig.forTable(table);
+    Metrics metrics = null;
 
     var start = System.currentTimeMillis();
     var dataFile = Strings.replacePrefix(file, "s3a://", "s3://");
@@ -468,7 +481,14 @@ public final class Insert {
       dataFile = dstDataFile;
     } else if (partitionSpec.isPartitioned() && partitionKey == null) {
       return copyPartitionedAndSorted(
-          file, tableSchema, partitionSpec, sortOrder, tableIO, inputFile, dstDataFileSource);
+          file,
+          tableSchema,
+          partitionSpec,
+          sortOrder,
+          metricsConfig,
+          tableIO,
+          inputFile,
+          dstDataFileSource);
     } else if (sortOrder.isSorted() && !sorted) {
       return Collections.singletonList(
           copySorted(
@@ -477,6 +497,7 @@ public final class Insert {
               tableSchema,
               partitionSpec,
               sortOrder,
+              metricsConfig,
               tableIO,
               inputFile,
               dataFileNamingStrategy,
@@ -498,20 +519,34 @@ public final class Insert {
               .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
               .project(tableSchema)
               .reuseContainers();
+
       Parquet.WriteBuilder writeBuilder =
           Parquet.write(outputFile)
               .overwrite(dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL)
               .createWriterFunc(GenericParquetWriter::buildWriter)
+              .metricsConfig(metricsConfig)
               .schema(tableSchema);
+
       logger.info("{}: copying to {}", file, dstDataFile);
-      // file size may have changed due to different compression, etc.
-      dataFileSizeInBytes = copy(readBuilder, writeBuilder);
+
+      try (CloseableIterable<Record> parquetReader = readBuilder.build()) {
+        try (FileAppender<Record> writer = writeBuilder.build()) {
+          writer.addAll(parquetReader);
+          writer.close(); // for write.length()
+          dataFileSizeInBytes = writer.length();
+          metrics = writer.metrics();
+        }
+      }
+
       dataFile = dstDataFile;
     }
     logger.info(
         "{}: adding data file (copy took {}s)", file, (System.currentTimeMillis() - start) / 1000);
-    MetricsConfig metricsConfig = MetricsConfig.forTable(table);
-    Metrics metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig);
+
+    if (metrics == null) {
+      metrics = ParquetUtil.footerMetrics(metadata, Stream.empty(), metricsConfig, nameMapping);
+    }
+
     DataFile dataFileObj =
         new DataFiles.Builder(partitionSpec)
             .withPath(dataFile)
@@ -528,13 +563,12 @@ public final class Insert {
       Schema tableSchema,
       PartitionSpec partitionSpec,
       SortOrder sortOrder,
+      MetricsConfig metricsConfig,
       FileIO tableIO,
       InputFile inputFile,
       DataFileNamingStrategy dstDataFileSource)
       throws IOException {
     logger.info("{}: partitioning{}", file, sortOrder.isSorted() ? "+sorting" : "");
-
-    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(tableSchema, partitionSpec);
 
     // FIXME: stream to reduce memory usage
     Map<PartitionKey, List<Record>> partitionedRecords =
@@ -563,14 +597,21 @@ public final class Insert {
 
       long fileSizeInBytes;
       Metrics metrics;
-      try (FileAppender<Record> appender =
-          appenderFactory.newAppender(outputFile, FileFormat.PARQUET)) {
+
+      Parquet.WriteBuilder writeBuilder =
+          Parquet.write(outputFile)
+              .overwrite(true) // FIXME
+              .createWriterFunc(GenericParquetWriter::buildWriter)
+              .metricsConfig(metricsConfig)
+              .schema(tableSchema);
+
+      try (FileAppender<Record> writer = writeBuilder.build()) {
         for (Record record : records) {
-          appender.add(record);
+          writer.add(record);
         }
-        appender.close();
-        fileSizeInBytes = appender.length();
-        metrics = appender.metrics();
+        writer.close();
+        fileSizeInBytes = writer.length();
+        metrics = writer.metrics();
       }
 
       logger.info("{}: adding data file: {}", file, dstDataFile);
@@ -587,12 +628,21 @@ public final class Insert {
     return dataFiles;
   }
 
+  private static String sprintTable(Schema s) {
+    return String.format(
+        "{%s}",
+        s.columns().stream()
+            .map(field -> field + (s.identifierFieldIds().contains(field.fieldId()) ? " (id)" : ""))
+            .collect(Collectors.joining("; ")));
+  }
+
   private static DataFile copySorted(
       String file,
       String dstDataFile,
       Schema tableSchema,
       PartitionSpec partitionSpec,
       SortOrder sortOrder,
+      MetricsConfig metricsConfig,
       FileIO tableIO,
       InputFile inputFile,
       DataFileNamingStrategy.Name dataFileNamingStrategy,
@@ -629,17 +679,18 @@ public final class Insert {
             .overwrite(
                 dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL) // FIXME
             .createWriterFunc(GenericParquetWriter::buildWriter)
+            .metricsConfig(metricsConfig)
             .schema(tableSchema);
 
     long fileSizeInBytes;
     Metrics metrics;
-    try (FileAppender<Record> appender = writeBuilder.build()) {
+    try (FileAppender<Record> writer = writeBuilder.build()) {
       for (Record record : records) {
-        appender.add(record);
+        writer.add(record);
       }
-      appender.close();
-      fileSizeInBytes = appender.length();
-      metrics = appender.metrics();
+      writer.close();
+      fileSizeInBytes = writer.length();
+      metrics = writer.metrics();
     }
 
     logger.info(
@@ -654,44 +705,6 @@ public final class Insert {
         .withMetrics(metrics)
         .withPartition(partitionKey)
         .build();
-  }
-
-  private static boolean sameSchema(Table table, Schema fileSchema) {
-    boolean sameSchema;
-    Schema tableSchema = table.schema();
-    String nameMapping = table.properties().get(TableProperties.DEFAULT_NAME_MAPPING);
-    if (nameMapping != null && !nameMapping.isEmpty()) {
-      NameMapping mapping = NameMappingParser.fromJson(nameMapping);
-      Map<Integer, String> tableSchemaIdToName = tableSchema.idToName();
-      var tableSchemaWithNameMappingApplied =
-          TypeUtil.assignIds(
-              Types.StructType.of(tableSchema.columns()),
-              oldId -> {
-                var fieldName = tableSchemaIdToName.get(oldId);
-                MappedField mappedField = mapping.find(fieldName);
-                return mappedField.id();
-              });
-      sameSchema = tableSchemaWithNameMappingApplied.asStructType().equals(fileSchema.asStruct());
-    } else {
-      sameSchema = tableSchema.sameSchema(fileSchema);
-    }
-    return sameSchema;
-  }
-
-  private static long copy(Parquet.ReadBuilder rb, Parquet.WriteBuilder wb) throws IOException {
-    try (CloseableIterable<Record> parquetReader = rb.build()) {
-      // not using try-with-resources because we need to close() for writer.length()
-      FileAppender<Record> writer = null;
-      try {
-        writer = wb.build();
-        writer.addAll(parquetReader);
-      } finally {
-        if (writer != null) {
-          writer.close();
-        }
-      }
-      return writer.length();
-    }
   }
 
   public interface DataFileNamingStrategy {
@@ -745,6 +758,7 @@ public final class Insert {
   public record Options(
       DataFileNamingStrategy.Name dataFileNamingStrategy,
       boolean skipDuplicates,
+      boolean forceDuplicates,
       boolean noCommit,
       boolean noCopy,
       boolean forceNoCopy,
@@ -766,6 +780,7 @@ public final class Insert {
     public static final class Builder {
       private DataFileNamingStrategy.Name dataFileNamingStrategy;
       private boolean skipDuplicates;
+      private boolean forceDuplicates;
       private boolean noCommit;
       private boolean noCopy;
       private boolean forceNoCopy;
@@ -789,6 +804,11 @@ public final class Insert {
 
       public Builder skipDuplicates(boolean skipDuplicates) {
         this.skipDuplicates = skipDuplicates;
+        return this;
+      }
+
+      public Builder forceDuplicates(boolean forceDuplicates) {
+        this.forceDuplicates = forceDuplicates;
         return this;
       }
 
@@ -861,6 +881,7 @@ public final class Insert {
         return new Options(
             dataFileNamingStrategy,
             skipDuplicates,
+            forceDuplicates,
             noCommit,
             forceNoCopy || noCopy,
             forceNoCopy,
