@@ -137,7 +137,7 @@ public final class Sorting {
 
     try (CloseableIterable<Record> records =
         Parquet.read(inputFile)
-            .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
+            .createReaderFunc(s -> GenericParquetReaders.buildReader(projectedSchema, s))
             .project(projectedSchema)
             .build()) {
 
