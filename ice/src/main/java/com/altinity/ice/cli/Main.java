@@ -18,6 +18,7 @@ import com.altinity.ice.cli.internal.cmd.Delete;
 import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
+import com.altinity.ice.cli.internal.cmd.DescribeParquet;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
 import com.altinity.ice.cli.internal.cmd.Scan;
@@ -131,6 +132,61 @@ public final class Main {
         options.add(Describe.Option.INCLUDE_METRICS);
       }
       Describe.run(catalog, target, json, options.toArray(new Describe.Option[0]));
+    }
+  }
+
+  @CommandLine.Command(name = "describe-parquet", description = "Describe parquet file metadata.")
+  void describeParquet(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<target>",
+              description = "Path to parquet file")
+          String target,
+      @CommandLine.Option(
+              names = {"-a", "--all"},
+              description = "Show everything")
+          boolean showAll,
+      @CommandLine.Option(
+              names = {"-s", "--summary"},
+              description = "Show size, rows, number of row groups, size, compress_size, etc.")
+          boolean showSummary,
+      @CommandLine.Option(
+              names = {"-c", "--columns"},
+              description = "Show columns")
+          boolean showColumns,
+      @CommandLine.Option(
+              names = {"-r", "--row-groups"},
+              description = "Show row groups")
+          boolean showRowGroups,
+      @CommandLine.Option(
+              names = {"-d", "--row-group-details"},
+              description = "Show column stats within row group")
+          boolean showRowGroupDetails,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      var options = new java.util.ArrayList<DescribeParquet.Option>();
+      if (showAll || showSummary) {
+        options.add(DescribeParquet.Option.SUMMARY);
+      }
+      if (showAll || showColumns) {
+        options.add(DescribeParquet.Option.COLUMNS);
+      }
+      if (showAll || showRowGroups) {
+        options.add(DescribeParquet.Option.ROW_GROUPS);
+      }
+      if (showAll || showRowGroupDetails) {
+        options.add(DescribeParquet.Option.ROW_GROUP_DETAILS);
+      }
+
+      if (options.isEmpty()) {
+        options.add(DescribeParquet.Option.SUMMARY);
+      }
+
+      DescribeParquet.run(catalog, target, json, options.toArray(new DescribeParquet.Option[0]));
     }
   }
 
