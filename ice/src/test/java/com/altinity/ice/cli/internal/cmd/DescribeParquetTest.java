@@ -30,9 +30,9 @@ public class DescribeParquetTest {
       InMemoryCatalog catalog = new InMemoryCatalog();
       catalog.initialize("test", java.util.Map.of());
       
-      String sampleFile = Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet").location();
+      var sampleFile = Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet");
       
-      DescribeParquet.run((org.apache.iceberg.rest.RESTCatalog) null, sampleFile, false, DescribeParquet.Option.SUMMARY);
+      DescribeParquet.run(sampleFile, false, DescribeParquet.Option.SUMMARY);
       
       String output = outContent.toString();
       
@@ -52,9 +52,9 @@ public class DescribeParquetTest {
     System.setOut(new PrintStream(outContent));
     
     try {
-      String sampleFile = Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet").location();
+      var sampleFile = Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet");
       
-      DescribeParquet.run(null, sampleFile, false, DescribeParquet.Option.COLUMNS);
+      DescribeParquet.run(sampleFile, false, DescribeParquet.Option.COLUMNS);
       
       String output = outContent.toString();
       
@@ -73,9 +73,9 @@ public class DescribeParquetTest {
     System.setOut(new PrintStream(outContent));
     
     try {
-      String sampleFile = Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet").location();
+      var sampleFile = Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet");
       
-      DescribeParquet.run(null, sampleFile, true, DescribeParquet.Option.SUMMARY);
+      DescribeParquet.run(sampleFile, true, DescribeParquet.Option.SUMMARY);
       
       String output = outContent.toString();
       

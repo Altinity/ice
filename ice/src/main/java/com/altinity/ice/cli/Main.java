@@ -151,7 +151,7 @@ public final class Main {
               description = "Show size, rows, number of row groups, size, compress_size, etc.")
           boolean showSummary,
       @CommandLine.Option(
-              names = {"-c", "--columns"},
+              names = {"--columns"},
               description = "Show columns")
           boolean showColumns,
       @CommandLine.Option(

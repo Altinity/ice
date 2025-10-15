@@ -50,6 +50,15 @@ public final class DescribeParquet {
     
     FileIO io = Input.newIO(filePath, null, new Lazy<>(() -> null));
     InputFile inputFile = Input.newFile(filePath, catalog, io);
+    run(inputFile, json, options);
+  }
+
+  public static void run(
+      InputFile inputFile,
+      boolean json,
+      Option... options)
+      throws IOException {
+    
     ParquetMetadata metadata = Metadata.read(inputFile);
     
     ParquetInfo info = extractParquetInfo(metadata, options);
