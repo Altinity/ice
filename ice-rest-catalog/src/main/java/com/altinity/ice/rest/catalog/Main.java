@@ -30,8 +30,10 @@ import com.altinity.ice.rest.catalog.internal.maintenance.SnapshotCleanup;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAdapter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAuthorizationHandler;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogHandler;
-import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableAWCredentials;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareConfig;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareCredentials;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableConfig;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableCredentials;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogServlet;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.net.HostAndPort;
@@ -49,6 +51,7 @@ import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.relocated.com.google.common.base.Function;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -235,6 +238,10 @@ public final class Main implements Callable<Integer> {
       mux.insertHandler(createAuthorizationHandler(config.bearerTokens(), config));
 
       restCatalogAdapter = new RESTCatalogAdapter(catalog);
+      var globalConfig = config.toIcebergConfigDefaults();
+      if (!globalConfig.isEmpty()) {
+        restCatalogAdapter = new RESTCatalogMiddlewareConfig(restCatalogAdapter, globalConfig);
+      }
       var loadTableConfig = config.toIcebergLoadTableConfig();
       if (!loadTableConfig.isEmpty()) {
         restCatalogAdapter =
@@ -244,12 +251,17 @@ public final class Main implements Callable<Integer> {
       if (awsAuth) {
         Map<String, AwsCredentialsProvider> awsCredentialsProviders =
             createAwsCredentialsProviders(config.bearerTokens(), config, icebergConfig);
+        Function<String, AwsCredentialsProvider> auth = awsCredentialsProviders::get;
         restCatalogAdapter =
-            new RESTCatalogMiddlewareTableAWCredentials(
-                restCatalogAdapter, awsCredentialsProviders::get);
+            new RESTCatalogMiddlewareTableCredentials(
+                new RESTCatalogMiddlewareCredentials(restCatalogAdapter, auth), auth);
       }
     } else {
       restCatalogAdapter = new RESTCatalogAdapter(catalog);
+      var globalConfig = config.toIcebergConfigDefaults();
+      if (!globalConfig.isEmpty()) {
+        restCatalogAdapter = new RESTCatalogMiddlewareConfig(restCatalogAdapter, globalConfig);
+      }
       var loadTableConfig = config.toIcebergLoadTableConfig();
       if (!loadTableConfig.isEmpty()) {
         restCatalogAdapter =
@@ -258,9 +270,10 @@ public final class Main implements Callable<Integer> {
 
       if (awsAuth) {
         DefaultCredentialsProvider awsCredentialsProvider = DefaultCredentialsProvider.create();
+        Function<String, AwsCredentialsProvider> auth = uid -> awsCredentialsProvider;
         restCatalogAdapter =
-            new RESTCatalogMiddlewareTableAWCredentials(
-                restCatalogAdapter, uid -> awsCredentialsProvider);
+            new RESTCatalogMiddlewareTableCredentials(
+                new RESTCatalogMiddlewareCredentials(restCatalogAdapter, auth), auth);
       }
     }
 

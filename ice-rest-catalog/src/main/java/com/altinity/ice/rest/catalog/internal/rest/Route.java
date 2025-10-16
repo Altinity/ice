@@ -40,6 +40,7 @@ import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.OAuthTokenResponse;
@@ -48,6 +49,7 @@ import org.apache.iceberg.util.Pair;
 
 public enum Route {
   TOKENS(HTTPRequest.HTTPMethod.POST, "v1/oauth/tokens", null, OAuthTokenResponse.class),
+  CREDENTIALS(HTTPRequest.HTTPMethod.GET, "v1/credentials", null, LoadCredentialsResponse.class),
   CONFIG(HTTPRequest.HTTPMethod.GET, "v1/config", null, ConfigResponse.class),
   LIST_NAMESPACES(
       HTTPRequest.HTTPMethod.GET, ResourcePaths.V1_NAMESPACES, null, ListNamespacesResponse.class),

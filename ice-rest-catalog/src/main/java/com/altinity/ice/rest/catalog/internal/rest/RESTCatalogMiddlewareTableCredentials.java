@@ -20,11 +20,11 @@ import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.identity.spi.AwsSessionCredentialsIdentity;
 
-public class RESTCatalogMiddlewareTableAWCredentials extends RESTCatalogMiddleware {
+public class RESTCatalogMiddlewareTableCredentials extends RESTCatalogMiddleware {
 
   private final Function<String, AwsCredentialsProvider> awsCredentialsProvider;
 
-  public RESTCatalogMiddlewareTableAWCredentials(
+  public RESTCatalogMiddlewareTableCredentials(
       RESTCatalogHandler next, Function<String, AwsCredentialsProvider> awsCredentialsProvider) {
     super(next);
     this.awsCredentialsProvider = awsCredentialsProvider;
@@ -55,10 +55,17 @@ public class RESTCatalogMiddlewareTableAWCredentials extends RESTCatalogMiddlewa
     AwsCredentials awsCredentials = credentialsProvider.resolveCredentials();
     tableConfig.put(S3FileIOProperties.ACCESS_KEY_ID, awsCredentials.accessKeyId());
     tableConfig.put(S3FileIOProperties.SECRET_ACCESS_KEY, awsCredentials.secretAccessKey());
-    if (awsCredentials instanceof AwsSessionCredentialsIdentity) {
-      tableConfig.put(
-          S3FileIOProperties.SESSION_TOKEN,
-          ((AwsSessionCredentialsIdentity) awsCredentials).sessionToken());
+    if (awsCredentials instanceof AwsSessionCredentialsIdentity awsSessionCredentials) {
+      tableConfig.put(S3FileIOProperties.SESSION_TOKEN, awsSessionCredentials.sessionToken());
+      if (awsSessionCredentials.expirationTime().isPresent()) {
+        // S3FileIOProperties.SESSION_TOKEN_EXPIRES_AT_MS
+        awsSessionCredentials
+            .expirationTime()
+            .ifPresent(
+                exp ->
+                    tableConfig.put(
+                        "s3.session-token-expires-at-ms", String.valueOf(exp.toEpochMilli())));
+      }
     }
   }
 }
