@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased](https://github.com/altinity/ice/compare/v0.8.1...master)
 
 ### Added
+- Support for vended credentials. 
 - `ice alter-table` command. 
 - `ice insert --force-duplicates` CLI flag.
 - `ice describe` output to include nested metrics.
