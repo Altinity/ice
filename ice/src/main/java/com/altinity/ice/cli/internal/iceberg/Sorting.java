@@ -25,7 +25,6 @@ import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.CloseableIterator;
 import org.apache.iceberg.io.InputFile;
-import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 
@@ -100,16 +99,14 @@ public final class Sorting {
     }
   }
 
-  public static boolean isSorted(
-      InputFile inputFile, Schema tableSchema, SortOrder sortOrder)
+  public static boolean isSorted(InputFile inputFile, Schema tableSchema, SortOrder sortOrder)
       throws IOException {
     return checkSorted(inputFile, tableSchema, sortOrder).ok;
   }
 
   // TODO: check metadata first to avoid full scan when unsorted
   public static SortCheckResult checkSorted(
-      InputFile inputFile, Schema tableSchema, SortOrder sortOrder)
-      throws IOException {
+      InputFile inputFile, Schema tableSchema, SortOrder sortOrder) throws IOException {
     if (sortOrder.isUnsorted()) {
       return new SortCheckResult(false);
     }
