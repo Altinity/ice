@@ -12,6 +12,7 @@ package com.altinity.ice.cli.internal.cmd;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Instant;
@@ -113,7 +114,11 @@ public final class Describe {
     }
 
     if (!tablesMetadata.isEmpty()) {
-      ObjectMapper mapper = json ? new ObjectMapper() : new ObjectMapper(new YAMLFactory());
+      ObjectMapper mapper =
+          json
+              ? new ObjectMapper()
+              : new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
+      mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
       mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
       String output = mapper.writeValueAsString(tablesMetadata);
       System.out.println(output);
