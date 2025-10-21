@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `ice insert` to accept files with compatible schema: subset of table schema and/or with primitive type promotions listed in
 [Schema Evolution](https://iceberg.apache.org/spec/#schema-evolution) (previously file schema had to match exactly).
+- `ice describe` output to minimize quotes.
 
 ### Fixed
 - Calculation of nested metrics.
