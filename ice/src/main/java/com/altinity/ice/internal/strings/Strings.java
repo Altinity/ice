@@ -39,4 +39,11 @@ public final class Strings {
     }
     return text;
   }
+
+  public static String removeSuffixAll(String text, String suffix) {
+    if (text.endsWith(suffix)) {
+      return removeSuffixAll(text.substring(0, text.length() - suffix.length()), suffix);
+    }
+    return text;
+  }
 }
