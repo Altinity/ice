@@ -85,6 +85,8 @@ import software.amazon.awssdk.services.s3.internal.crossregion.S3CrossRegionSync
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.utils.Lazy;
+import com.altinity.ice.cli.internal.http.MinioWildcard;
+
 
 public final class Insert {
 
@@ -106,22 +108,33 @@ public final class Insert {
     // Create transaction and pass it to updatePartitionAndSortOrderMetadata
     Transaction txn = table.newTransaction();
 
-    try (FileIO tableIO = table.io()) {
-      Lazy<S3Client> s3ClientLazy = newS3Client(options, tableIO, table);
-      try {
+try (FileIO tableIO = table.io()) {
+    Lazy<S3Client> s3ClientLazy = newS3Client(options, tableIO, table);
+    try {
         var filesExpanded =
             Arrays.stream(files)
                 .flatMap(
                     s -> {
-                      if (s.startsWith("s3://") && s.contains("*")) {
-                        var b = S3.bucketPath(s);
-                        return S3
-                            .listWildcard(s3ClientLazy.getValue(), b.bucket(), b.path(), -1)
-                            .stream();
-                      }
-                      return Stream.of(s);
+                        if (s.startsWith("s3://") && s.contains("*")) {
+                            var b = S3.bucketPath(s);
+                            return S3
+                                .listWildcard(s3ClientLazy.getValue(), b.bucket(), b.path(), -1)
+                                .stream();
+                        }
+
+                        // HTTP(S) wildcard for Minio & etc.
+                        if ((s.startsWith("http://") || s.startsWith("https://")) && s.contains("*")) {
+                            try {
+                                return MinioWildcard.listHTTPWildcard(s).stream();
+                            } catch (Exception e) {
+                                throw new RuntimeException("Failed to expand HTTP wildcard for " + s, e);
+                            }
+                        }
+
+                        return Stream.of(s);
                     })
                 .toList();
+                
         if (filesExpanded.isEmpty()) {
           throw new BadRequestException("No matching files found");
         }
