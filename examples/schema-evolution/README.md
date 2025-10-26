@@ -26,10 +26,11 @@ SELECT * FROM t INTO OUTFILE 't.v2.parquet' TRUNCATE FORMAT Parquet;
 SELECT * FROM 't.v1.parquet';
 SELECT * FROM 't.v2.parquet';
 "
+```
 
 2. Start Iceberg REST Catalog
 
-```
+```shell
 ice-rest-catalog
 ```
 

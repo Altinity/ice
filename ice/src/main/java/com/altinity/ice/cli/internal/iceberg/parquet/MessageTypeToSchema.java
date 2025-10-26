@@ -10,10 +10,8 @@
 package com.altinity.ice.cli.internal.iceberg.parquet;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.parquet.MessageTypeToType;
 import org.apache.iceberg.parquet.ParquetSchemaUtil;
@@ -34,27 +32,24 @@ public class MessageTypeToSchema {
 
   public static org.apache.iceberg.Schema convert(
       MessageType type, @Nullable NameMapping nameMapping) {
-    Function<String[], Integer> fieldWithoutIdToIdFunc;
-    if (ParquetSchemaUtil.hasIds(type)) {
-      fieldWithoutIdToIdFunc =
-          name -> {
-            throw new IllegalStateException(
-                String.format("Field missing id: %s", String.join(".", name)));
-          };
-    } else {
-      AtomicInteger nextId =
-          new AtomicInteger(1000); // same offset as used by ParquetSchemaUtil.convert
-      fieldWithoutIdToIdFunc =
-          name -> {
-            MappedField mappedField = nameMapping != null ? nameMapping.find(name) : null;
-            if (mappedField != null) {
-              return mappedField.id();
-            }
-            return nextId.getAndIncrement();
-          };
-    }
-    MessageTypeToType converter = new MessageTypeToType(fieldWithoutIdToIdFunc);
+    AtomicInteger nextId =
+        new AtomicInteger(1000); // same offset as used by ParquetSchemaUtil.convert
+    MessageTypeToType converter = new MessageTypeToType(name -> nextId.getAndIncrement());
     return new Schema(
-        ParquetTypeVisitor.visit(type, converter).asNestedType().fields(), converter.getAliases());
+        ParquetTypeVisitor.visit(getParquetTypeWithIds(type, nameMapping), converter)
+            .asNestedType()
+            .fields(),
+        converter.getAliases());
+  }
+
+  private static MessageType getParquetTypeWithIds(
+      MessageType type, @Nullable NameMapping nameMapping) {
+    if (ParquetSchemaUtil.hasIds(type)) {
+      return type;
+    }
+    if (nameMapping != null) {
+      return ParquetSchemaUtil.applyNameMapping(type, nameMapping);
+    }
+    return ParquetSchemaUtil.addFallbackIds(type);
   }
 }

@@ -182,6 +182,18 @@ public record Config(
   }
 
   public Map<String, String> toIcebergLoadTableConfig() {
+    var m = toIcebergConfigDefaults();
+    for (Map.Entry<String, String> e : loadTableProperties.entrySet()) {
+      if (e.getValue() != null) {
+        m.put(e.getKey(), e.getValue());
+      } else {
+        m.remove(e.getKey());
+      }
+    }
+    return m;
+  }
+
+  public Map<String, String> toIcebergConfigDefaults() {
     var m = new HashMap<String, String>();
     String iceIODefault = "ice.io.default.";
     if (s3 != null) {
@@ -198,13 +210,6 @@ public record Config(
     if (warehouse.startsWith("arn:aws:s3tables:")) {
       String region = warehouse.split(":")[3];
       m.putIfAbsent(iceIODefault + AwsClientProperties.CLIENT_REGION, region);
-    }
-    for (Map.Entry<String, String> e : loadTableProperties.entrySet()) {
-      if (e.getValue() != null) {
-        m.put(e.getKey(), e.getValue());
-      } else {
-        m.remove(e.getKey());
-      }
     }
     return m;
   }

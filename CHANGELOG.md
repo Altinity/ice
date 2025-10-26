@@ -5,9 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/altinity/ice/compare/v0.8.1...master)
+## [Unreleased](https://github.com/altinity/ice/compare/v0.9.0...master)
+
+## [0.9.0](https://github.com/altinity/ice/compare/v0.8.1...v0.9.0)
 
 ### Added
+- Support for vended credentials.  
+This enables creating new tables from existing Parquet files located in S3 without having direct access to object storage.
+e.g. `ice create-table foo.bar --use-vended-credentials --schema-from-parquet=s3://catalog-bucket/foo/bar/external-data/sample.parquet`. 
 - `ice alter-table` command. 
 - `ice insert --force-duplicates` CLI flag.
 - `ice describe` output to include nested metrics.
@@ -15,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `ice insert` to accept files with compatible schema: subset of table schema and/or with primitive type promotions listed in
 [Schema Evolution](https://iceberg.apache.org/spec/#schema-evolution) (previously file schema had to match exactly).
+- `ice describe` output to minimize quotes.
 
 ### Fixed
 - Calculation of nested metrics.

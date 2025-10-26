@@ -133,6 +133,7 @@ public class InsertWatch {
                     insertBatch.iterator().next(),
                     null,
                     true,
+                    options.useVendedCredentials(),
                     options.s3NoSignRequest(),
                     null,
                     null);

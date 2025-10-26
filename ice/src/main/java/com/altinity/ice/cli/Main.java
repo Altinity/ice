@@ -157,6 +157,11 @@ public final class Main {
               names = {"-p"},
               description = "Create table if not exists")
           boolean createTableIfNotExists,
+      @CommandLine.Option(
+              names = "--use-vended-credentials",
+              description =
+                  "Use vended credentials to access input files (instead of credentials from execution environment)")
+          boolean useVendedCredentials,
       @CommandLine.Option(names = {"--s3-region"}) String s3Region,
       @CommandLine.Option(
               names = {"--s3-no-sign-request"},
@@ -203,6 +208,7 @@ public final class Main {
           schemaFile,
           location,
           createTableIfNotExists,
+          useVendedCredentials,
           s3NoSignRequest,
           partitions,
           sortOrders);
@@ -270,10 +276,10 @@ public final class Main {
                   "Add files to catalog without copying them even if files are in different location(s) from table (implies --no-copy)")
           boolean forceNoCopy,
       @CommandLine.Option(
-              names = "--force-table-auth",
+              names = {"--use-vended-credentials", "--force-table-auth" /* deprecated */},
               description =
                   "Use table credentials to access input files (instead of credentials from execution environment)")
-          boolean forceTableAuth,
+          boolean useVendedCredentials,
       @CommandLine.Option(names = {"--s3-region"}) String s3Region,
       @CommandLine.Option(
               names = {"--s3-no-sign-request"},
@@ -378,6 +384,7 @@ public final class Main {
             dataFiles[0],
             null,
             createTableIfNotExists,
+            useVendedCredentials,
             s3NoSignRequest,
             partitions,
             sortOrders);
@@ -391,7 +398,7 @@ public final class Main {
               .noCommit(noCommit)
               .noCopy(noCopy)
               .forceNoCopy(forceNoCopy)
-              .forceTableAuth(forceTableAuth)
+              .useVendedCredentials(useVendedCredentials)
               .s3NoSignRequest(s3NoSignRequest)
               .s3CopyObject(s3CopyObject)
               .s3MultipartUploadThreadCount(s3MultipartUploadThreadCount)

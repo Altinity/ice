@@ -107,22 +107,7 @@ public final class Insert {
     Transaction txn = table.newTransaction();
 
     try (FileIO tableIO = table.io()) {
-      final Supplier<S3Client> s3ClientSupplier;
-      if (options.forceTableAuth()) {
-        FileIO underlyingTableIO = tableIO;
-        if (tableIO instanceof SchemeFileIO x) {
-          underlyingTableIO = x.io(table.location());
-        }
-        if (!(underlyingTableIO instanceof S3FileIO)) {
-          throw new UnsupportedOperationException(
-              "--force-table-auth is currently only supported for s3:// tables");
-        }
-        s3ClientSupplier = ((S3FileIO) underlyingTableIO)::client;
-      } else {
-        s3ClientSupplier = () -> S3.newClient(options.s3NoSignRequest());
-      }
-      Lazy<S3Client> s3ClientLazy =
-          new Lazy<>(() -> new S3CrossRegionSyncClient(s3ClientSupplier.get()));
+      Lazy<S3Client> s3ClientLazy = newS3Client(options, tableIO, table);
       try {
         var filesExpanded =
             Arrays.stream(files)
@@ -267,6 +252,27 @@ public final class Insert {
         }
       }
     }
+  }
+
+  private static Lazy<S3Client> newS3Client(Options options, FileIO tableIO, Table table) {
+    final Supplier<S3Client> s3ClientSupplier;
+    if (options.useVendedCredentials()) {
+      s3ClientSupplier =
+          () -> {
+            FileIO underlyingTableIO = tableIO;
+            if (tableIO instanceof SchemeFileIO x) {
+              underlyingTableIO = x.io(table.location());
+            }
+            if (!(underlyingTableIO instanceof S3FileIO)) {
+              throw new UnsupportedOperationException(
+                  "--use-vended-credentials/--force-table-auth is currently supported for tables with location=s3://...");
+            }
+            return ((S3FileIO) underlyingTableIO).client();
+          };
+    } else {
+      s3ClientSupplier = () -> S3.newClient(options.s3NoSignRequest());
+    }
+    return new Lazy<>(() -> new S3CrossRegionSyncClient(s3ClientSupplier.get()));
   }
 
   private static PartitionSpec syncTablePartitionSpec(
@@ -762,7 +768,7 @@ public final class Insert {
       boolean noCommit,
       boolean noCopy,
       boolean forceNoCopy,
-      boolean forceTableAuth,
+      boolean useVendedCredentials,
       boolean s3NoSignRequest,
       boolean s3CopyObject,
       int s3MultipartUploadThreadCount,
@@ -784,7 +790,7 @@ public final class Insert {
       private boolean noCommit;
       private boolean noCopy;
       private boolean forceNoCopy;
-      private boolean forceTableAuth;
+      private boolean useVendedCredentials;
       private boolean s3NoSignRequest;
       private boolean s3CopyObject;
       private int s3MultipartUploadThreadCount;
@@ -827,8 +833,8 @@ public final class Insert {
         return this;
       }
 
-      public Builder forceTableAuth(boolean forceTableAuth) {
-        this.forceTableAuth = forceTableAuth;
+      public Builder useVendedCredentials(boolean useVendedCredentials) {
+        this.useVendedCredentials = useVendedCredentials;
         return this;
       }
 
@@ -885,7 +891,7 @@ public final class Insert {
             noCommit,
             forceNoCopy || noCopy,
             forceNoCopy,
-            forceTableAuth,
+            useVendedCredentials,
             s3NoSignRequest,
             s3CopyObject,
             s3MultipartUploadThreadCount,
