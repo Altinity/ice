@@ -41,28 +41,20 @@ public final class DescribeParquet {
     ROW_GROUP_DETAILS
   }
 
-  public static void run(
-      RESTCatalog catalog,
-      String filePath,
-      boolean json,
-      Option... options)
+  public static void run(RESTCatalog catalog, String filePath, boolean json, Option... options)
       throws IOException {
-    
+
     FileIO io = Input.newIO(filePath, null, new Lazy<>(() -> null));
     InputFile inputFile = Input.newFile(filePath, catalog, io);
     run(inputFile, json, options);
   }
 
-  public static void run(
-      InputFile inputFile,
-      boolean json,
-      Option... options)
-      throws IOException {
-    
+  public static void run(InputFile inputFile, boolean json, Option... options) throws IOException {
+
     ParquetMetadata metadata = Metadata.read(inputFile);
-    
+
     ParquetInfo info = extractParquetInfo(metadata, options);
-    
+
     ObjectMapper mapper = json ? new ObjectMapper() : new ObjectMapper(new YAMLFactory());
     mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
     String output = mapper.writeValueAsString(info);
@@ -72,47 +64,45 @@ public final class DescribeParquet {
   private static ParquetInfo extractParquetInfo(ParquetMetadata metadata, Option... options) {
     var optionsSet = java.util.Set.of(options);
     boolean includeAll = optionsSet.contains(Option.ALL);
-    
+
     FileMetaData fileMetadata = metadata.getFileMetaData();
-    
+
     // Summary info
     Summary summary = null;
     if (includeAll || optionsSet.contains(Option.SUMMARY)) {
-      long totalRows = metadata.getBlocks().stream()
-          .mapToLong(BlockMetaData::getRowCount)
-          .sum();
-      
-      long compressedSize = metadata.getBlocks().stream()
-          .mapToLong(BlockMetaData::getCompressedSize)
-          .sum();
-      
-      long uncompressedSize = metadata.getBlocks().stream()
-          .mapToLong(BlockMetaData::getTotalByteSize)
-          .sum();
-      
-      summary = new Summary(
-          totalRows,
-          metadata.getBlocks().size(),
-          compressedSize,
-          uncompressedSize,
-          fileMetadata.getCreatedBy(),
-          fileMetadata.getSchema().getFieldCount()
-      );
+      long totalRows = metadata.getBlocks().stream().mapToLong(BlockMetaData::getRowCount).sum();
+
+      long compressedSize =
+          metadata.getBlocks().stream().mapToLong(BlockMetaData::getCompressedSize).sum();
+
+      long uncompressedSize =
+          metadata.getBlocks().stream().mapToLong(BlockMetaData::getTotalByteSize).sum();
+
+      summary =
+          new Summary(
+              totalRows,
+              metadata.getBlocks().size(),
+              compressedSize,
+              uncompressedSize,
+              fileMetadata.getCreatedBy(),
+              fileMetadata.getSchema().getFieldCount());
     }
-    
+
     // Column info
     List<Column> columns = null;
     if (includeAll || optionsSet.contains(Option.COLUMNS)) {
       columns = extractColumns(fileMetadata.getSchema());
     }
-    
+
     // Row group info
     List<RowGroup> rowGroups = null;
-    if (includeAll || optionsSet.contains(Option.ROW_GROUPS) || optionsSet.contains(Option.ROW_GROUP_DETAILS)) {
+    if (includeAll
+        || optionsSet.contains(Option.ROW_GROUPS)
+        || optionsSet.contains(Option.ROW_GROUP_DETAILS)) {
       boolean includeDetails = includeAll || optionsSet.contains(Option.ROW_GROUP_DETAILS);
       rowGroups = extractRowGroups(metadata.getBlocks(), includeDetails);
     }
-    
+
     return new ParquetInfo(summary, columns, rowGroups);
   }
 
@@ -124,28 +114,29 @@ public final class DescribeParquet {
         var annotation = field.asPrimitiveType().getLogicalTypeAnnotation();
         logicalType = annotation != null ? annotation.toString() : null;
       }
-      columns.add(new Column(
-          field.getName(),
-          field.isPrimitive() ? field.asPrimitiveType().getPrimitiveTypeName().name() : "GROUP",
-          field.getRepetition().name(),
-          logicalType
-      ));
+      columns.add(
+          new Column(
+              field.getName(),
+              field.isPrimitive() ? field.asPrimitiveType().getPrimitiveTypeName().name() : "GROUP",
+              field.getRepetition().name(),
+              logicalType));
     }
     return columns;
   }
 
-  private static List<RowGroup> extractRowGroups(List<BlockMetaData> blocks, boolean includeDetails) {
+  private static List<RowGroup> extractRowGroups(
+      List<BlockMetaData> blocks, boolean includeDetails) {
     List<RowGroup> rowGroups = new ArrayList<>();
-    
+
     for (int i = 0; i < blocks.size(); i++) {
       BlockMetaData block = blocks.get(i);
-      
+
       List<ColumnChunk> columnChunks = null;
       if (includeDetails) {
         columnChunks = new ArrayList<>();
         for (ColumnChunkMetaData column : block.getColumns()) {
           Statistics<?> stats = column.getStatistics();
-          
+
           ColumnStats columnStats = null;
           if (stats != null && !stats.isEmpty()) {
             long nulls = stats.isNumNullsSet() ? stats.getNumNulls() : 0;
@@ -159,39 +150,35 @@ public final class DescribeParquet {
             }
             columnStats = new ColumnStats(nulls, min, max);
           }
-          
-          columnChunks.add(new ColumnChunk(
-              column.getPath().toDotString(),
-              column.getPrimitiveType().getName(),
-              column.getEncodings().toString(),
-              column.getCodec().name(),
-              column.getTotalSize(),
-              column.getTotalUncompressedSize(),
-              column.getValueCount(),
-              columnStats
-          ));
+
+          columnChunks.add(
+              new ColumnChunk(
+                  column.getPath().toDotString(),
+                  column.getPrimitiveType().getName(),
+                  column.getEncodings().toString(),
+                  column.getCodec().name(),
+                  column.getTotalSize(),
+                  column.getTotalUncompressedSize(),
+                  column.getValueCount(),
+                  columnStats));
         }
       }
-      
-      rowGroups.add(new RowGroup(
-          i,
-          block.getRowCount(),
-          block.getTotalByteSize(),
-          block.getCompressedSize(),
-          block.getStartingPos(),
-          columnChunks
-      ));
+
+      rowGroups.add(
+          new RowGroup(
+              i,
+              block.getRowCount(),
+              block.getTotalByteSize(),
+              block.getCompressedSize(),
+              block.getStartingPos(),
+              columnChunks));
     }
-    
+
     return rowGroups;
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public record ParquetInfo(
-      Summary summary,
-      List<Column> columns,
-      List<RowGroup> rowGroups
-  ) {}
+  public record ParquetInfo(Summary summary, List<Column> columns, List<RowGroup> rowGroups) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record Summary(
@@ -200,16 +187,10 @@ public final class DescribeParquet {
       long compressedSize,
       long uncompressedSize,
       String createdBy,
-      int columnCount
-  ) {}
+      int columnCount) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public record Column(
-      String name,
-      String type,
-      String repetition,
-      String logicalType
-  ) {}
+  public record Column(String name, String type, String repetition, String logicalType) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record RowGroup(
@@ -218,8 +199,7 @@ public final class DescribeParquet {
       long totalSize,
       long compressedSize,
       long startingPos,
-      List<ColumnChunk> columns
-  ) {}
+      List<ColumnChunk> columns) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record ColumnChunk(
@@ -230,13 +210,8 @@ public final class DescribeParquet {
       long totalSize,
       long uncompressedSize,
       long valueCount,
-      ColumnStats stats
-  ) {}
+      ColumnStats stats) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public record ColumnStats(
-      long nulls,
-      String min,
-      String max
-  ) {}
+  public record ColumnStats(long nulls, String min, String max) {}
 }

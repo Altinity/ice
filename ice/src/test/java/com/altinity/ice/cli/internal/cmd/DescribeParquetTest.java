@@ -25,17 +25,18 @@ public class DescribeParquetTest {
     ByteArrayOutputStream outContent = new ByteArrayOutputStream();
     PrintStream originalOut = System.out;
     System.setOut(new PrintStream(outContent));
-    
+
     try {
       InMemoryCatalog catalog = new InMemoryCatalog();
       catalog.initialize("test", java.util.Map.of());
-      
-      var sampleFile = Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet");
-      
+
+      var sampleFile =
+          Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet");
+
       DescribeParquet.run(sampleFile, false, DescribeParquet.Option.SUMMARY);
-      
+
       String output = outContent.toString();
-      
+
       assertThat(output).contains("rows:");
       assertThat(output).contains("rowGroups:");
       assertThat(output).contains("compressedSize:");
@@ -50,14 +51,15 @@ public class DescribeParquetTest {
     ByteArrayOutputStream outContent = new ByteArrayOutputStream();
     PrintStream originalOut = System.out;
     System.setOut(new PrintStream(outContent));
-    
+
     try {
-      var sampleFile = Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet");
-      
+      var sampleFile =
+          Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet");
+
       DescribeParquet.run(sampleFile, false, DescribeParquet.Option.COLUMNS);
-      
+
       String output = outContent.toString();
-      
+
       assertThat(output).contains("columns:");
       assertThat(output).contains("name:");
       assertThat(output).contains("type:");
@@ -65,20 +67,21 @@ public class DescribeParquetTest {
       System.setOut(originalOut);
     }
   }
-  
-  @Test 
+
+  @Test
   public void testDescribeParquetJson() throws IOException {
     ByteArrayOutputStream outContent = new ByteArrayOutputStream();
     PrintStream originalOut = System.out;
     System.setOut(new PrintStream(outContent));
-    
+
     try {
-      var sampleFile = Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet");
-      
+      var sampleFile =
+          Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet");
+
       DescribeParquet.run(sampleFile, true, DescribeParquet.Option.SUMMARY);
-      
+
       String output = outContent.toString();
-      
+
       assertThat(output).contains("{");
       assertThat(output).contains("}");
       assertThat(output).contains("\"summary\"");
