@@ -89,8 +89,11 @@ public final class Input {
           createParentDirs(dst.toFile());
           String tempName = name + "~";
           Path tmp = Paths.get(httpCachePath, tempName);
+          // Clean up any existing temp file from previous interrupted runs
+          if (Files.exists(tmp)) {
+            Files.delete(tmp);
+          }
           try (InputStream in = URI.create(s).toURL().openStream()) {
-            // FIXME: race with another copy
             Files.copy(in, tmp);
           }
           Files.move(tmp, dst);

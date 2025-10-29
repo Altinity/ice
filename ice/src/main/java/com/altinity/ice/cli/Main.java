@@ -165,8 +165,14 @@ public final class Main {
       @CommandLine.Option(
               names = {"--json"},
               description = "Output JSON instead of YAML")
-          boolean json)
+          boolean json,
+      @CommandLine.Option(names = {"--s3-region"}) String s3Region,
+      @CommandLine.Option(
+              names = {"--s3-no-sign-request"},
+              description = "Access S3 files without authentication")
+          boolean s3NoSignRequest)
       throws IOException {
+    setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog()) {
       var options = new java.util.ArrayList<DescribeParquet.Option>();
       if (showAll || showSummary) {
@@ -186,7 +192,8 @@ public final class Main {
         options.add(DescribeParquet.Option.SUMMARY);
       }
 
-      DescribeParquet.run(catalog, target, json, options.toArray(new DescribeParquet.Option[0]));
+      DescribeParquet.run(
+          catalog, target, json, s3NoSignRequest, options.toArray(new DescribeParquet.Option[0]));
     }
   }
 

@@ -41,10 +41,17 @@ public final class DescribeParquet {
     ROW_GROUP_DETAILS
   }
 
-  public static void run(RESTCatalog catalog, String filePath, boolean json, Option... options)
+  public static void run(
+      RESTCatalog catalog,
+      String filePath,
+      boolean json,
+      boolean s3NoSignRequest,
+      Option... options)
       throws IOException {
 
-    FileIO io = Input.newIO(filePath, null, new Lazy<>(() -> null));
+    Lazy<software.amazon.awssdk.services.s3.S3Client> s3ClientLazy =
+        new Lazy<>(() -> com.altinity.ice.cli.internal.s3.S3.newClient(s3NoSignRequest));
+    FileIO io = Input.newIO(filePath, null, s3ClientLazy);
     InputFile inputFile = Input.newFile(filePath, catalog, io);
     run(inputFile, json, options);
   }
