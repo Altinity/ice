@@ -27,6 +27,7 @@ import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.Type;
+import software.amazon.awssdk.services.s3.internal.crossregion.S3CrossRegionSyncClient;
 import software.amazon.awssdk.utils.Lazy;
 
 public final class DescribeParquet {
@@ -50,7 +51,10 @@ public final class DescribeParquet {
       throws IOException {
 
     Lazy<software.amazon.awssdk.services.s3.S3Client> s3ClientLazy =
-        new Lazy<>(() -> com.altinity.ice.cli.internal.s3.S3.newClient(s3NoSignRequest));
+        new Lazy<>(
+            () ->
+                new S3CrossRegionSyncClient(
+                    com.altinity.ice.cli.internal.s3.S3.newClient(s3NoSignRequest)));
     FileIO io = Input.newIO(filePath, null, s3ClientLazy);
     InputFile inputFile = Input.newFile(filePath, catalog, io);
     run(inputFile, json, options);
