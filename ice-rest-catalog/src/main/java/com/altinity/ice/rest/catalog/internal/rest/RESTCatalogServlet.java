@@ -27,18 +27,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpHeaders;
-import org.apache.iceberg.exceptions.AlreadyExistsException;
-import org.apache.iceberg.exceptions.CommitFailedException;
-import org.apache.iceberg.exceptions.CommitStateUnknownException;
-import org.apache.iceberg.exceptions.ForbiddenException;
-import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
-import org.apache.iceberg.exceptions.NoSuchIcebergTableException;
-import org.apache.iceberg.exceptions.NoSuchNamespaceException;
-import org.apache.iceberg.exceptions.NoSuchTableException;
-import org.apache.iceberg.exceptions.NoSuchViewException;
-import org.apache.iceberg.exceptions.NotAuthorizedException;
-import org.apache.iceberg.exceptions.UnprocessableEntityException;
-import org.apache.iceberg.exceptions.ValidationException;
+import org.apache.iceberg.exceptions.*;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
 import org.apache.iceberg.relocated.com.google.common.io.CharStreams;
 import org.apache.iceberg.rest.HTTPRequest;
@@ -64,6 +53,7 @@ public class RESTCatalogServlet extends HttpServlet {
           .put(NoSuchTableException.class, 404)
           .put(NoSuchViewException.class, 404)
           .put(NoSuchIcebergTableException.class, 404)
+          .put(NotFoundException.class, 404)
           .put(UnsupportedOperationException.class, 406)
           .put(AlreadyExistsException.class, 409)
           .put(CommitFailedException.class, 409)
