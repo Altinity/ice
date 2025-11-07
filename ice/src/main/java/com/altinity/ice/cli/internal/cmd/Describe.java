@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-
 import org.apache.iceberg.*;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -100,27 +99,26 @@ public final class Describe {
   }
 
   private static Table.Data gatherTableData(
-    RESTCatalog catalog,
-    TableIdentifier tableId,
-    Set<Describe.Option> optionsSet) throws IOException {
+      RESTCatalog catalog, TableIdentifier tableId, Set<Describe.Option> optionsSet)
+      throws IOException {
 
     org.apache.iceberg.Table table = catalog.loadTable(tableId);
     Snapshot snapshot = table.currentSnapshot();
     Table.Snapshot snapshotInfo = null;
     if (snapshot != null) {
       snapshotInfo =
-        new Table.Snapshot(
-          snapshot.sequenceNumber(),
-          snapshot.snapshotId(),
-          snapshot.parentId(),
-          snapshot.timestampMillis(),
-          Instant.ofEpochMilli(snapshot.timestampMillis()).toString(),
-          Instant.ofEpochMilli(snapshot.timestampMillis())
-            .atZone(ZoneId.systemDefault())
-            .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
-          snapshot.operation(),
-          snapshot.summary(),
-          snapshot.manifestListLocation());
+          new Table.Snapshot(
+              snapshot.sequenceNumber(),
+              snapshot.snapshotId(),
+              snapshot.parentId(),
+              snapshot.timestampMillis(),
+              Instant.ofEpochMilli(snapshot.timestampMillis()).toString(),
+              Instant.ofEpochMilli(snapshot.timestampMillis())
+                  .atZone(ZoneId.systemDefault())
+                  .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+              snapshot.operation(),
+              snapshot.summary(),
+              snapshot.manifestListLocation());
     }
 
     List<Table.Metrics> metrics = null;
