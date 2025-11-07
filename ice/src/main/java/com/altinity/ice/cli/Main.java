@@ -10,6 +10,7 @@
 package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
+import com.altinity.ice.cli.internal.cmd.AlterTable;
 import com.altinity.ice.cli.internal.cmd.Check;
 import com.altinity.ice.cli.internal.cmd.CreateNamespace;
 import com.altinity.ice.cli.internal.cmd.CreateTable;
@@ -18,15 +19,18 @@ import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.Insert;
+import com.altinity.ice.cli.internal.cmd.InsertWatch;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
+import com.altinity.ice.internal.jetty.DebugServer;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -36,9 +40,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
+import org.apache.curator.shaded.com.google.common.net.HostAndPort;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.eclipse.jetty.server.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.AutoComplete;
@@ -151,6 +157,11 @@ public final class Main {
               names = {"-p"},
               description = "Create table if not exists")
           boolean createTableIfNotExists,
+      @CommandLine.Option(
+              names = "--use-vended-credentials",
+              description =
+                  "Use vended credentials to access input files (instead of credentials from execution environment)")
+          boolean useVendedCredentials,
       @CommandLine.Option(names = {"--s3-region"}) String s3Region,
       @CommandLine.Option(
               names = {"--s3-no-sign-request"},
@@ -197,9 +208,44 @@ public final class Main {
           schemaFile,
           location,
           createTableIfNotExists,
+          useVendedCredentials,
           s3NoSignRequest,
           partitions,
           sortOrders);
+    }
+  }
+
+  @CommandLine.Command(name = "alter-table", description = "Alter table.")
+  void alterTable(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<updates>",
+              description =
+                  """
+                  List of table modifications,
+                  e.g. [{"op":"drop_column","name":"foo"}]
+
+                  Supported operations:
+                    - add_column      (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional))
+                    - alter_column    (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types))
+                    - rename_column   (params: "name", "new_name")
+                    - drop_column     (params: "name")
+                    - set_tblproperty (params: "key", "value" (set to null to remove table property))
+                    - rename_to       (params: "new_name")
+                  """)
+          String updatesJson)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog(this.configFile())) {
+      TableIdentifier tableId = TableIdentifier.parse(name);
+
+      ObjectMapper mapper = newObjectMapper();
+      AlterTable.Update[] updates = mapper.readValue(updatesJson, AlterTable.Update[].class);
+      AlterTable.run(catalog, tableId, Arrays.stream(updates).toList());
     }
   }
 
@@ -229,10 +275,10 @@ public final class Main {
                   "Add files to catalog without copying them even if files are in different location(s) from table (implies --no-copy)")
           boolean forceNoCopy,
       @CommandLine.Option(
-              names = "--force-table-auth",
+              names = {"--use-vended-credentials", "--force-table-auth" /* deprecated */},
               description =
                   "Use table credentials to access input files (instead of credentials from execution environment)")
-          boolean forceTableAuth,
+          boolean useVendedCredentials,
       @CommandLine.Option(names = {"--s3-region"}) String s3Region,
       @CommandLine.Option(
               names = {"--s3-no-sign-request"},
@@ -241,9 +287,14 @@ public final class Main {
       @CommandLine.Option(
               names = "--s3-copy-object",
               description =
-                  "Avoid download/upload by using https://docs.aws.amazon.com/AmazonS3/latest/API/API_CopyObject.html for copying S3 objects."
+                  "Avoid download/upload by using https://docs.aws.amazon.com/AmazonS3/latest/API/API_CopyObject.html or https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html for copying S3 objects."
                       + " Note that AWS does not support copying objects anonymously (i.e. you can't use this flag to copy objects from public buckets like https://registry.opendata.aws/aws-public-blockchain/).")
           boolean s3CopyObject,
+      @CommandLine.Option(
+              names = "--s3-multipart-upload-thread-count",
+              description = "Number of threads to use for uploading multiparts.",
+              defaultValue = "4")
+          int s3MultipartUploadThreadCount,
       @CommandLine.Option(names = "--no-commit", description = "Skip transaction commit")
           boolean noCommit,
       @CommandLine.Option(
@@ -253,6 +304,8 @@ public final class Main {
           Insert.DataFileNamingStrategy.Name dataFileNamingStrategy,
       @CommandLine.Option(names = "--skip-duplicates", description = "Skip duplicates")
           boolean skipDuplicates,
+      @CommandLine.Option(names = "--force-duplicates", description = "Force insert duplicates")
+          boolean forceDuplicates,
       @CommandLine.Option(
               names = {"--retry-list"},
               description =
@@ -271,10 +324,26 @@ public final class Main {
                   "Sort order, e.g. [{\"column\":\"name\", \"desc\":false, \"nullFirst\":false}]")
           String sortOrderJson,
       @CommandLine.Option(
+              names = {"--assume-sorted"},
+              description = "Skip data sorting. Assume it's already sorted.")
+          boolean assumeSorted,
+      @CommandLine.Option(
               names = {"--thread-count"},
               description = "Number of threads to use for inserting data",
               defaultValue = "-1")
-          int threadCount)
+          int threadCount,
+      @CommandLine.Option(
+              names = {"--watch"},
+              description = "Event queue. Supported: AWS SQS")
+          String watch,
+      @CommandLine.Option(
+              names = {"--watch-fire-once"},
+              description = "")
+          boolean watchFireOnce,
+      @CommandLine.Option(
+              names = {"--watch-debug-addr"},
+              description = "")
+          String watchDebugAddr)
       throws IOException, InterruptedException {
     if (s3NoSignRequest && s3CopyObject) {
       throw new UnsupportedOperationException(
@@ -305,33 +374,62 @@ public final class Main {
       }
 
       TableIdentifier tableId = TableIdentifier.parse(name);
-      if (createTableIfNotExists) {
+      boolean watchMode = !Strings.isNullOrEmpty(watch);
+
+      if (createTableIfNotExists && !watchMode) {
         CreateTable.run(
             catalog,
             tableId,
             dataFiles[0],
             null,
             createTableIfNotExists,
+            useVendedCredentials,
             s3NoSignRequest,
             partitions,
             sortOrders);
+      } // delayed in watch mode
+
+      Insert.Options options =
+          Insert.Options.builder()
+              .dataFileNamingStrategy(dataFileNamingStrategy)
+              .skipDuplicates(skipDuplicates)
+              .forceDuplicates(forceDuplicates)
+              .noCommit(noCommit)
+              .noCopy(noCopy)
+              .forceNoCopy(forceNoCopy)
+              .useVendedCredentials(useVendedCredentials)
+              .s3NoSignRequest(s3NoSignRequest)
+              .s3CopyObject(s3CopyObject)
+              .s3MultipartUploadThreadCount(s3MultipartUploadThreadCount)
+              .assumeSorted(assumeSorted)
+              .ignoreNotFound(watchMode)
+              .retryListFile(retryList)
+              .partitionList(partitions)
+              .sortOrderList(sortOrders)
+              .threadCount(
+                  threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount)
+              .build();
+
+      if (!watchMode) {
+        Insert.run(catalog, tableId, dataFiles, options);
+      } else {
+        if (!Strings.isNullOrEmpty(watchDebugAddr)) {
+          JvmMetrics.builder().register();
+
+          HostAndPort debugHostAndPort = HostAndPort.fromString(watchDebugAddr);
+          Server debugServer =
+              DebugServer.create(debugHostAndPort.getHost(), debugHostAndPort.getPort());
+          try {
+            debugServer.start();
+          } catch (Exception e) {
+            throw new RuntimeException(e); // TODO: find a better one
+          }
+          logger.info("Serving http://{}/{metrics,healtz,livez,readyz}", debugHostAndPort);
+        }
+
+        InsertWatch.run(
+            catalog, tableId, dataFiles, watch, watchFireOnce, createTableIfNotExists, options);
       }
-      Insert.run(
-          catalog,
-          tableId,
-          dataFiles,
-          dataFileNamingStrategy,
-          skipDuplicates,
-          noCommit,
-          noCopy,
-          forceNoCopy,
-          forceTableAuth,
-          s3NoSignRequest,
-          s3CopyObject,
-          retryList,
-          partitions,
-          sortOrders,
-          threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount);
     }
   }
 
@@ -387,10 +485,14 @@ public final class Main {
       @CommandLine.Option(
               names = {"-p"},
               description = "Ignore not found")
-          boolean ignoreNotFound)
+          boolean ignoreNotFound,
+      @CommandLine.Option(
+              names = {"--purge"},
+              description = "Delete data")
+          boolean purge)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
-      DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound);
+      DeleteTable.run(catalog, TableIdentifier.parse(name), ignoreNotFound, purge);
     }
   }
 
@@ -443,10 +545,14 @@ public final class Main {
           String partitionJson,
       @CommandLine.Option(
               names = "--dry-run",
-              description = "Log files that would be deleted without actually deleting them",
-              defaultValue = "true")
-          boolean dryRun)
+              description =
+                  "Log files that would be deleted without actually deleting them (true by default)")
+          Boolean dryRun)
       throws IOException {
+    if (dryRun == null) {
+      dryRun = true;
+    }
+
     try (RESTCatalog catalog = loadCatalog(this.configFile())) {
       List<PartitionFilter> partitions = new ArrayList<>();
       if (partitionJson != null && !partitionJson.isEmpty()) {
@@ -469,9 +575,10 @@ public final class Main {
     return loadCatalog(this.configFile());
   }
 
-  private ObjectMapper newObjectMapper() {
+  private static ObjectMapper newObjectMapper() {
     ObjectMapper om = new ObjectMapper(new YAMLFactory());
     om.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+    om.configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, true);
     return om;
   }
 

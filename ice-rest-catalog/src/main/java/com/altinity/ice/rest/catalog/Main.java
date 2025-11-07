@@ -9,42 +9,50 @@
  */
 package com.altinity.ice.rest.catalog;
 
+import com.altinity.ice.internal.io.Matcher;
+import com.altinity.ice.internal.jetty.DebugServer;
+import com.altinity.ice.internal.jetty.PlainErrorHandler;
+import com.altinity.ice.internal.jetty.ServerConfig;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
 import com.altinity.ice.rest.catalog.internal.auth.Session;
 import com.altinity.ice.rest.catalog.internal.aws.CredentialsProvider;
 import com.altinity.ice.rest.catalog.internal.config.Config;
+import com.altinity.ice.rest.catalog.internal.config.MaintenanceConfig;
 import com.altinity.ice.rest.catalog.internal.etcd.EtcdCatalog;
-import com.altinity.ice.rest.catalog.internal.jetty.PlainErrorHandler;
-import com.altinity.ice.rest.catalog.internal.jetty.ServerConfig;
+import com.altinity.ice.rest.catalog.internal.maintenance.DataCompaction;
+import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceJob;
+import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceRunner;
 import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceScheduler;
+import com.altinity.ice.rest.catalog.internal.maintenance.ManifestCompaction;
+import com.altinity.ice.rest.catalog.internal.maintenance.OrphanCleanup;
+import com.altinity.ice.rest.catalog.internal.maintenance.SnapshotCleanup;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAdapter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAuthorizationHandler;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogHandler;
-import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableAWCredentials;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareConfig;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareCredentials;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableConfig;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableCredentials;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogServlet;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.net.HostAndPort;
-import io.prometheus.metrics.exporter.servlet.jakarta.PrometheusMetricsServlet;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.relocated.com.google.common.base.Function;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
-import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.gzip.GzipHandler;
@@ -85,7 +93,115 @@ public final class Main implements Callable<Integer> {
 
   private Main() {}
 
-  public static Server createServer(
+  // TODO: ice-rest-catalog maintenance list-orphan-files/list-data-compaction-candidates
+  @CommandLine.Command(name = "perform-maintenance", description = "Run maintenance job(s).")
+  void performMaintenance(
+      @CommandLine.Option(
+              names = "--job",
+              description =
+                  "MANIFEST_COMPACTION, DATA_COMPACTION, SNAPSHOT_CLEANUP, ORPHAN_CLEANUP (all by default)")
+          MaintenanceConfig.Job[] modes,
+      @CommandLine.Option(
+              names = "--max-snapshot-age-hours",
+              description = "Max snapshot age in hours (5 days by default)")
+          Integer maxSnapshotAgeHours,
+      @CommandLine.Option(
+              names = "--min-snapshots-to-keep",
+              description = "Minimum number of snapshots to keep (1 by default)")
+          Integer minSnapshotsToKeep,
+      @CommandLine.Option(
+              names = "--target-file-size-mb",
+              description = "The target file size for the table in MB (64 min; 512 by default)")
+          Integer targetFileSizeMB,
+      @CommandLine.Option(
+              names = "--min-input-files",
+              description =
+                  "The minimum number of files to be compacted if a table partition size is smaller than the target file size (5 by default)")
+          Integer minInputFiles,
+      @CommandLine.Option(
+              names = "--data-compaction-candidate-min-age-in-hours",
+              description =
+                  "How long to wait before considering file for data compaction (1 day by default; -1 to disable)")
+          Integer dataCompactionCandidateMinAgeInHours,
+      @CommandLine.Option(
+              names = "--orphan-file-retention-period-in-days",
+              description =
+                  "The number of days to retain orphan files before deleting them (3 by default; -1 to disable)")
+          Integer orphanFileRetentionPeriodInDays,
+      @CommandLine.Option(
+              names = "--orphan-whitelist",
+              description = "Orphan whitelist (defaults to */metadata/*, */data/*)")
+          String[] orphanWhitelist,
+      @CommandLine.Option(names = "--dry-run", description = "Print changes without applying them")
+          Boolean dryRun,
+      @CommandLine.Option(
+              names = "--schedule",
+              description =
+                  "Maintenance schedule in https://github.com/shyiko/skedule?tab=readme-ov-file#format format, e.g. \"every day 00:00\". Empty schedule means one time run (default)")
+          String schedule,
+      @CommandLine.Option(
+              names = "--debug-addr",
+              description = "host:port (0.0.0.0:5001 by default)")
+          String debugAddr)
+      throws IOException, InterruptedException {
+    var config = Config.load(configFile());
+
+    MaintenanceConfig maintenanceConfig = config.maintenance();
+    maintenanceConfig =
+        new MaintenanceConfig(
+            modes != null ? modes : maintenanceConfig.jobs(),
+            Objects.requireNonNullElse(
+                maxSnapshotAgeHours, maintenanceConfig.maxSnapshotAgeHours()),
+            Objects.requireNonNullElse(minSnapshotsToKeep, maintenanceConfig.minSnapshotsToKeep()),
+            Objects.requireNonNullElse(targetFileSizeMB, maintenanceConfig.targetFileSizeMB()),
+            Objects.requireNonNullElse(minInputFiles, maintenanceConfig.minInputFiles()),
+            Objects.requireNonNullElse(
+                dataCompactionCandidateMinAgeInHours,
+                maintenanceConfig.dataCompactionCandidateMinAgeInHours()),
+            Objects.requireNonNullElse(
+                orphanFileRetentionPeriodInDays,
+                maintenanceConfig.orphanFileRetentionPeriodInDays()),
+            Objects.requireNonNullElse(orphanWhitelist, maintenanceConfig.orphanWhitelist()),
+            Objects.requireNonNullElse(dryRun, maintenanceConfig.dryRun()));
+
+    var icebergConfig = config.toIcebergConfig();
+    logger.debug(
+        "Iceberg configuration: {}",
+        icebergConfig.entrySet().stream()
+            .map(e -> !e.getKey().contains("key") ? e.getKey() + "=" + e.getValue() : e.getKey())
+            .sorted()
+            .collect(Collectors.joining(", ")));
+
+    var catalog = loadCatalog(config, icebergConfig);
+
+    MaintenanceRunner maintenanceRunner = newMaintenanceRunner(catalog, maintenanceConfig);
+    String activeSchedule =
+        !Strings.isNullOrEmpty(schedule) ? schedule : config.maintenanceSchedule();
+    if (Strings.isNullOrEmpty(activeSchedule)) {
+      maintenanceRunner.run();
+    } else {
+      // TODO: ensure all http handlers are hooked in
+      JvmMetrics.builder().register();
+
+      HostAndPort debugHostAndPort =
+          HostAndPort.fromString(
+              !Strings.isNullOrEmpty(debugAddr) ? debugAddr : config.debugAddr());
+      Server debugServer =
+          DebugServer.create(debugHostAndPort.getHost(), debugHostAndPort.getPort());
+      try {
+        debugServer.start();
+      } catch (Exception e) {
+        throw new RuntimeException(e); // TODO: find a better one
+      }
+      logger.info("Serving http://{}/{metrics,healtz,livez,readyz}", debugHostAndPort);
+
+      startMaintenanceScheduler(activeSchedule, maintenanceRunner);
+
+      debugServer.join();
+    }
+  }
+
+  private static Server createServer(
       String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
     var s = createBaseServer(catalog, config, icebergConfig, true);
     ServerConnector connector = new ServerConnector(s);
@@ -122,6 +238,10 @@ public final class Main implements Callable<Integer> {
       mux.insertHandler(createAuthorizationHandler(config.bearerTokens(), config));
 
       restCatalogAdapter = new RESTCatalogAdapter(catalog);
+      var globalConfig = config.toIcebergConfigDefaults();
+      if (!globalConfig.isEmpty()) {
+        restCatalogAdapter = new RESTCatalogMiddlewareConfig(restCatalogAdapter, globalConfig);
+      }
       var loadTableConfig = config.toIcebergLoadTableConfig();
       if (!loadTableConfig.isEmpty()) {
         restCatalogAdapter =
@@ -131,12 +251,17 @@ public final class Main implements Callable<Integer> {
       if (awsAuth) {
         Map<String, AwsCredentialsProvider> awsCredentialsProviders =
             createAwsCredentialsProviders(config.bearerTokens(), config, icebergConfig);
+        Function<String, AwsCredentialsProvider> auth = awsCredentialsProviders::get;
         restCatalogAdapter =
-            new RESTCatalogMiddlewareTableAWCredentials(
-                restCatalogAdapter, awsCredentialsProviders::get);
+            new RESTCatalogMiddlewareTableCredentials(
+                new RESTCatalogMiddlewareCredentials(restCatalogAdapter, auth), auth);
       }
     } else {
       restCatalogAdapter = new RESTCatalogAdapter(catalog);
+      var globalConfig = config.toIcebergConfigDefaults();
+      if (!globalConfig.isEmpty()) {
+        restCatalogAdapter = new RESTCatalogMiddlewareConfig(restCatalogAdapter, globalConfig);
+      }
       var loadTableConfig = config.toIcebergLoadTableConfig();
       if (!loadTableConfig.isEmpty()) {
         restCatalogAdapter =
@@ -145,9 +270,10 @@ public final class Main implements Callable<Integer> {
 
       if (awsAuth) {
         DefaultCredentialsProvider awsCredentialsProvider = DefaultCredentialsProvider.create();
+        Function<String, AwsCredentialsProvider> auth = uid -> awsCredentialsProvider;
         restCatalogAdapter =
-            new RESTCatalogMiddlewareTableAWCredentials(
-                restCatalogAdapter, uid -> awsCredentialsProvider);
+            new RESTCatalogMiddlewareTableCredentials(
+                new RESTCatalogMiddlewareCredentials(restCatalogAdapter, auth), auth);
       }
     }
 
@@ -227,43 +353,6 @@ public final class Main implements Callable<Integer> {
     return new RESTCatalogAuthorizationHandler(tokens, anonymousSession);
   }
 
-  private static Server createDebugServer(String host, int port) {
-    var mux = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
-    mux.insertHandler(new GzipHandler());
-
-    mux.addServlet(new ServletHolder(new PrometheusMetricsServlet()), "/metrics");
-    var h =
-        new ServletHolder(
-            new HttpServlet() {
-              @Override
-              protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-                  throws IOException {
-                resp.setStatus(HttpServletResponse.SC_OK);
-                resp.setContentType(MimeTypes.Type.TEXT_PLAIN.asString());
-                resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
-                try (PrintWriter w = resp.getWriter()) {
-                  w.write("OK");
-                }
-              }
-            });
-    mux.addServlet(h, "/healthz");
-
-    // TODO: provide proper impl
-    mux.addServlet(h, "/livez");
-    mux.addServlet(h, "/readyz");
-
-    var s = new Server();
-    overrideJettyDefaults(s);
-    s.setHandler(mux);
-
-    ServerConnector connector = new ServerConnector(s);
-    connector.setHost(host);
-    connector.setPort(port);
-    s.addConnector(connector);
-
-    return s;
-  }
-
   private static void overrideJettyDefaults(Server s) {
     ServerConfig.setQuiet(s);
     s.setErrorHandler(new PlainErrorHandler());
@@ -280,7 +369,11 @@ public final class Main implements Callable<Integer> {
             .map(e -> !e.getKey().contains("key") ? e.getKey() + "=" + e.getValue() : e.getKey())
             .sorted()
             .collect(Collectors.joining(", ")));
+
+    var catalog = loadCatalog(config, icebergConfig);
+
     ObjectMapper om = new ObjectMapper();
+
     for (Config.Token t : config.bearerTokens()) {
       if (Strings.isNullOrEmpty(t.name())) {
         logger.info(
@@ -299,28 +392,17 @@ public final class Main implements Callable<Integer> {
           om.writeValueAsString(config.anonymousAccess().accessConfig()));
     }
 
-    // FIXME: remove
-    if (config.s3() != null) {
-      var awsRegion = config.s3().region();
-      if (!awsRegion.isEmpty()) {
-        System.setProperty("aws.region", awsRegion);
-      }
+    // Initialize and start the maintenance scheduler
+    if (!Strings.isNullOrEmpty(config.maintenanceSchedule())) {
+      MaintenanceRunner maintenanceRunner = newMaintenanceRunner(catalog, config.maintenance());
+      startMaintenanceScheduler(config.maintenanceSchedule(), maintenanceRunner);
+      // TODO: http endpoint to trigger
+    } else {
+      logger.info("Catalog maintenance disabled (no maintenance schedule specified)");
     }
 
     // TODO: ensure all http handlers are hooked in
     JvmMetrics.builder().register();
-
-    String catalogName = config.name();
-    String catalogImpl = icebergConfig.get(CatalogProperties.CATALOG_IMPL);
-    Catalog catalog;
-    if (EtcdCatalog.class.getName().equals(catalogImpl)) {
-      catalog = newEctdCatalog(catalogName, icebergConfig);
-    } else {
-      catalog = CatalogUtil.buildIcebergCatalog(catalogName, icebergConfig, null);
-    }
-
-    // Initialize and start the maintenance scheduler
-    initializeMaintenanceScheduler(catalog, config);
 
     // TODO: replace with uds (jetty-unixdomain-server is all that is needed here but in ice you'll
     // need to implement custom org.apache.iceberg.rest.RESTClient)
@@ -345,25 +427,76 @@ public final class Main implements Callable<Integer> {
 
     // FIXME: exception here does not terminate the process
     HostAndPort debugHostAndPort = HostAndPort.fromString(config.debugAddr());
-    createDebugServer(debugHostAndPort.getHost(), debugHostAndPort.getPort()).start();
+    DebugServer.create(debugHostAndPort.getHost(), debugHostAndPort.getPort()).start();
     logger.info("Serving http://{}/{metrics,healtz,livez,readyz}", debugHostAndPort);
 
     httpServer.join();
     return 0;
   }
 
-  private void initializeMaintenanceScheduler(Catalog catalog, Config config) {
-    if (Strings.isNullOrEmpty(config.maintenanceSchedule())) {
+  private Catalog loadCatalog(Config config, Map<String, String> icebergConfig) throws IOException {
+    // FIXME: remove
+    if (config.s3() != null) {
+      var awsRegion = config.s3().region();
+      if (!awsRegion.isEmpty()) {
+        System.setProperty("aws.region", awsRegion);
+      }
+    }
+
+    String catalogName = config.name();
+    String catalogImpl = icebergConfig.get(CatalogProperties.CATALOG_IMPL);
+    Catalog catalog;
+    if (EtcdCatalog.class.getName().equals(catalogImpl)) {
+      catalog = newEctdCatalog(catalogName, icebergConfig);
+    } else {
+      catalog = CatalogUtil.buildIcebergCatalog(catalogName, icebergConfig, null);
+    }
+    return catalog;
+  }
+
+  private MaintenanceRunner newMaintenanceRunner(Catalog catalog, MaintenanceConfig config) {
+    final boolean dryRun = config.dryRun();
+    MaintenanceConfig.Job[] jobNames =
+        Objects.requireNonNullElse(config.jobs(), MaintenanceConfig.Job.values());
+    List<MaintenanceJob> jobs =
+        Arrays.stream(jobNames)
+            .distinct()
+            .map(
+                maintenanceMode ->
+                    (MaintenanceJob)
+                        switch (maintenanceMode) {
+                          case DATA_COMPACTION ->
+                              new DataCompaction(
+                                  config.targetFileSizeMB() * 1024L * 1024L,
+                                  config.minInputFiles(),
+                                  TimeUnit.HOURS.toMillis(
+                                      config.dataCompactionCandidateMinAgeInHours()),
+                                  dryRun);
+                          case MANIFEST_COMPACTION -> new ManifestCompaction(dryRun);
+                          case ORPHAN_CLEANUP ->
+                              new OrphanCleanup(
+                                  TimeUnit.DAYS.toMillis(config.orphanFileRetentionPeriodInDays()),
+                                  Matcher.from(config.orphanWhitelist()),
+                                  dryRun);
+                          case SNAPSHOT_CLEANUP ->
+                              new SnapshotCleanup(
+                                  config.maxSnapshotAgeHours(),
+                                  config.minSnapshotsToKeep(),
+                                  dryRun);
+                        })
+            .toList();
+    return new MaintenanceRunner(catalog, jobs);
+  }
+
+  private void startMaintenanceScheduler(String schedule, MaintenanceRunner maintenanceRunner) {
+    if (Strings.isNullOrEmpty(schedule)) {
       logger.info("Catalog maintenance disabled (no maintenance schedule specified)");
       return;
     }
     try {
-      MaintenanceScheduler scheduler =
-          new MaintenanceScheduler(
-              catalog, config.maintenanceSchedule(), config.snapshotTTLInDays());
+      MaintenanceScheduler scheduler = new MaintenanceScheduler(schedule, maintenanceRunner);
       scheduler.startScheduledMaintenance();
-      logger.info(
-          "Maintenance scheduler initialized with schedule: {}", config.maintenanceSchedule());
+      logger.info("Maintenance scheduler initialized with schedule: {}", schedule);
     } catch (Exception e) {
       logger.error("Failed to initialize maintenance scheduler", e);
       throw new RuntimeException(e);

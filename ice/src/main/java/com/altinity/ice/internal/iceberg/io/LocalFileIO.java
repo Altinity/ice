@@ -16,11 +16,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.io.BulkDeletionFailureException;
@@ -32,12 +35,15 @@ import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 
 public class LocalFileIO implements DelegateFileIO {
 
-  // current workdir by default
+  public static final String LOCALFILEIO_PROP_WAREHOUSE = "localfileio.warehouse";
+
   public static final String LOCALFILEIO_PROP_BASEDIR = "localfileio.basedir";
-  public static final String LOCALFILEIO_PROP_WAREHOUSE =
-      "localfileio.warehouse"; // e.g. file://path/to/warehouse/root/relative/to/localfileio.basedir
-  private Path basePath;
+  public static final String LOCALFILEIO_PROP_ALLOWACCESS = "localfileio.allowaccess";
+
+  private String workDir;
+  private Path warehousePath;
   private String locationPrefix;
+  private List<Path> allowAccess = List.of(); // TODO: replace with trie
 
   @Override
   public void initialize(Map<String, String> properties) {
@@ -51,40 +57,104 @@ public class LocalFileIO implements DelegateFileIO {
         warehouse.startsWith("file://"),
         "\"%s\" must start with file://",
         LOCALFILEIO_PROP_WAREHOUSE);
-    String baseDir = properties.getOrDefault(LOCALFILEIO_PROP_BASEDIR, "");
-    if (baseDir.isEmpty()) {
-      baseDir = System.getProperty("user.dir");
-    }
-    if (!baseDir.isEmpty()) {
-      baseDir = Strings.removeSuffix(baseDir, "/") + "/";
-    }
-    String base = baseDir + Strings.removeSuffix(Strings.removePrefix(warehouse, "file://"), "/");
-    if (!Files.isDirectory(Paths.get(base))) {
+    this.workDir = resolveWorkdir(warehouse, properties.get(LOCALFILEIO_PROP_BASEDIR));
+    Path warehousePath = resolveWarehousePath(warehouse, workDir);
+    if (!Files.isDirectory(warehousePath)) {
       throw new IllegalArgumentException(
-          String.format("\"%s\" must point to an existing directory", LOCALFILEIO_PROP_WAREHOUSE));
+          String.format("\"%s\" must point to an existing directory", warehousePath));
     }
-    Path basePath;
     try {
-      basePath = Paths.get(base).toRealPath();
+      this.warehousePath = warehousePath.toRealPath();
     } catch (IOException e) {
       throw new RuntimeIOException(e);
     }
-    // TODO: do no allow dir that contain subfolders other than data/metadata (unless force flag is
-    // used)
+    var x = Strings.removeSuffix(Strings.removePrefix(warehouse, "file://"), "/");
+    this.locationPrefix = "file://" + (!x.isEmpty() ? x + "/" : "");
+    this.allowAccess =
+        Arrays.stream(properties.getOrDefault(LOCALFILEIO_PROP_ALLOWACCESS, "").split(","))
+            .map(s -> Strings.removePrefix(s.trim(), "file://"))
+            .filter(s -> !s.isEmpty())
+            .map(Paths::get)
+            .toList();
+  }
+
+  /**
+   * resolveWorkdir returns workdir based on whether warehouse is absolute or relative, e.g. <code>
+   * resolveWorkdir("/foo/bar", null) -> "/"
+   * resolveWorkdir("foo/bar", "/") -> "/"
+   * resolveWorkdir("foo/bar", "/baz") -> "/baz"
+   * resolveWorkdir("foo/bar", null) -> "$PWD"
+   * </code>
+   */
+  public static String resolveWorkdir(String fileWarehouse, @Nullable String warehouseBaseDir) {
+    String baseDir = Objects.requireNonNullElse(warehouseBaseDir, "");
+    if (baseDir.isEmpty()) {
+      baseDir =
+          Strings.removePrefix(fileWarehouse, "file://").startsWith("/")
+              ? "/"
+              : System.getProperty("user.dir") /* workdir */;
+    }
+    return baseDir;
+  }
+
+  /**
+   * resolveBasePath returns warehouse's absolute path, e.g. <code>
+   * resolveBasePath("/foo/bar", "/") -> "/foo/bar"
+   * resolveBasePath("foo/bar", "/") -> "/foo/bar"
+   * resolveBasePath("foo/bar", "/baz") -> "/baz/foo/bar"
+   * resolveBasePath("foo/bar", "$PWD") -> "$PWD/foo/bar"
+   * </code>
+   */
+  public static Path resolveWarehousePath(String fileWarehouse, String workDir) {
+    Path basePath =
+        Paths.get(
+                Strings.removeSuffix(workDir, "/")
+                    + "/"
+                    + Strings.removeSuffix(Strings.removePrefix(fileWarehouse, "file://"), "/"))
+            .toAbsolutePath();
+    // TODO: do no allow dir that contain subfolders other than data/metadata
+    //       (unless force flag is used)
     if ("/".equals(basePath.toString())) {
       throw new IllegalArgumentException(
           String.format("\"%s\" cannot point to /", LOCALFILEIO_PROP_WAREHOUSE));
     }
-    this.basePath = basePath;
-    var x = Strings.removeSuffix(Strings.removePrefix(warehouse, "file://"), "/");
-    this.locationPrefix = "file://" + (!x.isEmpty() ? x + "/" : "");
+    return basePath;
   }
 
+  // TODO: refactor (resolve + all resolve* above); this feels way more complicated that it needs to
+  // be
   private Path resolve(String userPath) {
     String relativeToBase = Strings.removePrefix(userPath, this.locationPrefix);
-    Path resolved = basePath.resolve(relativeToBase).normalize().toAbsolutePath();
-    if (!resolved.startsWith(basePath)) {
-      throw new SecurityException(String.format("Access outside \"%s\" is not allowed", resolved));
+    if (relativeToBase.startsWith("file://")) {
+      // userPath is not relative to locationPrefix (expected when --force-no-copy is used)
+      // check if it's explicitly whitelisted by the user
+      relativeToBase = Strings.removePrefix(relativeToBase, "file://");
+      if (allowAccess.isEmpty()) {
+        throw new SecurityException(
+            String.format(
+                "Access outside \"%s\" is not allowed: \"%s\" (add `localFileIOAllowAccess: [\"/dir\"]` to .ice.yaml to whitelist)",
+                warehousePath, relativeToBase));
+      }
+      Path resolved;
+      if (relativeToBase.startsWith("/")) {
+        resolved = Paths.get(relativeToBase).toAbsolutePath();
+      } else {
+        resolved = Paths.get(workDir).resolve(relativeToBase).toAbsolutePath();
+      }
+      if (allowAccess.stream().noneMatch(resolved::startsWith)) {
+        throw new SecurityException(
+            String.format(
+                "Access outside \"%s\" (plus \"%s\") is not allowed: \"%s\"",
+                warehousePath,
+                String.join("\", \"", allowAccess.stream().map(Path::toString).toList()),
+                relativeToBase));
+      }
+      return resolved;
+    }
+    Path resolved = warehousePath.resolve(relativeToBase).normalize().toAbsolutePath();
+    if (!resolved.startsWith(warehousePath)) {
+      throw new SecurityException(
+          String.format("Access outside \"%s\" is not allowed: \"%s\"", warehousePath, resolved));
     }
     return resolved;
   }
@@ -107,7 +177,7 @@ public class LocalFileIO implements DelegateFileIO {
   }
 
   private String location(Path path) {
-    return locationPrefix + basePath.relativize(path);
+    return locationPrefix + warehousePath.relativize(path);
   }
 
   @Override

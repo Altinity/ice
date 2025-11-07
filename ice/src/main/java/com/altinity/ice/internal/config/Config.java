@@ -37,6 +37,7 @@ public final class Config {
     }
     ObjectMapper om = new ObjectMapper(new YAMLFactory());
     om.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+    om.configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, true);
     // TODO: support env var interpolation
     try {
       return om.readValue(v, type);

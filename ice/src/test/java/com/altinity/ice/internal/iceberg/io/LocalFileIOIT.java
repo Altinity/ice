@@ -57,7 +57,7 @@ public class LocalFileIOIT {
   }
 
   @Test
-  public void testBasic() throws IOException {
+  public void testBasicFlow() throws IOException {
     for (var warehouse : new String[] {"file://.", "file://", "file://x/y/z"}) {
       tempDir.toFile().mkdirs();
       new File(tempDir.toString(), Strings.removePrefix(warehouse, "file://")).mkdirs();
@@ -77,14 +77,6 @@ public class LocalFileIOIT {
                             warehouse)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("must point to an existing directory");
-
-        /*
-                assertThatThrownBy(
-                        () ->
-                            io.initialize(Map.of(LocalFileIO.LOCALFILEIO_PROP_BASEDIR, tempDir.toString())))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("required");
-        */
 
         Function<String, String> warehouseLocation =
             (String s) -> (warehouse.endsWith("/") ? warehouse : warehouse + "/") + s;
@@ -154,10 +146,4 @@ public class LocalFileIOIT {
       }
     }
   }
-
-  /*  @Test
-  public void testWithCatalog() throws IOException {
-    new InMemoryCatalog();
-
-  }*/
 }

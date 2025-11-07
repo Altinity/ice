@@ -22,9 +22,10 @@ public final class DeleteTable {
 
   private DeleteTable() {}
 
-  public static void run(RESTCatalog catalog, TableIdentifier nsTable, boolean ignoreNotFound)
+  public static void run(
+      RESTCatalog catalog, TableIdentifier nsTable, boolean ignoreNotFound, boolean purge)
       throws IOException {
-    var purge = true; // FIXME
+    // TODO: exclude files outside of table location during purge
     if (!catalog.dropTable(nsTable, purge)) {
       if (!ignoreNotFound) {
         throw new NotFoundException(String.format("Table %s not found", nsTable));

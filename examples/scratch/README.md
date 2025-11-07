@@ -50,9 +50,6 @@ ice create-table flowers.iris_no_copy --schema-from-parquet=file://iris.parquet
 local-mc cp iris.parquet local/bucket1/flowers/iris_no_copy/
 ice insert flowers.iris_no_copy --no-copy s3://bucket1/flowers/iris_no_copy/iris.parquet
 
-# delete partition(By default --dry-run=true is enabled to print the list of partitions that will be deleted)
-ice delete nyc.taxis --dry-run=false
-
 # inspect
 ice describe
 
