@@ -23,9 +23,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.iceberg.*;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.types.Conversions;
@@ -77,8 +81,7 @@ public final class Describe {
         try {
           tableData = gatherTableData(catalog, tableId, optionsSet);
           tableMetadata = new Table.Metadata(tableId.toString());
-        } catch (Exception e) {
-          e.printStackTrace(System.err);
+        } catch (ServiceFailureException e) {
           tableMetadata = new Table.Metadata(tableId.toString(), e.getMessage());
         }
 
