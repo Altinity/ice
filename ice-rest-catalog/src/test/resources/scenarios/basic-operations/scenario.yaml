@@ -1,0 +1,28 @@
+name: "Basic Catalog Operations"
+description: "Tests fundamental catalog operations like namespace and table management"
+
+# Configuration for ICE REST catalog server (optional overrides from defaults)
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+# Environment variables that will be available to scripts
+env:
+  NAMESPACE_NAME: "test_ns"
+
+# Cloud resources needed for this scenario (future use for provisioning)
+cloudResources:
+  s3:
+    buckets:
+      - "test-bucket"
+
+# Test phases
+phases:
+  - name: "setup"
+    description: "Create namespace"
+  - name: "verify"
+    description: "Verify namespace exists and can be deleted"
+  - name: "cleanup"
+    description: "Delete namespace"
+
+
+

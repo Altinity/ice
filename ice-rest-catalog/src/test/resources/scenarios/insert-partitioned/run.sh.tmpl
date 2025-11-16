@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+
+echo "Running insert with partitioning test..."
+
+# Create namespace
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "✓ Created namespace: ${NAMESPACE_NAME}"
+
+# Get the full path to the input file
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/${INPUT_FILE}"
+
+# Create table with partitioning and insert data
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} ${INPUT_PATH} --partition="${PARTITION_SPEC}"
+echo "✓ Inserted data with partitioning into table ${TABLE_NAME}"
+
+# Describe the table to verify partitioning (if describe command exists)
+# {{ICE_CLI}} --config {{CLI_CONFIG}} describe-table ${TABLE_NAME}
+
+# Cleanup
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+echo "✓ Deleted table: ${TABLE_NAME}"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "✓ Deleted namespace: ${NAMESPACE_NAME}"
+
+echo "Insert with partitioning test completed successfully"
+

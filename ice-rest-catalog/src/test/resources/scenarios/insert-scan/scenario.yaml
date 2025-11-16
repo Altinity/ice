@@ -1,0 +1,26 @@
+name: "Insert and Scan Operations"
+description: "Tests inserting data from parquet files and scanning tables"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_scan"
+  TABLE_NAME: "test_scan.users"
+  INPUT_FILE: "input.parquet"
+
+cloudResources:
+  s3:
+    buckets:
+      - "test-bucket"
+
+phases:
+  - name: "setup"
+    description: "Create namespace and table with data"
+  - name: "verify"
+    description: "Scan table and verify data"
+  - name: "cleanup"
+    description: "Delete table and namespace"
+
+
+

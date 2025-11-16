@@ -1,0 +1,29 @@
+name: "Insert with Partitioning"
+description: "Tests inserting data with partitioning specifications"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_insert_partitioned"
+  TABLE_NAME: "test_insert_partitioned.iris_partitioned"
+  INPUT_FILE: "input.parquet"
+  PARTITION_SPEC: '[{"column":"variety","transform":"identity"}]'
+
+cloudResources:
+  s3:
+    buckets:
+      - "test-bucket"
+
+phases:
+  - name: "setup"
+    description: "Create namespace"
+  - name: "run"
+    description: "Create partitioned table and insert data"
+  - name: "verify"
+    description: "Verify table was created with correct partitioning"
+  - name: "cleanup"
+    description: "Delete table and namespace"
+
+
+
