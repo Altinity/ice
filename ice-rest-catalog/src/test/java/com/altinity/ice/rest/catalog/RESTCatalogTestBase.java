@@ -92,7 +92,7 @@ public abstract class RESTCatalogTestBase {
                 new Config.AccessConfig(
                     false, null)), // anonymousAccess - enable with read-write for testing
             null, // maintenanceSchedule
-            0, // snapshotTTLInDays
+            null, // maintenance
             null, // loadTableProperties
             null // icebergProperties
             );
@@ -141,5 +141,15 @@ public abstract class RESTCatalogTestBase {
     Files.write(tempConfigFile.toPath(), configContent.getBytes());
 
     return tempConfigFile;
+  }
+
+  /** Get the MinIO endpoint URL */
+  protected String getMinioEndpoint() {
+    return "http://" + minio.getHost() + ":" + minio.getMappedPort(9000);
+  }
+
+  /** Get the REST catalog URI */
+  protected String getCatalogUri() {
+    return "http://localhost:8080";
   }
 }
