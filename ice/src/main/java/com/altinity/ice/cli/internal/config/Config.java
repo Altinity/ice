@@ -27,6 +27,9 @@ public record Config(
     @JsonPropertyDescription(
             "PEM-encoded CA bundle (use base64: prefix to pass base64-encoded value)")
         String caCrt,
+    @JsonPropertyDescription(
+            "Skip SSL certificate verification (WARNING: insecure, use only for development)")
+        Boolean sslVerify,
     @JsonPropertyDescription("Bearer token to authorizer requests with") String bearerToken,
     @JsonPropertyDescription(
             "/path/to/dir where to store downloaded files when `ice insert`ing from http:// & https://")
