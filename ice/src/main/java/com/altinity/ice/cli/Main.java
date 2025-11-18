@@ -81,6 +81,13 @@ public final class Main {
       scope = CommandLine.ScopeType.INHERIT)
   private String logLevel;
 
+  @CommandLine.Option(
+      names = {"--insecure", "--ssl-no-verify"},
+      description =
+          "Skip SSL certificate verification (WARNING: insecure, use only for development)",
+      scope = CommandLine.ScopeType.INHERIT)
+  private boolean insecure;
+
   private Main() {}
 
   @CommandLine.Command(name = "check", description = "Check configuration.")
@@ -595,7 +602,19 @@ public final class Main {
       }
     }
 
-    RESTCatalog catalog = RESTCatalogFactory.create(caCrt);
+    // Command-line flag takes precedence over config file
+    // Default to true (verify SSL) unless explicitly disabled
+    boolean sslVerify = !insecure;
+    if (config.sslVerify() != null) {
+      sslVerify = config.sslVerify() && !insecure;
+    }
+
+    if (!sslVerify) {
+      logger.warn(
+          "SSL certificate verification is DISABLED. This is insecure and should only be used for development.");
+    }
+
+    RESTCatalog catalog = RESTCatalogFactory.create(caCrt, sslVerify);
     var icebergConfig = config.toIcebergConfig();
     logger.debug(
         "Iceberg configuration: {}",

@@ -19,12 +19,16 @@ import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.Collection;
+import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 import org.apache.hc.client5.http.ssl.DefaultClientTlsStrategy;
-import org.apache.hc.client5.http.ssl.HostnameVerificationPolicy;
 import org.apache.hc.client5.http.ssl.HttpsSupport;
+import org.apache.hc.client5.http.ssl.TlsSocketStrategy;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.SessionCatalog;
 import org.apache.iceberg.rest.HTTPClient;
@@ -32,13 +36,17 @@ import org.apache.iceberg.rest.RESTCatalog;
 
 public class RESTCatalogFactory {
 
-  public static RESTCatalog create(byte[] caCrt) {
-    if (caCrt == null) {
+  public static RESTCatalog create(byte[] caCrt, boolean sslVerify) {
+    if (caCrt == null && sslVerify) {
       return new RESTCatalog();
     }
     SSLContext sslContext;
     try {
-      sslContext = loadCABundle(caCrt);
+      if (!sslVerify) {
+        sslContext = createInsecureSSLContext();
+      } else {
+        sslContext = loadCABundle(caCrt);
+      }
     } catch (CertificateException
         | KeyStoreException
         | IOException
@@ -46,9 +54,10 @@ public class RESTCatalogFactory {
         | KeyManagementException e) {
       throw new RuntimeException(e);
     }
-    var tlsSocketStrategy =
-        new DefaultClientTlsStrategy(
-            sslContext, HostnameVerificationPolicy.BOTH, HttpsSupport.getDefaultHostnameVerifier());
+    HostnameVerifier hostnameVerifier =
+        sslVerify ? HttpsSupport.getDefaultHostnameVerifier() : (hostname, session) -> true;
+    TlsSocketStrategy tlsSocketStrategy =
+        new DefaultClientTlsStrategy(sslContext, hostnameVerifier);
     return new RESTCatalog(
         SessionCatalog.SessionContext.createEmpty(),
         x ->
@@ -78,6 +87,25 @@ public class RESTCatalogFactory {
     tmf.init(trustStore);
     SSLContext sslContext = SSLContext.getInstance("TLS");
     sslContext.init(null, tmf.getTrustManagers(), new SecureRandom());
+    return sslContext;
+  }
+
+  private static SSLContext createInsecureSSLContext()
+      throws NoSuchAlgorithmException, KeyManagementException {
+    TrustManager[] trustAllCerts =
+        new TrustManager[] {
+          new X509TrustManager() {
+            public X509Certificate[] getAcceptedIssuers() {
+              return new X509Certificate[0];
+            }
+
+            public void checkClientTrusted(X509Certificate[] certs, String authType) {}
+
+            public void checkServerTrusted(X509Certificate[] certs, String authType) {}
+          }
+        };
+    SSLContext sslContext = SSLContext.getInstance("TLS");
+    sslContext.init(null, trustAllCerts, new SecureRandom());
     return sslContext;
   }
 }
