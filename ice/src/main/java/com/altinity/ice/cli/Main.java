@@ -238,12 +238,13 @@ public final class Main {
                   e.g. [{"op":"drop_column","name":"foo"}]
 
                   Supported operations:
-                    - add_column      (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional))
-                    - alter_column    (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types))
-                    - rename_column   (params: "name", "new_name")
-                    - drop_column     (params: "name")
-                    - set_tblproperty (params: "key", "value" (set to null to remove table property))
-                    - rename_to       (params: "new_name")
+                    - add_column           (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional))
+                    - alter_column         (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types))
+                    - rename_column        (params: "name", "new_name")
+                    - drop_column          (params: "name")
+                    - set_tblproperty      (params: "key", "value" (set to null to remove table property))
+                    - rename_to            (params: "new_name")
+                    - drop_partition_field (params: "name")
                   """)
           String updatesJson)
       throws IOException {

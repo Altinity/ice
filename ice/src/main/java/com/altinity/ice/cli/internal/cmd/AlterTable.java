@@ -17,6 +17,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.UpdatePartitionSpec;
 import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.Catalog;
@@ -41,6 +42,7 @@ public class AlterTable {
     @JsonSubTypes.Type(value = DropColumn.class, name = "drop_column"),
     @JsonSubTypes.Type(value = SetTblProperty.class, name = "set_tblproperty"),
     @JsonSubTypes.Type(value = RenameTo.class, name = "rename_to"),
+    @JsonSubTypes.Type(value = DropPartitionField.class, name = "drop_partition_field"),
   })
   public abstract static class Update {}
 
@@ -111,6 +113,14 @@ public class AlterTable {
     }
   }
 
+  public static class DropPartitionField extends Update {
+    private final String name;
+
+    public DropPartitionField(@JsonProperty(value = "name", required = true) String name) {
+      this.name = name;
+    }
+  }
+
   public static void run(Catalog catalog, TableIdentifier tableId, List<Update> updates)
       throws IOException {
     if (updates.isEmpty()) {
@@ -122,6 +132,7 @@ public class AlterTable {
     Transaction tx = table.newTransaction();
     Lazy<UpdateSchema> schemaUpdates = new Lazy<>(tx::updateSchema);
     Lazy<UpdateProperties> propertiesUpdates = new Lazy<>(tx::updateProperties);
+    Lazy<UpdatePartitionSpec> partitionSpecUpdates = new Lazy<>(tx::updateSpec);
     RenameTo renameTo = null;
     for (Update update : updates) {
       switch (update) {
@@ -150,6 +161,9 @@ public class AlterTable {
         case RenameTo up -> {
           renameTo = up;
         }
+        case DropPartitionField up -> {
+          partitionSpecUpdates.getValue().removeField(up.name);
+        }
         default -> throw new UnsupportedOperationException();
       }
     }
@@ -158,6 +172,9 @@ public class AlterTable {
     }
     if (propertiesUpdates.hasValue()) {
       propertiesUpdates.getValue().commit();
+    }
+    if (partitionSpecUpdates.hasValue()) {
+      partitionSpecUpdates.getValue().commit();
     }
     tx.commitTransaction();
     if (renameTo != null) {
