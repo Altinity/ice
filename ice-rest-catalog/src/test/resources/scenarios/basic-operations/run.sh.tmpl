@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+# Template variables will be replaced at runtime:
+# {{ICE_CLI}} - path to ice CLI executable
+# {{CLI_CONFIG}} - path to temporary ICE CLI config file
+# {{MINIO_ENDPOINT}} - minio endpoint URL
+# {{CATALOG_URI}} - REST catalog URI
+# Environment variables from scenario.yaml are also available
+
+echo "Running basic operations test..."
+
+# Create namespace via CLI
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "✓ Created namespace: ${NAMESPACE_NAME}"
+
+# List namespaces to verify
+{{ICE_CLI}} --config {{CLI_CONFIG}} list-namespaces
+echo "✓ Listed namespaces"
+
+# Delete the namespace via CLI
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "✓ Deleted namespace: ${NAMESPACE_NAME}"
+
+echo "Basic operations test completed successfully"
+
