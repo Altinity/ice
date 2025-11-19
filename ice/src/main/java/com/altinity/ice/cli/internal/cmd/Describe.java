@@ -77,15 +77,15 @@ public final class Describe {
         }
 
         Describe.Table.Data tableData = null;
-        Table.Metadata tableMetadata;
+        Table.Error tableError = null;
         try {
           tableData = gatherTableData(catalog, tableId, optionsSet);
-          tableMetadata = new Table.Metadata(tableId.toString());
         } catch (ServiceFailureException e) {
-          tableMetadata = new Table.Metadata(tableId.toString(), e.getMessage());
+          tableError = new Table.Error(e.getMessage());
         }
 
-        tablesMetadata.add(new Table("Table", tableMetadata, tableData));
+        tablesMetadata.add(
+            new Table("Table", new Table.Metadata(tableId.toString()), tableData, tableError));
       }
     }
 
@@ -226,20 +226,16 @@ public final class Describe {
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  record Table(String kind, Table.Metadata metadata, Table.Data data) {
+  record Table(String kind, Table.Metadata metadata, Table.Data data, Table.Error error) {
     public Table {
       if (kind == null) {
         kind = "Table";
       }
     }
 
-    record Metadata(String id, String status) {
-      static final String STATUS_OK = "OK";
+    record Metadata(String id) {}
 
-      Metadata(String id) {
-        this(id, STATUS_OK);
-      }
-    }
+    record Error(String message) {}
 
     record Data(
         String schemaRaw,
