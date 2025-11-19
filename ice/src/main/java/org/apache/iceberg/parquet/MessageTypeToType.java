@@ -43,13 +43,13 @@ import org.apache.parquet.schema.Type.Repetition;
  *
  * <p>Fields we could not determine IDs for will be pruned.
  */
-class MessageTypeToType extends ParquetTypeVisitor<Type> {
+public class MessageTypeToType extends ParquetTypeVisitor<Type> {
   private static final Joiner DOT = Joiner.on(".");
 
   private final Map<String, Integer> aliasToId = Maps.newHashMap();
   private final Function<String[], Integer> nameToIdFunc;
 
-  MessageTypeToType(Function<String[], Integer> nameToIdFunc) {
+  public MessageTypeToType(Function<String[], Integer> nameToIdFunc) {
     this.nameToIdFunc = nameToIdFunc;
   }
 

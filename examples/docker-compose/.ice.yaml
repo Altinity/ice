@@ -1,4 +1,4 @@
-uri: http://localhost:5000
+uri: http://localhost:5001
 bearerToken: foo
 s3:
   endpoint: http://localhost:8999

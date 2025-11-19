@@ -138,7 +138,7 @@ public class SchemeFileIO implements DelegateFileIO {
     }
   }
 
-  private DelegateFileIO io(String location) {
+  public DelegateFileIO io(String location) {
     String s = scheme(location);
     String impl = SCHEME_TO_FILE_IO.get(s);
     Preconditions.checkNotNull(

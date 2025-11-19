@@ -29,10 +29,16 @@ public record Config(
         String caCrt,
     @JsonPropertyDescription("Bearer token to authorizer requests with") String bearerToken,
     @JsonPropertyDescription(
+            "Skip SSL certificate verification (WARNING: insecure, use only for development)")
+        Boolean sslVerify,
+    @JsonPropertyDescription(
             "/path/to/dir where to store downloaded files when `ice insert`ing from http:// & https://")
         String httpCacheDir,
+    @JsonPropertyDescription("Path to warehouse, e.g. s3://..., file://...") String warehouse,
     @JsonPropertyDescription("/path/to/dir to serve as a root for warehouse=file://...")
         String localFileIOBaseDir,
+    @JsonPropertyDescription("Locations outside the warehouse that ice is allowed to access")
+        String[] localFileIOAllowAccess,
     @JsonPropertyDescription("Settings for warehouse=s3://...") S3 s3,
     @JsonPropertyDescription(
             "(experimental) Iceberg properties (see https://iceberg.apache.org/javadoc/1.8.1/"
@@ -102,7 +108,13 @@ public record Config(
       }
     }
 
+    m.putNotNullOrEmpty(LocalFileIO.LOCALFILEIO_PROP_WAREHOUSE, warehouse);
     m.putNotNullOrEmpty(LocalFileIO.LOCALFILEIO_PROP_BASEDIR, localFileIOBaseDir);
+    if (localFileIOAllowAccess != null) {
+      m.putNotNullOrEmpty(
+          LocalFileIO.LOCALFILEIO_PROP_ALLOWACCESS, String.join(",", localFileIOAllowAccess));
+    }
+
     m.putNotNullOrEmpty(OPTION_HTTP_CACHE, httpCacheDir);
 
     if (icebergProperties != null) {

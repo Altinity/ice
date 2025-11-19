@@ -1,0 +1,5 @@
+/.ice-rest-catalog.yaml
+/.terraform.lock.hcl
+/terraform.tfstate
+/terraform.tfstate.backup
+/tf.export

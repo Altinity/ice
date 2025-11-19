@@ -75,7 +75,7 @@ public class S3 {
       if (r.size() >= limit) {
         break;
       }
-      continuationToken = response.isTruncated() ? response.nextContinuationToken() : null;
+      continuationToken = response.nextContinuationToken();
     } while (continuationToken != null);
     return r;
   }

@@ -49,7 +49,7 @@ public class EtcdCatalogIT {
 
   @SuppressWarnings("rawtypes")
   private final GenericContainer etcd =
-      new GenericContainer("bitnami/etcd:3.5.21")
+      new GenericContainer("milvusdb/etcd:3.5.21-r2")
           .withExposedPorts(2379, 2380)
           .withEnv("ALLOW_NONE_AUTHENTICATION", "yes");
 

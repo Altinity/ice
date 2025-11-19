@@ -7,7 +7,7 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
-package com.altinity.ice.rest.catalog.internal.jetty;
+package com.altinity.ice.internal.jetty;
 
 import java.util.stream.Stream;
 import org.eclipse.jetty.server.HttpConfiguration;

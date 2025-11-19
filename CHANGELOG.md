@@ -5,7 +5,118 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/altinity/ice/compare/v0.4.0...master)
+## [Unreleased](https://github.com/altinity/ice/compare/v0.10.0...master)
+
+## [0.10.0](https://github.com/altinity/ice/compare/v0.9.0...v0.10.0)
+
+### Added
+- `ice --insecure` CLI option.
+
+### Changed
+- `ice describe` output to include `error`(s) when table(s) cannot be read due to the internal server error(s).  
+
+### Fixed
+- ice-rest-catalog/etcd: dropTable failing when table files are missing/corrupted.
+
+## [0.9.0](https://github.com/altinity/ice/compare/v0.8.1...v0.9.0)
+
+### Added
+- Support for vended credentials.  
+This enables creating new tables from existing Parquet files located in S3 without having direct access to object storage.
+e.g. `ice create-table foo.bar --use-vended-credentials --schema-from-parquet=s3://catalog-bucket/foo/bar/external-data/sample.parquet`. 
+- `ice alter-table` command. 
+- `ice insert --force-duplicates` CLI flag.
+- `ice describe` output to include nested metrics.
+
+### Changed
+- `ice insert` to accept files with compatible schema: subset of table schema and/or with primitive type promotions listed in
+[Schema Evolution](https://iceberg.apache.org/spec/#schema-evolution) (previously file schema had to match exactly).
+- `ice describe` output to minimize quotes.
+
+### Fixed
+- Calculation of nested metrics.
+
+## [0.8.1](https://github.com/altinity/ice/compare/v0.8.0...v0.8.1)
+
+### Fixed
+- ice: nullCount metric calculation.
+
+## [0.8.0](https://github.com/altinity/ice/compare/v0.7.3...v0.8.0)
+
+### Added
+- ice: Support for using `ice --s3-copy-object` on files over 5 GiB in size.  
+
+### Fixed
+- ice --watch not url decoding object keys from SQS messages.
+- ice: metrics generated for time/timestamp* columns with millisecond precision ([#61](https://github.com/Altinity/ice/pull/61)).
+- ice: NPE while evaluating s3 wildcard expressions against minio ([#60](https://github.com/Altinity/ice/pull/60)).
+
+## [0.7.3](https://github.com/altinity/ice/compare/v0.7.2...v0.7.3)
+
+### Fixed
+- ice-rest-catalog: ORPHAN_CLEANUP maintenance job failing after snapshot cleanup.
+
+## [0.7.2](https://github.com/altinity/ice/compare/v0.7.1...v0.7.2)
+
+### Fixed
+- ice failing to ignore deleted files with % in their names.
+
+## [0.7.1](https://github.com/altinity/ice/compare/v0.7.0...v0.7.1)
+
+### Fixed
+- ice: ClassCastException when reading metrics for enum columns. 
+
+## [0.7.0](https://github.com/altinity/ice/compare/v0.6.2...v0.7.0)
+
+### Changed
+- ice --watch to ignore deleted files.
+- ice --watch to recreate table if deleted and --create-table/-p is set.
+- org.apache.parquet.CorruptStatistics warnings to exclude stacktrace.
+
+## Fixed
+- ice YAML/JSON inputs parsing ignoring trailing tokens.
+
+### Removed
+- jvm stats logging.
+
+## [0.6.2](https://github.com/altinity/ice/compare/v0.6.1...v0.6.2)
+
+### Fixed
+- ice: `watch` ignoring all `s3:ObjectCreated:*` but `s3:ObjectCreated:Put`.
+
+## [0.6.1](https://github.com/altinity/ice/compare/v0.6.0...v0.6.1)
+
+### Fixed
+- ice: sort order check.
+
+## [0.6.0](https://github.com/altinity/ice/compare/v0.5.1...v0.6.0)
+
+### Added
+- ice: Support for `warehouse=file:///absolute/path`.
+- ice: Ability to whitelist `file://` locations outside the `warehouse=file://...` (useful when referencing 
+Parquet files located elsewhere on the filesystem).
+
+## [0.5.1](https://github.com/altinity/ice/compare/v0.5.0...v0.5.1)
+
+### Fixed
+- ice: `ice delete --dry-run`.
+
+## [0.5.0](https://github.com/altinity/ice/compare/v0.4.0...v0.5.0)
+
+### Added
+- ice: Support for `ice insert` in watch mode. See [examples/s3watch](examples/s3watch) for details.
+- ice-rest-catalog: `MANIFEST_COMPACTION`, `DATA_COMPACTION`, `SNAPSHOT_CLEANUP` and `ORPHAN_CLEANUP` maintenance routines. These
+can be enabled either via ice-rest-catalog.yaml/maintenance section or performed ad-hoc via `ice-rest-catalog perform-maintenance`. 
+- ice: `ice delete` command.
+
+### Changed
+- ice: `ice delete-table` not to delete any data unless `--purge` is specified.
+- ice-rest-catalog: catalog maintenance config section. `snapshotTTLInDays` moved to `maintenance.snapshotTTLInDays`.
+
+### Fixed
+- ice: Partitioning metadata missing when data is inserted with `--no-copy` or `--s3-copy-object`.
+- ice: `NULLS_FIRST`/`NULLS_LAST` being ignored when sorting.
+- ice: Path construction in `localfileio`.  
 
 ## [0.4.0](https://github.com/altinity/ice/compare/v0.3.1...v0.4.0)
 

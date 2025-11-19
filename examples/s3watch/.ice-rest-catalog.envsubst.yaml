@@ -1,0 +1,6 @@
+uri: jdbc:sqlite:file:data/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500
+warehouse: s3://${CATALOG_S3_BUCKET_NAME}
+s3:
+  region: ${AWS_REGION}
+bearerTokens:
+- value: foo

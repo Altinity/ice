@@ -6,3 +6,4 @@ target
 /release
 .devbox
 /.envrc
+*.credentials

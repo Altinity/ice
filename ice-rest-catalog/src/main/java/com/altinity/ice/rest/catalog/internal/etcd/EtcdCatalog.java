@@ -354,6 +354,17 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
         .toList();
   }
 
+  /**
+   * {@link org.apache.iceberg.catalog.Catalog#tableExists(TableIdentifier)} override that doesn't
+   * throw when table metadata files are missing/corrupted, allowing {@link
+   * #dropTable(TableIdentifier, boolean)} to succeed.
+   */
+  @Override
+  public boolean tableExists(TableIdentifier identifier) {
+    ByteSequence key = byteSeq(tableKey(identifier));
+    return unwrap(kv.get(key, GetOption.builder().withCountOnly(true).build())).getCount() > 0;
+  }
+
   private String tableKey(Namespace namespace) {
     return tablePrefix() + namespaceToPath(namespace);
   }

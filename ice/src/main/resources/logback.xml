@@ -33,7 +33,7 @@
     <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
       <layout class="com.altinity.ice.internal.logback.ColorAwarePatternLayout">
         <!-- FIXME: stacktrace filtering has perf implications -->
-        <pattern>%gray(%d{yyyy-MM-dd HH:mm:ss} [%.11thread]) %highlight(%-4level) %gray(%logger{27} >) %msg%n%ex{full,
+        <pattern>%gray(%d{yyyy-MM-dd HH:mm:ss} [%.11thread]) %highlight(%-4level) %gray(%logger{27} >) %X{msgContext}%msg%n%replace(%ex{full,
           org.eclipse.jetty,
           jakarta.servlet,
           software.amazon.awssdk.core.internal,
@@ -41,7 +41,7 @@
           picocli,
           java.base,
           org.codehaus.mojo.exec
-          }
+          }){'\A(?s)(?=.*org\.apache\.parquet\.CorruptStatistics).*',''}
         </pattern>
       </layout>
     </encoder>
