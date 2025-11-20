@@ -9,7 +9,7 @@ ARCH="${ARCH:-$(uname -m)}"
 
 # Convert architecture names
 case "$ARCH" in
-  x86_64)
+  x86_64|amd64)
     ARCH="amd64"
     PROFILE="native-amd64-static"
     ;;
