@@ -15,4 +15,20 @@ jobs:
           distribution: 'graalvm'
           cache: maven
       - run: ./mvnw clean verify
-      # TODO: check native-image can build ice
+  
+  native-build:
+    name: Build and test native image
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'graalvm'
+          cache: maven
+      - name: Install musl for static linking
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Build native image (amd64 static with musl)
+        run: ./build-native.sh
+        env:
+          ARCH: amd64
