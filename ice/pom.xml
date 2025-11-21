@@ -690,7 +690,8 @@
               <mainClass>com.altinity.ice.cli.Main</mainClass>
               <buildArgs>
                 <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/reflection-config.json</buildArg>
-                <buildArg>--initialize-at-run-time=io.netty.channel.ChannelHandlerMask</buildArg>
+                <buildArg>--initialize-at-run-time=io.netty</buildArg>
+                <buildArg>--initialize-at-run-time=ch.qos.logback</buildArg>
                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
               </buildArgs>
 
@@ -723,7 +724,8 @@
               <buildArgs>
                 <!-- Base configuration -->
                 <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/reflection-config.json</buildArg>
-                <buildArg>--initialize-at-run-time=io.netty.channel.ChannelHandlerMask</buildArg>
+                <buildArg>--initialize-at-run-time=io.netty</buildArg>
+                <buildArg>--initialize-at-run-time=ch.qos.logback</buildArg>
                 <!-- Static linking with musl for truly standalone binary (amd64 only) -->
                 <buildArg>--static</buildArg>
                 <buildArg>--libc=musl</buildArg>
@@ -760,7 +762,8 @@
               <buildArgs>
                 <!-- Base configuration -->
                 <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/reflection-config.json</buildArg>
-                <buildArg>--initialize-at-run-time=io.netty.channel.ChannelHandlerMask</buildArg>
+                <buildArg>--initialize-at-run-time=io.netty</buildArg>
+                <buildArg>--initialize-at-run-time=ch.qos.logback</buildArg>
                 <!-- ARM64 optimizations (no static musl support yet) -->
                 <buildArg>-H:+RemoveUnusedSymbols</buildArg>
                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
