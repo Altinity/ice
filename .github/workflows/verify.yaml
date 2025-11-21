@@ -26,9 +26,13 @@ jobs:
           java-version: '21'
           distribution: 'graalvm'
           cache: maven
-      - name: Install musl for static linking
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
-      - name: Build native image (amd64 static with musl)
-        run: ./build-native.sh
-        env:
-          ARCH: amd64
+      - name: Build native image (dynamic linking - no musl required)
+        run: ./mvnw -Pnative -pl ice clean package -Dmaven.test.skip=true
+      - name: Test native binary
+        run: ./test-native-binary.sh
+      - name: Upload native binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ice-native-amd64-dynamic
+          path: ice/target/ice
+          if-no-files-found: error
