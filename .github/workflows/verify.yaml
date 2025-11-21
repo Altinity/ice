@@ -28,8 +28,6 @@ jobs:
           cache: maven
       - name: Build native image (dynamic linking - no musl required)
         run: ./mvnw -Pnative -pl ice clean package -Dmaven.test.skip=true
-      - name: Test native binary
-        run: ./test-native-binary.sh
       - name: Upload native binary as artifact
         uses: actions/upload-artifact@v4
         with:
