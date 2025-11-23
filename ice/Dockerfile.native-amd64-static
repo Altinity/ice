@@ -1,5 +1,5 @@
 # Dockerfile for building ICE native image (amd64, static with musl)
-# Usage: docker build -f ice/Dockerfile.native-amd64-static -t ice-native:amd64-static .
+# Usage: docker build -f ice/Dockerfile.native-amd64-static -t ice-native:amd64 .
 
 FROM ghcr.io/graalvm/native-image-community:21-muslib AS builder
 
