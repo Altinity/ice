@@ -52,16 +52,14 @@ Build standalone native binaries with no Java dependency:
 sdk env  # or ensure Java 21+ and GraalVM are available
 
 # For amd64 (static with musl - no dependencies)
-./build-native.sh
-# Produces: ice/target/ice (static binary)
-
-# Or use Maven directly
 mvn -Pnative-amd64-static -pl ice clean package -Dmaven.test.skip=true
+For arm64
+mvn -Pnative-arm64 -pl ice clean package -Dmaven.test.skip=true
 
-# For ARM64 (dynamic with glibc)
-ARCH=arm64 ./build-native.sh
-# Or: mvn -Pnative-arm64 -pl ice clean package -Dmaven.test.skip=true
+# Docker builds
+docker build -f ice/Dockerfile.native-amd64-static -t ice-native:amd64 .
 
+docker build -f ice/Dockerfile.native-arm64 -t ice-native:arm64 .
 
 ## License
 
