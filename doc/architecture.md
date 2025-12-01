@@ -21,19 +21,14 @@ All catalog state (namespaces, tables, schemas, snapshots, etc.) is maintained i
 
 ### Service Discovery
 
-`ice-rest-catalog` uses **DNS+SRV** records to discover and connect to the etcd cluster. This allows dynamic discovery of etcd endpoints without hardcoded addresses. The catalog queries the etcd headless service for available instances.
+`ice-rest-catalog` uses **DNS+SRV** records to discover and connect to the etcd cluster.
+The catalog uses jetcd library to interact with etcd https://github.com/etcd-io/jetcd. 
+The etcd cluster can be accessed using dns+srv as it allows dynamic discovery of etcd endpoints without hardcoded addresses.
 
 ### High Availability
 
 - Multiple `ice-rest-catalog` replicas behind a load balancer
-- etcd cluster with Raft consensus (quorum-based replication)
+- etcd cluster.
 - Persistent volumes for etcd data
 - S3 for durable object storage
-
-## Data Flow
-
-1. **Client → Catalog**: HTTPS requests to ice-rest-catalog service
-2. **Catalog → etcd**: DNS+SRV discovery, then read/write operations on :2379
-3. **Catalog → S3**: Direct read/write of Parquet/metadata files
-4. **etcd Cluster**: Internal Raft consensus on :2380
 
