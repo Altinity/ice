@@ -31,4 +31,3 @@ The etcd cluster can be accessed using dns+srv as it allows dynamic discovery of
 - etcd cluster.
 - Persistent volumes for etcd data
 - S3 for durable object storage
-
