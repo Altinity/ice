@@ -24,6 +24,7 @@ import static org.apache.iceberg.TableProperties.COMMIT_NUM_RETRIES_DEFAULT;
 import static org.apache.iceberg.TableProperties.COMMIT_TOTAL_RETRY_TIME_MS_DEFAULT;
 
 import com.altinity.ice.rest.catalog.internal.auth.Session;
+import com.altinity.ice.rest.catalog.internal.metrics.PrometheusMetricsReporter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -66,12 +67,18 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
   private final Catalog catalog;
   private final SupportsNamespaces asNamespaceCatalog;
   private final ViewCatalog asViewCatalog;
+  private final PrometheusMetricsReporter metricsReporter;
 
   public RESTCatalogAdapter(Catalog catalog) {
+    this(catalog, null);
+  }
+
+  public RESTCatalogAdapter(Catalog catalog, PrometheusMetricsReporter metricsReporter) {
     this.catalog = catalog;
     this.asNamespaceCatalog =
         catalog instanceof SupportsNamespaces ? (SupportsNamespaces) catalog : null;
     this.asViewCatalog = catalog instanceof ViewCatalog ? (ViewCatalog) catalog : null;
+    this.metricsReporter = metricsReporter;
   }
 
   @Override
@@ -236,9 +243,14 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
         }
 
       case REPORT_METRICS:
-        // nothing to do here other than checking that we're getting the correct request
-        castRequest(ReportMetricsRequest.class, requestBody);
-        return null;
+        {
+          ReportMetricsRequest request = castRequest(ReportMetricsRequest.class, requestBody);
+          if (metricsReporter != null && request.report() != null) {
+            String catalogName = catalog.name();
+            metricsReporter.report(catalogName, request.report());
+          }
+          return null;
+        }
 
       case COMMIT_TRANSACTION:
         {

@@ -27,6 +27,7 @@ import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceScheduler;
 import com.altinity.ice.rest.catalog.internal.maintenance.ManifestCompaction;
 import com.altinity.ice.rest.catalog.internal.maintenance.OrphanCleanup;
 import com.altinity.ice.rest.catalog.internal.maintenance.SnapshotCleanup;
+import com.altinity.ice.rest.catalog.internal.metrics.PrometheusMetricsReporter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAdapter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAuthorizationHandler;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogHandler;
@@ -202,8 +203,13 @@ public final class Main implements Callable<Integer> {
   }
 
   private static Server createServer(
-      String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
-    var s = createBaseServer(catalog, config, icebergConfig, true);
+      String host,
+      int port,
+      Catalog catalog,
+      Config config,
+      Map<String, String> icebergConfig,
+      PrometheusMetricsReporter metricsReporter) {
+    var s = createBaseServer(catalog, config, icebergConfig, true, metricsReporter);
     ServerConnector connector = new ServerConnector(s);
     connector.setHost(host);
     connector.setPort(port);
@@ -212,8 +218,13 @@ public final class Main implements Callable<Integer> {
   }
 
   private static Server createAdminServer(
-      String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
-    var s = createBaseServer(catalog, config, icebergConfig, false);
+      String host,
+      int port,
+      Catalog catalog,
+      Config config,
+      Map<String, String> icebergConfig,
+      PrometheusMetricsReporter metricsReporter) {
+    var s = createBaseServer(catalog, config, icebergConfig, false, metricsReporter);
     ServerConnector connector = new ServerConnector(s);
     connector.setHost(host);
     connector.setPort(port);
@@ -222,7 +233,11 @@ public final class Main implements Callable<Integer> {
   }
 
   private static Server createBaseServer(
-      Catalog catalog, Config config, Map<String, String> icebergConfig, boolean requireAuth) {
+      Catalog catalog,
+      Config config,
+      Map<String, String> icebergConfig,
+      boolean requireAuth,
+      PrometheusMetricsReporter metricsReporter) {
     var mux = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
     mux.insertHandler(new GzipHandler());
     // TODO: RequestLogHandler
@@ -237,7 +252,7 @@ public final class Main implements Callable<Integer> {
     if (requireAuth) {
       mux.insertHandler(createAuthorizationHandler(config.bearerTokens(), config));
 
-      restCatalogAdapter = new RESTCatalogAdapter(catalog);
+      restCatalogAdapter = new RESTCatalogAdapter(catalog, metricsReporter);
       var globalConfig = config.toIcebergConfigDefaults();
       if (!globalConfig.isEmpty()) {
         restCatalogAdapter = new RESTCatalogMiddlewareConfig(restCatalogAdapter, globalConfig);
@@ -257,7 +272,7 @@ public final class Main implements Callable<Integer> {
                 new RESTCatalogMiddlewareCredentials(restCatalogAdapter, auth), auth);
       }
     } else {
-      restCatalogAdapter = new RESTCatalogAdapter(catalog);
+      restCatalogAdapter = new RESTCatalogAdapter(catalog, metricsReporter);
       var globalConfig = config.toIcebergConfigDefaults();
       if (!globalConfig.isEmpty()) {
         restCatalogAdapter = new RESTCatalogMiddlewareConfig(restCatalogAdapter, globalConfig);
@@ -401,6 +416,9 @@ public final class Main implements Callable<Integer> {
       logger.info("Catalog maintenance disabled (no maintenance schedule specified)");
     }
 
+    // Initialize Iceberg metrics reporter for Prometheus (singleton)
+    PrometheusMetricsReporter metricsReporter = PrometheusMetricsReporter.getInstance();
+
     // TODO: ensure all http handlers are hooked in
     JvmMetrics.builder().register();
 
@@ -414,14 +432,21 @@ public final class Main implements Callable<Integer> {
               adminHostAndPort.getPort(),
               catalog,
               config,
-              icebergConfig);
+              icebergConfig,
+              metricsReporter);
       adminServer.start();
       logger.warn("Serving admin endpoint at http://{}/v1/{config,*}", adminHostAndPort);
     }
 
     HostAndPort hostAndPort = HostAndPort.fromString(config.addr());
     Server httpServer =
-        createServer(hostAndPort.getHost(), hostAndPort.getPort(), catalog, config, icebergConfig);
+        createServer(
+            hostAndPort.getHost(),
+            hostAndPort.getPort(),
+            catalog,
+            config,
+            icebergConfig,
+            metricsReporter);
     httpServer.start();
     logger.info("Serving http://{}/v1/{config,*}", hostAndPort);
 
