@@ -16,15 +16,8 @@ import io.prometheus.metrics.core.metrics.Gauge;
 import io.prometheus.metrics.core.metrics.Histogram;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Prometheus metrics for HTTP/REST endpoint monitoring.
- *
- * <p>This class uses a singleton pattern because Prometheus metrics can only be registered once per
- * JVM.
- */
 public class HttpMetrics {
 
-  // Singleton instance
   private static volatile HttpMetrics instance;
   private static final Object lock = new Object();
 
@@ -33,7 +26,6 @@ public class HttpMetrics {
   private final Histogram requestDuration;
   private final Gauge requestsInFlight;
 
-  /** Returns the singleton instance of the HTTP metrics. */
   public static HttpMetrics getInstance() {
     if (instance == null) {
       synchronized (lock) {
@@ -75,54 +67,24 @@ public class HttpMetrics {
             .register();
   }
 
-  /**
-   * Record the start of a request. Call this at the beginning of request handling.
-   *
-   * @param method HTTP method (GET, POST, etc.)
-   * @param route Route name (e.g., LOAD_TABLE, LIST_NAMESPACES)
-   */
   public void recordRequestStart(String method, String route) {
     requestsTotal.labelValues(method, route).inc();
     requestsInFlight.inc();
   }
 
-  /**
-   * Record the completion of a request. Call this at the end of request handling.
-   *
-   * @param method HTTP method (GET, POST, etc.)
-   * @param route Route name (e.g., LOAD_TABLE, LIST_NAMESPACES)
-   * @param statusCode HTTP status code (200, 404, 500, etc.)
-   * @param startTimeNanos Start time from System.nanoTime()
-   */
   public void recordRequestEnd(String method, String route, int statusCode, long startTimeNanos) {
     requestsInFlight.dec();
 
-    // Record duration
     double durationSeconds =
         (System.nanoTime() - startTimeNanos) / (double) TimeUnit.SECONDS.toNanos(1);
     requestDuration.labelValues(method, route).observe(durationSeconds);
-
-    // Record response by status code
     responsesTotal.labelValues(method, route, Integer.toString(statusCode)).inc();
   }
 
-  /**
-   * Helper class for timing requests using try-with-resources.
-   *
-   * <p>Usage:
-   *
-   * <pre>{@code
-   * try (var timer = httpMetrics.startRequest("GET", "LOAD_TABLE")) {
-   *   // handle request
-   *   timer.setStatusCode(200);
-   * }
-   * }</pre>
-   */
   public RequestTimer startRequest(String method, String route) {
     return new RequestTimer(this, method, route);
   }
 
-  /** Auto-closeable timer for request duration tracking. */
   public static class RequestTimer implements AutoCloseable {
     private final HttpMetrics metrics;
     private final String method;
