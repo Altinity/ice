@@ -160,4 +160,36 @@ public final class IcebergMetricNames {
   public static final double[] DURATION_BUCKETS = {
     0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60
   };
+
+  // ==========================================================================
+  // HTTP/REST Endpoint Metrics
+  // ==========================================================================
+
+  public static final String LABEL_METHOD = "method";
+  public static final String LABEL_ROUTE = "route";
+  public static final String LABEL_STATUS_CLASS = "status_class";
+
+  public static final String[] HTTP_REQUEST_LABELS = {LABEL_METHOD, LABEL_ROUTE};
+  public static final String[] HTTP_RESPONSE_LABELS = {
+    LABEL_METHOD, LABEL_ROUTE, LABEL_STATUS_CLASS
+  };
+
+  public static final String HTTP_REQUESTS_TOTAL_NAME = "iceberg_http_requests_total";
+  public static final String HTTP_REQUESTS_TOTAL_HELP = "Total number of HTTP requests";
+
+  public static final String HTTP_REQUEST_DURATION_NAME = "iceberg_http_request_duration_seconds";
+  public static final String HTTP_REQUEST_DURATION_HELP = "HTTP request duration in seconds";
+
+  public static final String HTTP_RESPONSES_TOTAL_NAME = "iceberg_http_responses_total";
+  public static final String HTTP_RESPONSES_TOTAL_HELP =
+      "Total number of HTTP responses by status class";
+
+  public static final String HTTP_REQUESTS_IN_FLIGHT_NAME = "iceberg_http_requests_in_flight";
+  public static final String HTTP_REQUESTS_IN_FLIGHT_HELP =
+      "Number of HTTP requests currently being processed";
+
+  /** HTTP request duration buckets (in seconds) - suitable for REST API calls. */
+  public static final double[] HTTP_DURATION_BUCKETS = {
+    0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
+  };
 }

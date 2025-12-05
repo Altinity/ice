@@ -19,6 +19,7 @@
 package com.altinity.ice.rest.catalog.internal.rest;
 
 import com.altinity.ice.rest.catalog.internal.auth.Session;
+import com.altinity.ice.rest.catalog.internal.metrics.HttpMetrics;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -72,9 +73,11 @@ public class RESTCatalogServlet extends HttpServlet {
           .buildOrThrow();
 
   private final RESTCatalogHandler restCatalogAdapter;
+  private final HttpMetrics httpMetrics;
 
   public RESTCatalogServlet(RESTCatalogHandler restCatalogAdapter) {
     this.restCatalogAdapter = restCatalogAdapter;
+    this.httpMetrics = HttpMetrics.getInstance();
   }
 
   protected void handle(HttpServletRequest request, HttpServletResponse response)
@@ -84,70 +87,81 @@ public class RESTCatalogServlet extends HttpServlet {
 
     Pair<Route, Map<String, String>> routeContext = Route.from(method, path);
     if (routeContext == null) {
-      response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-      var res =
-          ErrorResponse.builder()
-              .responseCode(400)
-              .withType("BadRequestException")
-              .withMessage(String.format("No route for %s %s", method, path))
-              .build();
-      RESTObjectMapper.mapper().writeValue(response.getWriter(), res);
+      // Track unknown route requests
+      try (var timer = httpMetrics.startRequest(method.name(), "UNKNOWN")) {
+        timer.setStatusCode(HttpServletResponse.SC_BAD_REQUEST);
+        response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        var res =
+            ErrorResponse.builder()
+                .responseCode(400)
+                .withType("BadRequestException")
+                .withMessage(String.format("No route for %s %s", method, path))
+                .build();
+        RESTObjectMapper.mapper().writeValue(response.getWriter(), res);
+      }
       return;
     }
-
-    Session session = Session.from(request);
-    String userToLog = "";
-    if (session != null) {
-      userToLog = "@" + session.uid() + " ";
-    }
-    logger.info("{}{} {}", userToLog, method, path);
 
     Route route = routeContext.first();
-    Map<String, String> pathParams = routeContext.second();
 
-    // FIXME: this should be in RESTCatalogAdapter, not here
-    Object requestBody = null;
-    if (route.requestClass() != null) {
-      requestBody = RESTObjectMapper.mapper().readValue(request.getReader(), route.requestClass());
-    } else if (route == Route.TOKENS) {
-      requestBody = RESTUtil.decodeFormData(CharStreams.toString(request.getReader()));
-    }
+    // Track request with metrics
+    try (var timer = httpMetrics.startRequest(method.name(), route.name())) {
+      Session session = Session.from(request);
+      String userToLog = "";
+      if (session != null) {
+        userToLog = "@" + session.uid() + " ";
+      }
+      logger.info("{}{} {}", userToLog, method, path);
 
-    Map<String, String> queryParams =
-        request.getParameterMap().entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue()[0]));
+      Map<String, String> pathParams = routeContext.second();
 
-    Map<String, String> params =
-        ImmutableMap.<String, String>builder().putAll(pathParams).putAll(queryParams).build();
-
-    RESTResponse responseBody;
-    try {
-      responseBody =
-          restCatalogAdapter.handle(session, route, params, requestBody, route.responseClass());
-    } catch (Exception e) {
-      ErrorResponse error =
-          ErrorResponse.builder()
-              .responseCode(STATUS_CODE_BY_EXCEPTION.getOrDefault(e.getClass(), 500))
-              .withType(e.getClass().getSimpleName())
-              .withMessage(e.getMessage())
-              .build();
-
-      if (error.code() < 500) {
-        logger.warn("{}{} {}: {}", userToLog, method, path, e.getMessage());
-      } else {
-        logger.error("{}{} {}", userToLog, method, path, e);
+      // FIXME: this should be in RESTCatalogAdapter, not here
+      Object requestBody = null;
+      if (route.requestClass() != null) {
+        requestBody =
+            RESTObjectMapper.mapper().readValue(request.getReader(), route.requestClass());
+      } else if (route == Route.TOKENS) {
+        requestBody = RESTUtil.decodeFormData(CharStreams.toString(request.getReader()));
       }
 
-      response.setStatus(error.code());
-      response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
-      RESTObjectMapper.mapper().writeValue(response.getWriter(), error);
-      return;
-    }
+      Map<String, String> queryParams =
+          request.getParameterMap().entrySet().stream()
+              .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue()[0]));
 
-    response.setStatus(HttpServletResponse.SC_OK);
-    response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
-    if (responseBody != null) {
-      RESTObjectMapper.mapper().writeValue(response.getWriter(), responseBody);
+      Map<String, String> params =
+          ImmutableMap.<String, String>builder().putAll(pathParams).putAll(queryParams).build();
+
+      RESTResponse responseBody;
+      try {
+        responseBody =
+            restCatalogAdapter.handle(session, route, params, requestBody, route.responseClass());
+      } catch (Exception e) {
+        ErrorResponse error =
+            ErrorResponse.builder()
+                .responseCode(STATUS_CODE_BY_EXCEPTION.getOrDefault(e.getClass(), 500))
+                .withType(e.getClass().getSimpleName())
+                .withMessage(e.getMessage())
+                .build();
+
+        if (error.code() < 500) {
+          logger.warn("{}{} {}: {}", userToLog, method, path, e.getMessage());
+        } else {
+          logger.error("{}{} {}", userToLog, method, path, e);
+        }
+
+        timer.setStatusCode(error.code());
+        response.setStatus(error.code());
+        response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
+        RESTObjectMapper.mapper().writeValue(response.getWriter(), error);
+        return;
+      }
+
+      timer.setStatusCode(HttpServletResponse.SC_OK);
+      response.setStatus(HttpServletResponse.SC_OK);
+      response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
+      if (responseBody != null) {
+        RESTObjectMapper.mapper().writeValue(response.getWriter(), responseBody);
+      }
     }
   }
 
