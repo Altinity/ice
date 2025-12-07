@@ -1,6 +1,6 @@
 services:
   elasticmq:
-    image: softwaremill/elasticmq-native:1.6.9
+    image: softwaremill/elasticmq-native:1.6.15
     restart: unless-stopped
     ports:
       - '9324:9324'   # SQS API

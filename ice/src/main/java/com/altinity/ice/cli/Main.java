@@ -420,6 +420,7 @@ public final class Main {
       if (!watchMode) {
         Insert.run(catalog, tableId, dataFiles, options);
       } else {
+        boolean metricsEnabled = false;
         if (!Strings.isNullOrEmpty(watchDebugAddr)) {
           JvmMetrics.builder().register();
 
@@ -432,10 +433,18 @@ public final class Main {
             throw new RuntimeException(e); // TODO: find a better one
           }
           logger.info("Serving http://{}/{metrics,healtz,livez,readyz}", debugHostAndPort);
+          metricsEnabled = true;
         }
 
         InsertWatch.run(
-            catalog, tableId, dataFiles, watch, watchFireOnce, createTableIfNotExists, options);
+            catalog,
+            tableId,
+            dataFiles,
+            watch,
+            watchFireOnce,
+            createTableIfNotExists,
+            options,
+            metricsEnabled);
       }
     }
   }
