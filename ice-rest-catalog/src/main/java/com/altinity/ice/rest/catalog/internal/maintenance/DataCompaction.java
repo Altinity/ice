@@ -13,6 +13,7 @@ import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.iceberg.RecordComparator;
 import com.altinity.ice.internal.iceberg.io.SchemeFileIO;
 import com.altinity.ice.internal.strings.Strings;
+import com.altinity.ice.rest.catalog.internal.metrics.MaintenanceMetrics;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -146,6 +147,8 @@ public record DataCompaction(
     FileIO tableIO = table.io();
     Schema tableSchema = table.schema();
     PartitionSpec tableSpec = table.spec();
+    String tableName = table.name();
+    MaintenanceMetrics maintenanceMetrics = MaintenanceMetrics.getInstance();
 
     Transaction tx = table.newTransaction();
 
@@ -162,6 +165,10 @@ public record DataCompaction(
     if (dryRun) {
       return;
     }
+
+    // Calculate total bytes to read
+    long totalBytesToRead = dataFiles.stream().mapToLong(DataFile::fileSizeInBytes).sum();
+    maintenanceMetrics.recordCompactionBytesRead(tableName, totalBytesToRead);
 
     OutputFile outputFile =
         tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
@@ -252,5 +259,10 @@ public record DataCompaction(
     delOp.commit();
 
     tx.commitTransaction();
+
+    // Record metrics after successful commit
+    maintenanceMetrics.recordCompactionFilesMerged(tableName, dataFiles.size());
+    maintenanceMetrics.recordCompactionFileCreated(tableName);
+    maintenanceMetrics.recordCompactionBytesWritten(tableName, dataFileSizeInBytes);
   }
 }
