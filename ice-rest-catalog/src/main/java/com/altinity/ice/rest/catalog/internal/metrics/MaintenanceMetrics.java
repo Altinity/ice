@@ -74,10 +74,10 @@ public class MaintenanceMetrics {
       "ice_maintenance_compaction_files_merged_total";
   private static final String COMPACTION_FILES_MERGED_TOTAL_HELP = "Total input files merged";
 
-  private static final String COMPACTION_FILES_CREATED_TOTAL_NAME =
-      "ice_maintenance_compaction_files_created_total";
-  private static final String COMPACTION_FILES_CREATED_TOTAL_HELP =
-      "Total output files created after merge";
+  private static final String COMPACTION_OUTPUT_FILES_TOTAL_NAME =
+      "ice_maintenance_compaction_output_files_total";
+  private static final String COMPACTION_OUTPUT_FILES_TOTAL_HELP =
+      "Total output files produced after merge";
 
   private static final String COMPACTION_BYTES_READ_TOTAL_NAME =
       "ice_maintenance_compaction_bytes_read_total";
@@ -108,7 +108,7 @@ public class MaintenanceMetrics {
 
   // Data Compaction
   private final Counter compactionFilesMergedTotal;
-  private final Counter compactionFilesCreatedTotal;
+  private final Counter compactionOutputFilesTotal;
   private final Counter compactionBytesReadTotal;
   private final Counter compactionBytesWrittenTotal;
 
@@ -189,10 +189,10 @@ public class MaintenanceMetrics {
             .labelNames(LABEL_TABLE)
             .register();
 
-    this.compactionFilesCreatedTotal =
+    this.compactionOutputFilesTotal =
         Counter.builder()
-            .name(COMPACTION_FILES_CREATED_TOTAL_NAME)
-            .help(COMPACTION_FILES_CREATED_TOTAL_HELP)
+            .name(COMPACTION_OUTPUT_FILES_TOTAL_NAME)
+            .help(COMPACTION_OUTPUT_FILES_TOTAL_HELP)
             .labelNames(LABEL_TABLE)
             .register();
 
@@ -249,8 +249,8 @@ public class MaintenanceMetrics {
     compactionFilesMergedTotal.labelValues(table).inc(count);
   }
 
-  public void recordCompactionFileCreated(String table) {
-    compactionFilesCreatedTotal.labelValues(table).inc();
+  public void recordCompactionOutputFile(String table) {
+    compactionOutputFilesTotal.labelValues(table).inc();
   }
 
   public void recordCompactionBytesRead(String table, long bytes) {

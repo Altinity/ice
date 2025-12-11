@@ -75,18 +75,20 @@ public class MaintenanceScheduler {
   }
 
   public void performMaintenance() {
-    MaintenanceMetrics metrics = MaintenanceMetrics.getInstance();
-
-    if (isMaintenanceMode.get()) {
-      logger.info("Skipping maintenance task as system is already in maintenance mode");
-      metrics.recordMaintenanceSkipped();
-      return;
-    }
 
     long startTime = System.nanoTime();
     boolean success = false;
-
+    MaintenanceMetrics metrics = null;
     try {
+
+      metrics = MaintenanceMetrics.getInstance();
+
+      if (isMaintenanceMode.get()) {
+        logger.info("Skipping maintenance task as system is already in maintenance mode");
+        metrics.recordMaintenanceSkipped();
+        return;
+      }
+
       logger.info("Starting scheduled maintenance task");
       setMaintenanceMode(true);
       metrics.recordMaintenanceStarted();
@@ -100,7 +102,9 @@ public class MaintenanceScheduler {
     } finally {
       setMaintenanceMode(false);
       double durationSecs = (System.nanoTime() - startTime) / 1_000_000_000.0;
-      metrics.recordMaintenanceCompleted(success, durationSecs);
+      if (metrics != null) {
+        metrics.recordMaintenanceCompleted(success, durationSecs);
+      }
     }
   }
 

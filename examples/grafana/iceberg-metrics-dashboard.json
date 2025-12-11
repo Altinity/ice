@@ -3868,7 +3868,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (table) (rate(ice_maintenance_compaction_files_created_total[$__rate_interval]))",
+          "expr": "sum by (table) (rate(ice_maintenance_compaction_output_files_total[$__rate_interval]))",
           "legendFormat": "Created - {{table}}",
           "refId": "B"
         }

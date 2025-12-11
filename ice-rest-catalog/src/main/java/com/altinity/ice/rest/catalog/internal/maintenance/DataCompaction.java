@@ -262,7 +262,7 @@ public record DataCompaction(
 
     // Record metrics after successful commit
     maintenanceMetrics.recordCompactionFilesMerged(tableName, dataFiles.size());
-    maintenanceMetrics.recordCompactionFileCreated(tableName);
+    maintenanceMetrics.recordCompactionOutputFile(tableName);
     maintenanceMetrics.recordCompactionBytesWritten(tableName, dataFileSizeInBytes);
   }
 }
