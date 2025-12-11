@@ -13,17 +13,20 @@
 
 ### Stateless Catalog
 
-The `ice-rest-catalog` is completely stateless and deployed as a Kubernetes Deployment with multiple replicas. It can be scaled horizontally without coordination. The catalog does not store any state locally—all metadata is persisted in etcd.
+The `ice-rest-catalog` is completely stateless and deployed as a Kubernetes Deployment with multiple replicas.
+It can be scaled horizontally without coordination. The catalog does not store any state locally—all metadata is persisted in etcd.
 
 ### State Management
 
-All catalog state (namespaces, tables, schemas, snapshots, etc.) is maintained in **etcd**, a distributed, consistent key-value store. Each etcd instance runs as a StatefulSet pod with persistent storage, ensuring data durability across restarts.
+All catalog state (namespaces, tables, schemas, snapshots, etc.) is maintained in **etcd**, a distributed, consistent key-value store. 
+Each etcd instance runs as a StatefulSet pod with persistent storage, ensuring data durability across restarts.
 
 ### Service Discovery
 
-`ice-rest-catalog` uses **DNS+SRV** records to discover and connect to the etcd cluster.
+`ice-rest-catalog` uses the k8s service to access the cluster.
 The catalog uses jetcd library to interact with etcd https://github.com/etcd-io/jetcd. 
-The etcd cluster can be accessed using dns+srv as it allows dynamic discovery of etcd endpoints without hardcoded addresses.
+In the etcd cluster, the data is replicated in all the nodes of the cluster. 
+The service provides a round-robin approach to access the nodes in the cluster.
 
 ### High Availability
 
@@ -31,3 +34,14 @@ The etcd cluster can be accessed using dns+srv as it allows dynamic discovery of
 - etcd cluster.
 - Persistent volumes for etcd data
 - S3 for durable object storage
+
+
+### k8s Manifest Files
+
+Kubernetes deployment manifests and configuration files are available in the [`examples/eks`](../examples/eks/) folder:
+
+- [`etcd.eks.yaml`](../examples/eks/etcd.eks.yaml) - etcd StatefulSet deployment
+- [`ice-rest-catalog.eks.envsubst.yaml`](../examples/eks/ice-rest-catalog.eks.envsubst.yaml) - ice-rest-catalog Deployment (requires envsubst)
+- [`eks.envsubst.yaml`](../examples/eks/eks.envsubst.yaml) - Combined EKS deployment template
+
+See the [EKS README](../examples/eks/README.md) for detailed setup instructions.
