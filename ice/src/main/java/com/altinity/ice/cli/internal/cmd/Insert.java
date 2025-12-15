@@ -422,6 +422,8 @@ public final class Insert {
         logger.warn(
             "{} does not appear to be partitioned. Falling back to full scan (slow)",
             inputFile.location());
+      } else {
+        logger.info("{}: using inferred partition key {}", file, partitionKey);
       }
     }
 

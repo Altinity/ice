@@ -44,6 +44,7 @@ class ParquetConversions {
       case DATE:
         return (Literal<T>) Literal.of((Integer) value);
       case LONG:
+        return (Literal<T>) Literal.of((Long) value);
       case TIME:
       case TIMESTAMP:
         // time & timestamp/timestamptz are stored in microseconds
@@ -52,11 +53,8 @@ class ParquetConversions {
             (parquetType.getLogicalTypeAnnotation()
                     instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation t
                 && t.getUnit() == LogicalTypeAnnotation.TimeUnit.MILLIS);
-        if (parquetType.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT32) { // uint32
-          long v = ((Integer) value).longValue();
-          return (Literal<T>) Literal.of(millis ? v * 1000L : v);
-        }
-        return (Literal<T>) Literal.of(millis ? (Long) value * 1000L : (Long) value);
+        var v = ((Number) value).longValue();
+        return (Literal<T>) Literal.of(millis ? v * 1000L : v);
       case FLOAT:
         return (Literal<T>) Literal.of((Float) value);
       case DOUBLE:
