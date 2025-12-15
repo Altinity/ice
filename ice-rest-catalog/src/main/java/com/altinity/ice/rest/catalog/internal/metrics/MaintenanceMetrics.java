@@ -49,6 +49,10 @@ public class MaintenanceMetrics {
   private static final String LAST_RUN_TIMESTAMP_HELP =
       "Unix timestamp of the last maintenance run";
 
+  private static final String START_TIMESTAMP_NAME = "ice_maintenance_start_timestamp";
+  private static final String START_TIMESTAMP_HELP =
+      "Unix timestamp when current maintenance started (0 if not running)";
+
   private static final String SKIPPED_TOTAL_NAME = "ice_maintenance_skipped_total";
   private static final String SKIPPED_TOTAL_HELP =
       "Times maintenance was skipped (already in maintenance mode)";
@@ -98,6 +102,7 @@ public class MaintenanceMetrics {
   private final Histogram durationSeconds;
   private final Gauge inProgress;
   private final Gauge lastRunTimestamp;
+  private final Gauge startTimestamp;
   private final Counter skippedTotal;
 
   // Orphan Cleanup
@@ -148,6 +153,9 @@ public class MaintenanceMetrics {
             .help(LAST_RUN_TIMESTAMP_HELP)
             .labelNames(STATUS_LABELS)
             .register();
+
+    this.startTimestamp =
+        Gauge.builder().name(START_TIMESTAMP_NAME).help(START_TIMESTAMP_HELP).register();
 
     this.skippedTotal =
         Counter.builder().name(SKIPPED_TOTAL_NAME).help(SKIPPED_TOTAL_HELP).register();
@@ -215,6 +223,7 @@ public class MaintenanceMetrics {
 
   public void recordMaintenanceStarted() {
     inProgress.set(1.0);
+    startTimestamp.set(System.currentTimeMillis() / 1000.0);
   }
 
   public void recordMaintenanceCompleted(boolean success, double durationSecs) {
@@ -223,6 +232,7 @@ public class MaintenanceMetrics {
     durationSeconds.observe(durationSecs);
     lastRunTimestamp.labelValues(status).set(System.currentTimeMillis() / 1000.0);
     inProgress.set(0.0);
+    startTimestamp.set(0.0);
   }
 
   public void recordMaintenanceSkipped() {

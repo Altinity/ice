@@ -3202,6 +3202,7 @@
           "color": {
             "mode": "palette-classic"
           },
+          "decimals": 0,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -3433,6 +3434,89 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "Shows how long maintenance has been running. Use this for alerting if maintenance is stuck (e.g., alert if > 1 hour).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "match": "null",
+                "result": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "Not Running"
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 300
+              },
+              {
+                "color": "orange",
+                "value": 1800
+              },
+              {
+                "color": "red",
+                "value": 3600
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 103
+      },
+      "id": 307,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(time() - ice_maintenance_start_timestamp) * (ice_maintenance_in_progress == 1) * (ice_maintenance_start_timestamp > 0)",
+          "legendFormat": "Duration",
+          "refId": "A"
+        }
+      ],
+      "title": "Current Maintenance Duration",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3488,7 +3572,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 103
+        "y": 107
       },
       "id": 310,
       "options": {
