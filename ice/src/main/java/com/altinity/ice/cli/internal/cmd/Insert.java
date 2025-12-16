@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -92,13 +93,15 @@ public final class Insert {
 
   private Insert() {}
 
+  public record Result(boolean anyFilesProcessed, boolean anyFilesFailed, int failedCount) {}
+
   // TODO: refactor
-  public static void run(
+  public static Result run(
       RESTCatalog catalog, TableIdentifier nsTable, String[] files, Options options)
       throws NoSuchTableException, IOException, InterruptedException {
     if (files.length == 0) {
       // no work to be done
-      return;
+      return new Result(false, false, 0);
     }
 
     Table table = catalog.loadTable(nsTable);
@@ -166,6 +169,7 @@ public final class Insert {
                     ? new RetryLog(options.retryListFile)
                     : null) {
           boolean atLeastOneFileAppended = false;
+          final AtomicInteger failedCount = new AtomicInteger(0);
 
           int numThreads = Math.min(options.threadCount(), filesExpanded.size());
           ExecutorService executor = Executors.newFixedThreadPool(numThreads);
@@ -202,6 +206,7 @@ public final class Insert {
                             logger.error(
                                 "{}: error (adding to retry list and continuing)", file, e);
                             retryLog.add(file);
+                            failedCount.incrementAndGet();
                             return Collections.emptyList();
                           } else {
                             throw new IOException(String.format("Error processing %s", file), e);
@@ -221,6 +226,7 @@ public final class Insert {
                 if (retryLog == null) {
                   throw new IOException("Error processing file(s)", e.getCause());
                 }
+                failedCount.incrementAndGet();
               }
             }
           } finally {
@@ -245,6 +251,9 @@ public final class Insert {
           } else {
             logger.warn("Table commit skipped (--no-commit)");
           }
+
+          int finalFailedCount = failedCount.get();
+          return new Result(atLeastOneFileAppended, finalFailedCount > 0, finalFailedCount);
         }
       } finally {
         if (s3ClientLazy.hasValue()) {

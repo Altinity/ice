@@ -120,7 +120,11 @@ public class InsertWatch {
             logger.info("Inserting {}", insertBatch);
 
             try {
-              Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
+              Insert.Result result =
+                  Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
+              if (result.anyFilesFailed()) {
+                logger.warn("{} file(s) failed to insert in this batch", result.failedCount());
+              }
             } catch (NoSuchTableException e) {
               if (!createTableIfNotExists) {
                 throw e;
@@ -145,7 +149,11 @@ public class InsertWatch {
                 retryInsert = false;
               }
               if (retryInsert) {
-                Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
+                Insert.Result result =
+                    Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
+                if (result.anyFilesFailed()) {
+                  logger.warn("{} file(s) failed to insert in this batch", result.failedCount());
+                }
               }
             }
           }
