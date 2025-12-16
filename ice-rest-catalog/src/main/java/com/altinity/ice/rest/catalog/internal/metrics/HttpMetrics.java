@@ -25,6 +25,7 @@ public class HttpMetrics {
   private final Counter responsesTotal;
   private final Histogram requestDuration;
   private final Gauge requestsInFlight;
+  private final Counter responseSizeBytes;
 
   public static HttpMetrics getInstance() {
     if (instance == null) {
@@ -65,6 +66,13 @@ public class HttpMetrics {
             .name(HTTP_REQUESTS_IN_FLIGHT_NAME)
             .help(HTTP_REQUESTS_IN_FLIGHT_HELP)
             .register();
+
+    this.responseSizeBytes =
+        Counter.builder()
+            .name(HTTP_RESPONSE_SIZE_BYTES_NAME)
+            .help(HTTP_RESPONSE_SIZE_BYTES_HELP)
+            .labelNames(HTTP_REQUEST_LABELS)
+            .register();
   }
 
   public void recordRequestStart(String method, String route) {
@@ -72,13 +80,17 @@ public class HttpMetrics {
     requestsInFlight.inc();
   }
 
-  public void recordRequestEnd(String method, String route, int statusCode, long startTimeNanos) {
+  public void recordRequestEnd(
+      String method, String route, int statusCode, long startTimeNanos, long responseSize) {
     requestsInFlight.dec();
 
     double durationSeconds =
         (System.nanoTime() - startTimeNanos) / (double) TimeUnit.SECONDS.toNanos(1);
     requestDuration.labelValues(method, route).observe(durationSeconds);
     responsesTotal.labelValues(method, route, Integer.toString(statusCode)).inc();
+    if (responseSize > 0) {
+      responseSizeBytes.labelValues(method, route).inc(responseSize);
+    }
   }
 
   public RequestTimer startRequest(String method, String route) {
@@ -91,6 +103,7 @@ public class HttpMetrics {
     private final String route;
     private final long startTimeNanos;
     private int statusCode = 200;
+    private long responseSize = 0;
 
     RequestTimer(HttpMetrics metrics, String method, String route) {
       this.metrics = metrics;
@@ -105,9 +118,14 @@ public class HttpMetrics {
       this.statusCode = statusCode;
     }
 
+    /** Set the response size in bytes before closing. */
+    public void setResponseSize(long responseSize) {
+      this.responseSize = responseSize;
+    }
+
     @Override
     public void close() {
-      metrics.recordRequestEnd(method, route, statusCode, startTimeNanos);
+      metrics.recordRequestEnd(method, route, statusCode, startTimeNanos, responseSize);
     }
   }
 }

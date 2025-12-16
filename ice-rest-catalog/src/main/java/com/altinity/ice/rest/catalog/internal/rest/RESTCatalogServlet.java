@@ -97,7 +97,9 @@ public class RESTCatalogServlet extends HttpServlet {
                 .withType("BadRequestException")
                 .withMessage(String.format("No route for %s %s", method, path))
                 .build();
-        RESTObjectMapper.mapper().writeValue(response.getWriter(), res);
+        byte[] responseBytes = RESTObjectMapper.mapper().writeValueAsBytes(res);
+        timer.setResponseSize(responseBytes.length);
+        response.getOutputStream().write(responseBytes);
       }
       return;
     }
@@ -152,7 +154,9 @@ public class RESTCatalogServlet extends HttpServlet {
         timer.setStatusCode(error.code());
         response.setStatus(error.code());
         response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
-        RESTObjectMapper.mapper().writeValue(response.getWriter(), error);
+        byte[] errorBytes = RESTObjectMapper.mapper().writeValueAsBytes(error);
+        timer.setResponseSize(errorBytes.length);
+        response.getOutputStream().write(errorBytes);
         return;
       }
 
@@ -160,7 +164,9 @@ public class RESTCatalogServlet extends HttpServlet {
       response.setStatus(HttpServletResponse.SC_OK);
       response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
       if (responseBody != null) {
-        RESTObjectMapper.mapper().writeValue(response.getWriter(), responseBody);
+        byte[] responseBytes = RESTObjectMapper.mapper().writeValueAsBytes(responseBody);
+        timer.setResponseSize(responseBytes.length);
+        response.getOutputStream().write(responseBytes);
       }
     }
   }

@@ -188,6 +188,9 @@ public final class IcebergMetricNames {
   public static final String HTTP_REQUESTS_IN_FLIGHT_HELP =
       "Number of HTTP requests currently being processed";
 
+  public static final String HTTP_RESPONSE_SIZE_BYTES_NAME = "iceberg_http_response_size_bytes";
+  public static final String HTTP_RESPONSE_SIZE_BYTES_HELP = "HTTP response size in bytes";
+
   /** HTTP request duration buckets (in seconds) - suitable for REST API calls. */
   public static final double[] HTTP_DURATION_BUCKETS = {
     0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10

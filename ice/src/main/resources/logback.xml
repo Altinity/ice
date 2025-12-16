@@ -14,6 +14,8 @@
   <logger name="org.eclipse.jetty" level="WARN"/>
   <!-- hide "Unable to load metrics class: 'org.apache.iceberg.hadoop.HadoopMetricsContext', falling back to null metrics" -->
   <logger name="org.apache.iceberg.aws.s3.S3FileIO" level="ERROR"/>
+  <!-- hide "Unclosed input stream" warnings from Iceberg's S3InputStream finalizer -->
+  <logger name="org.apache.iceberg.aws.s3.S3InputStream" level="ERROR"/>
   <logger name="org.apache.iceberg.BaseMetastoreTableOperations" level="WARN"/>
   <logger name="io.grpc.internal" level="ERROR"/>
 
