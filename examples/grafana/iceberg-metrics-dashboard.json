@@ -789,28 +789,10 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum by (le, catalog, namespace, table, operation) (rate(iceberg_commit_duration_seconds_bucket{catalog=~\"$catalog\", namespace=~\"$namespace\", table=~\"$table\"}[$__rate_interval])))",
+          "expr": "sum by (catalog, namespace, table, operation) (increase(iceberg_commit_duration_seconds_sum{catalog=~\"$catalog\", namespace=~\"$namespace\", table=~\"$table\"}[$__range])) ",
           "legendFormat": "p50 - {{catalog}}.{{namespace}}.{{table}} ({{operation}})",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "histogram_quantile(0.95, sum by (le, catalog, namespace, table, operation) (rate(iceberg_commit_duration_seconds_bucket{catalog=~\"$catalog\", namespace=~\"$namespace\", table=~\"$table\"}[$__rate_interval])))",
-          "legendFormat": "p95 - {{catalog}}.{{namespace}}.{{table}} ({{operation}})",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "histogram_quantile(0.99, sum by (le, catalog, namespace, table, operation) (rate(iceberg_commit_duration_seconds_bucket{catalog=~\"$catalog\", namespace=~\"$namespace\", table=~\"$table\"}[$__rate_interval])))",
-          "legendFormat": "p99 - {{catalog}}.{{namespace}}.{{table}} ({{operation}})",
-          "refId": "C"
         }
       ],
       "title": "Commit Duration",
@@ -1006,8 +988,10 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
+          "editorMode": "code",
           "expr": "sum by (catalog, namespace, table) (rate(iceberg_scan_positional_delete_files_total{catalog=~\"$catalog\", namespace=~\"$namespace\", table=~\"$table\"}[$__rate_interval]))",
           "legendFormat": "Positional - {{catalog}}.{{namespace}}.{{table}}",
+          "range": true,
           "refId": "A"
         },
         {
@@ -1021,106 +1005,6 @@
         }
       ],
       "title": "Delete Files Scanned by Type",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 32
-      },
-      "id": 31,
-      "options": {
-        "legend": {
-          "calcs": [
-            "sum"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum by (catalog, namespace, table) (rate(iceberg_commit_added_delete_files_total{catalog=~\"$catalog\", namespace=~\"$namespace\", table=~\"$table\"}[$__rate_interval]))",
-          "legendFormat": "Added - {{catalog}}.{{namespace}}.{{table}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "-sum by (catalog, namespace, table) (rate(iceberg_commit_removed_delete_files_total{catalog=~\"$catalog\", namespace=~\"$namespace\", table=~\"$table\"}[$__rate_interval]))",
-          "legendFormat": "Removed - {{catalog}}.{{namespace}}.{{table}}",
-          "refId": "B"
-        }
-      ],
-      "title": "Delete Files Added/Removed",
       "type": "timeseries"
     },
     {
@@ -2319,8 +2203,10 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
+          "editorMode": "code",
           "expr": "sum by (table, queue) (rate(ice_watch_files_inserted_total{table=~\"$watch_table\", queue=~\"$watch_queue\", instance=~\"$watch_instance\"}[$__rate_interval]))",
           "legendFormat": "{{table}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -3543,107 +3429,6 @@
       ],
       "title": "Orphan Cleanup Rate",
       "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "binBps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 107
-      },
-      "id": 314,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "sum"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum by (table) (rate(ice_maintenance_compaction_bytes_read_total[$__rate_interval]))",
-          "legendFormat": "Read - {{table}}",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum by (table) (rate(ice_maintenance_compaction_bytes_written_total[$__rate_interval]))",
-          "legendFormat": "Written - {{table}}",
-          "refId": "B"
-        }
-      ],
-      "title": "Compaction Throughput",
-      "type": "timeseries"
     }
   ],
   "refresh": "5s",
@@ -3746,10 +3531,10 @@
         "current": {
           "selected": true,
           "text": [
-            "All"
+            "iris"
           ],
           "value": [
-            "$__all"
+            "iris"
           ]
         },
         "datasource": {
