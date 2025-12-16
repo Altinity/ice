@@ -42,6 +42,8 @@ import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.PrimitiveType;
 
 public final class Partitioning {
 
@@ -157,8 +159,15 @@ public final class Partitioning {
         Transform<Object, Object> transform = (Transform<Object, Object>) field.transform();
         SerializableFunction<Object, Object> boundTransform = transform.bind(type);
 
-        Object minTransformed = boundTransform.apply(stats.genericGetMin());
-        Object maxTransformed = boundTransform.apply(stats.genericGetMax());
+        PrimitiveType parquetType = stats.type();
+
+        Comparable<?> parquetMin = stats.genericGetMin();
+        var min = fromParquetPrimitive(type, parquetType, parquetMin);
+        Comparable<?> parquetMax = stats.genericGetMax();
+        var max = fromParquetPrimitive(type, parquetType, parquetMax);
+
+        Object minTransformed = boundTransform.apply(min);
+        Object maxTransformed = boundTransform.apply(max);
 
         if (!minTransformed.equals(maxTransformed)) {
           same = false;
@@ -167,7 +176,7 @@ public final class Partitioning {
 
         if (valueTransformed == null) {
           valueTransformed = minTransformed;
-          value = stats.genericGetMin();
+          value = min;
         } else if (!valueTransformed.equals(minTransformed)) {
           same = false;
           break;
@@ -186,23 +195,40 @@ public final class Partitioning {
     return partitionKey;
   }
 
+  // Copied from org.apache.iceberg.parquet.ParquetConversions.
+  private static Object fromParquetPrimitive(Type type, PrimitiveType parquetType, Object value) {
+    switch (type.typeId()) {
+      case TIME:
+      case TIMESTAMP:
+        // time & timestamp/timestamptz are stored in microseconds
+        // https://iceberg.apache.org/spec/#parquet
+        var millis =
+            (parquetType.getLogicalTypeAnnotation()
+                    instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation t
+                && t.getUnit() == LogicalTypeAnnotation.TimeUnit.MILLIS);
+        var v = ((Number) value).longValue();
+        return millis ? v * 1000L : v;
+    }
+    return value;
+  }
+
   private static Object decodeStatValue(Object parquetStatValue, Type icebergType) {
     if (parquetStatValue == null) return null;
     return switch (icebergType.typeId()) {
-      case STRING -> ((org.apache.parquet.io.api.Binary) parquetStatValue).toStringUsingUTF8();
+      case BOOLEAN -> parquetStatValue;
       case INTEGER -> ((Number) parquetStatValue).intValue();
       case LONG -> ((Number) parquetStatValue).longValue();
       case FLOAT -> ((Number) parquetStatValue).floatValue();
       case DOUBLE -> ((Number) parquetStatValue).doubleValue();
-      case BOOLEAN -> parquetStatValue;
       case DATE ->
           // Parquet DATE (INT32) is days since epoch (same as Iceberg DATE)
           ((Number) parquetStatValue).intValue();
-      case TIMESTAMP ->
+      case TIME, TIMESTAMP ->
           // Parquet timestamp might come as INT64 (micros) or Binary; assuming long micros for now
           ((Number) parquetStatValue).longValue();
-      case DECIMAL -> throw new UnsupportedOperationException();
-      default -> null;
+      case STRING -> ((org.apache.parquet.io.api.Binary) parquetStatValue).toStringUsingUTF8();
+      default ->
+          throw new UnsupportedOperationException("unsupported type: " + icebergType.typeId());
     };
   }
 
