@@ -23,6 +23,8 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hc.core5.http.ContentType;
@@ -79,6 +81,7 @@ public class RESTCatalogServlet extends HttpServlet {
 
   protected void handle(HttpServletRequest request, HttpServletResponse response)
       throws IOException {
+    long startTime = System.currentTimeMillis();
     HTTPRequest.HTTPMethod method = HTTPRequest.HTTPMethod.valueOf(request.getMethod());
     String path = request.getRequestURI().substring(1);
 
@@ -91,7 +94,11 @@ public class RESTCatalogServlet extends HttpServlet {
               .withType("BadRequestException")
               .withMessage(String.format("No route for %s %s", method, path))
               .build();
-      RESTObjectMapper.mapper().writeValue(response.getWriter(), res);
+      StringWriter noRouteWriter = new StringWriter();
+      RESTObjectMapper.mapper().writeValue(noRouteWriter, res);
+      String noRouteBody = noRouteWriter.toString();
+      response.getWriter().write(noRouteBody);
+      logResponseDebug(startTime, noRouteBody);
       return;
     }
 
@@ -140,15 +147,43 @@ public class RESTCatalogServlet extends HttpServlet {
 
       response.setStatus(error.code());
       response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
-      RESTObjectMapper.mapper().writeValue(response.getWriter(), error);
+      StringWriter errorWriter = new StringWriter();
+      RESTObjectMapper.mapper().writeValue(errorWriter, error);
+      String errorBody = errorWriter.toString();
+      response.getWriter().write(errorBody);
+      logResponseDebug(startTime, errorBody);
       return;
     }
 
     response.setStatus(HttpServletResponse.SC_OK);
     response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
+    String responseBodyStr = null;
     if (responseBody != null) {
-      RESTObjectMapper.mapper().writeValue(response.getWriter(), responseBody);
+      StringWriter stringWriter = new StringWriter();
+      RESTObjectMapper.mapper().writeValue(stringWriter, responseBody);
+      responseBodyStr = stringWriter.toString();
+      response.getWriter().write(responseBodyStr);
     }
+    logResponseDebug(startTime, responseBodyStr);
+  }
+
+  private void logResponseDebug(long startTime, String responseBody) {
+    if (!logger.isDebugEnabled()) {
+      return;
+    }
+    long responseTimeMs = System.currentTimeMillis() - startTime;
+    int responseSizeBytes =
+        responseBody != null ? responseBody.getBytes(StandardCharsets.UTF_8).length : 0;
+    String truncatedBody = "";
+    if (responseBody != null) {
+      truncatedBody =
+          responseBody.length() > 2000 ? responseBody.substring(0, 2000) + "..." : responseBody;
+    }
+    logger.debug(
+        "Response: time={}ms, size={} bytes, body={}",
+        responseTimeMs,
+        responseSizeBytes,
+        truncatedBody);
   }
 
   @Override
