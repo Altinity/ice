@@ -73,6 +73,9 @@ public class HttpMetrics {
             .help(HTTP_RESPONSE_SIZE_BYTES_HELP)
             .labelNames(HTTP_REQUEST_LABELS)
             .register();
+
+    // Initialize with zero to make metrics visible immediately
+    this.responseSizeBytes.labelValues("GET", "CONFIG").inc(0);
   }
 
   public void recordRequestStart(String method, String route) {
