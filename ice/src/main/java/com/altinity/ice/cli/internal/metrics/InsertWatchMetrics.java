@@ -209,10 +209,6 @@ public class InsertWatchMetrics {
     logger.info("InsertWatch Prometheus metrics initialized");
   }
 
-  // ==========================================================================
-  // Public methods
-  // ==========================================================================
-
   public void recordMessagesReceived(String table, String queue, int count) {
     messagesReceivedTotal.labelValues(table, queue).inc(count);
   }

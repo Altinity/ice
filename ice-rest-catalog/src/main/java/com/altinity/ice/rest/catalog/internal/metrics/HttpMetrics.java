@@ -9,7 +9,19 @@
  */
 package com.altinity.ice.rest.catalog.internal.metrics;
 
-import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.*;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_DURATION_BUCKETS;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_REQUESTS_IN_FLIGHT_HELP;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_REQUESTS_IN_FLIGHT_NAME;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_REQUESTS_TOTAL_HELP;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_REQUESTS_TOTAL_NAME;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_REQUEST_DURATION_HELP;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_REQUEST_DURATION_NAME;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_REQUEST_LABELS;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_RESPONSES_TOTAL_HELP;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_RESPONSES_TOTAL_NAME;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_RESPONSE_LABELS;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_RESPONSE_SIZE_BYTES_HELP;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.HTTP_RESPONSE_SIZE_BYTES_NAME;
 
 import io.prometheus.metrics.core.metrics.Counter;
 import io.prometheus.metrics.core.metrics.Gauge;
