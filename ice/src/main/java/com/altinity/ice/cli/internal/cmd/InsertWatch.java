@@ -60,6 +60,7 @@ public class InsertWatch {
         nsTable,
         input,
         sqsQueueURL,
+        null,
         terminateAfterOneBatch,
         createTableIfNotExists,
         options,
@@ -71,6 +72,7 @@ public class InsertWatch {
       TableIdentifier nsTable,
       String[] input,
       String sqsQueueURL,
+      String sqsOverrideEndpoint,
       boolean terminateAfterOneBatch,
       boolean createTableIfNotExists,
       Insert.Options options,
@@ -94,7 +96,7 @@ public class InsertWatch {
     String tableLabel = nsTable.toString();
     String queueLabel = sqsQueueURL;
 
-    final SqsClient sqs = buildSqsClient(sqsQueueURL);
+    final SqsClient sqs = buildSqsClient(sqsOverrideEndpoint);
     ReceiveMessageRequest req =
         ReceiveMessageRequest.builder()
             .queueUrl(sqsQueueURL)
@@ -341,22 +343,15 @@ public class InsertWatch {
             .build());
   }
 
-  private static SqsClient buildSqsClient(String sqsQueueURL) {
+  private static SqsClient buildSqsClient(String sqsOverrideEndpoint) {
     SqsClientBuilder builder = SqsClient.builder();
 
-    // Extract endpoint from queue URL for non-AWS endpoints (e.g., ElasticMQ)
-    // AWS SQS URLs look like: https://sqs.us-east-1.amazonaws.com/123456789012/queue-name
-    // ElasticMQ URLs look like: http://localhost:9324/000000000000/queue-name
-    try {
-      URI uri = URI.create(sqsQueueURL);
-      String host = uri.getHost();
-      if (host != null && !host.endsWith(".amazonaws.com")) {
-        URI endpoint = new URI(uri.getScheme(), null, host, uri.getPort(), null, null, null);
-        logger.info("Using custom SQS endpoint: {}", endpoint);
-        builder.endpointOverride(endpoint);
-      }
-    } catch (Exception e) {
-      logger.warn("Failed to parse SQS queue URL for endpoint extraction: {}", e.getMessage());
+    // Use explicit endpoint if provided (e.g. for LocalStack)
+    // Otherwise, AWS SDK will use AWS_ENDPOINT_URL_SQS env var or default AWS endpoints
+    if (sqsOverrideEndpoint != null && !sqsOverrideEndpoint.isEmpty()) {
+      URI endpoint = URI.create(sqsOverrideEndpoint);
+      logger.info("Using custom SQS endpoint: {}", endpoint);
+      builder.endpointOverride(endpoint);
     }
 
     return builder.build();

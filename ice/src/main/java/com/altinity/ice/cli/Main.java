@@ -344,6 +344,10 @@ public final class Main {
               description = "Event queue. Supported: AWS SQS")
           String watch,
       @CommandLine.Option(
+              names = {"--watch-endpoint"},
+              description = "Custom SQS endpoint URL (e.g. http://localhost:9324 for LocalStack)")
+          String watchEndpoint,
+      @CommandLine.Option(
               names = {"--watch-fire-once"},
               description = "")
           boolean watchFireOnce,
@@ -441,6 +445,7 @@ public final class Main {
             tableId,
             dataFiles,
             watch,
+            watchEndpoint,
             watchFireOnce,
             createTableIfNotExists,
             options,

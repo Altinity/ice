@@ -251,8 +251,8 @@ public class MaintenanceMetrics {
     orphanFilesExcludedTotal.labelValues(table).inc(count);
   }
 
-  public void recordOrphanDeleteFailure(String table) {
-    orphanDeleteFailuresTotal.labelValues(table).inc();
+  public void recordOrphanDeleteFailure(String table, int count) {
+    orphanDeleteFailuresTotal.labelValues(table).inc(count);
   }
 
   public void recordCompactionFilesMerged(String table, int count) {

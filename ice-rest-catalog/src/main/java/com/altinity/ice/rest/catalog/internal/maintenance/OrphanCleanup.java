@@ -103,8 +103,8 @@ public record OrphanCleanup(long olderThanMillis, Matcher whitelist, boolean dry
 
       // Record deletion metrics
       metrics.recordOrphanFilesDeleted(tableName, deletedCount.get());
-      for (int i = 0; i < failedCount.get(); i++) {
-        metrics.recordOrphanDeleteFailure(tableName);
+      if (failedCount.get() > 0) {
+        metrics.recordOrphanDeleteFailure(tableName, failedCount.get());
       }
     } else {
       orphanedFiles.stream().sorted().forEach(file -> logger.info("To be deleted: {}", file));
