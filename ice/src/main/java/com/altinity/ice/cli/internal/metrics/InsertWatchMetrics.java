@@ -23,7 +23,6 @@ public class InsertWatchMetrics {
 
   private static final Logger logger = LoggerFactory.getLogger(InsertWatchMetrics.class);
 
-  // Initialization-on-Demand Holder for thread-safe lazy singleton
   private static class Holder {
     private static final InsertWatchMetrics INSTANCE = new InsertWatchMetrics();
   }
