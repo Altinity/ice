@@ -19,8 +19,9 @@ public class MaintenanceMetrics {
 
   private static final Logger logger = LoggerFactory.getLogger(MaintenanceMetrics.class);
 
-  private static volatile MaintenanceMetrics instance;
-  private static final Object lock = new Object();
+  private static class Holder {
+    private static final MaintenanceMetrics INSTANCE = new MaintenanceMetrics();
+  }
 
   // ==========================================================================
   // Labels
@@ -119,14 +120,7 @@ public class MaintenanceMetrics {
 
   /** Returns the singleton instance of the metrics. */
   public static MaintenanceMetrics getInstance() {
-    if (instance == null) {
-      synchronized (lock) {
-        if (instance == null) {
-          instance = new MaintenanceMetrics();
-        }
-      }
-    }
-    return instance;
+    return Holder.INSTANCE;
   }
 
   private MaintenanceMetrics() {

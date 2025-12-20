@@ -8,6 +8,13 @@ Start the ElasticMQ server
 Start ice in insert mode.
 `insert flowers.iris -p --no-copy --skip-duplicates s3://bucket1/flowers/iris/external-data/ --watch="http://localhost:9324/000000000000/s3-events"`
 
+# for local ElasticMQ server
+`ice insert flowers.iris -p --no-copy --skip-duplicates \
+  s3://bucket1/flowers/iris/external-data/ \
+  --watch="http://localhost:9324/000000000000/s3-events" \
+  --watch-endpoint="http://localhost:9324"
+  `
+  
 Insert a S3 notification message(test) to ElasticMQ
 ```
 export AWS_ACCESS_KEY_ID=x

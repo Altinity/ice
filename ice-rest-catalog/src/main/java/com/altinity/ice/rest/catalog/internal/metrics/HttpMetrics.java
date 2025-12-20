@@ -30,8 +30,9 @@ import java.util.concurrent.TimeUnit;
 
 public class HttpMetrics {
 
-  private static volatile HttpMetrics instance;
-  private static final Object lock = new Object();
+  private static class Holder {
+    private static final HttpMetrics INSTANCE = new HttpMetrics();
+  }
 
   private final Counter requestsTotal;
   private final Counter responsesTotal;
@@ -40,14 +41,7 @@ public class HttpMetrics {
   private final Counter responseSizeBytes;
 
   public static HttpMetrics getInstance() {
-    if (instance == null) {
-      synchronized (lock) {
-        if (instance == null) {
-          instance = new HttpMetrics();
-        }
-      }
-    }
-    return instance;
+    return Holder.INSTANCE;
   }
 
   private HttpMetrics() {

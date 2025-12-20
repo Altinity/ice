@@ -45,9 +45,9 @@ public class PrometheusMetricsReporter implements MetricsReporter {
 
   private static final Logger logger = LoggerFactory.getLogger(PrometheusMetricsReporter.class);
 
-  // Singleton instance
-  private static volatile PrometheusMetricsReporter instance;
-  private static final Object lock = new Object();
+  private static class Holder {
+    private static final PrometheusMetricsReporter INSTANCE = new PrometheusMetricsReporter();
+  }
 
   // Scan metrics counters
   private final Counter scansTotal;
@@ -89,14 +89,7 @@ public class PrometheusMetricsReporter implements MetricsReporter {
 
   /** Returns the singleton instance of the metrics reporter. */
   public static PrometheusMetricsReporter getInstance() {
-    if (instance == null) {
-      synchronized (lock) {
-        if (instance == null) {
-          instance = new PrometheusMetricsReporter();
-        }
-      }
-    }
-    return instance;
+    return Holder.INSTANCE;
   }
 
   private PrometheusMetricsReporter() {

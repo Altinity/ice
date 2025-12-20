@@ -23,9 +23,10 @@ public class InsertWatchMetrics {
 
   private static final Logger logger = LoggerFactory.getLogger(InsertWatchMetrics.class);
 
-  // Singleton instance
-  private static volatile InsertWatchMetrics instance;
-  private static final Object lock = new Object();
+  // Initialization-on-Demand Holder for thread-safe lazy singleton
+  private static class Holder {
+    private static final InsertWatchMetrics INSTANCE = new InsertWatchMetrics();
+  }
 
   // ==========================================================================
   // Metric Names
@@ -111,14 +112,7 @@ public class InsertWatchMetrics {
 
   /** Returns the singleton instance of the metrics reporter. */
   public static InsertWatchMetrics getInstance() {
-    if (instance == null) {
-      synchronized (lock) {
-        if (instance == null) {
-          instance = new InsertWatchMetrics();
-        }
-      }
-    }
-    return instance;
+    return Holder.INSTANCE;
   }
 
   private InsertWatchMetrics() {
