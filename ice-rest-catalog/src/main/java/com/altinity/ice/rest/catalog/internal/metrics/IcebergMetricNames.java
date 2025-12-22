@@ -195,4 +195,32 @@ public final class IcebergMetricNames {
   public static final double[] HTTP_DURATION_BUCKETS = {
     0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
   };
+
+  // ==========================================================================
+  // Catalog-Level Metrics
+  // ==========================================================================
+
+  public static final String CATALOG_TABLES_NAME = "iceberg_catalog_tables";
+  public static final String CATALOG_TABLES_HELP = "Current number of tables in the catalog";
+
+  public static final String CATALOG_NAMESPACES_NAME = "iceberg_catalog_namespaces";
+  public static final String CATALOG_NAMESPACES_HELP =
+      "Current number of namespaces in the catalog";
+
+  public static final String CATALOG_OPERATIONS_TOTAL_NAME = "iceberg_catalog_operations_total";
+  public static final String CATALOG_OPERATIONS_TOTAL_HELP =
+      "Total number of catalog operations (create/drop table/namespace)";
+
+  public static final String[] CATALOG_OPERATION_LABELS = {LABEL_CATALOG, LABEL_OPERATION};
+
+  // ==========================================================================
+  // Table-Level Metrics (from CommitReport)
+  // ==========================================================================
+
+  public static final String TABLE_SNAPSHOTS_TOTAL_NAME = "iceberg_table_snapshots_total";
+  public static final String TABLE_SNAPSHOTS_TOTAL_HELP = "Total number of snapshots per table";
+
+  public static final String TABLE_SCHEMA_UPDATES_TOTAL_NAME = "iceberg_table_schema_updates_total";
+  public static final String TABLE_SCHEMA_UPDATES_TOTAL_HELP =
+      "Total number of schema evolutions per table";
 }

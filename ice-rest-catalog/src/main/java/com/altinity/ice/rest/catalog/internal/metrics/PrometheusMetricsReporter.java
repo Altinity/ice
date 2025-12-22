@@ -87,6 +87,10 @@ public class PrometheusMetricsReporter implements MetricsReporter {
   // Status metric to confirm reporter is active
   private final Counter metricsReporterActive;
 
+  // Table-level metrics
+  private final Counter tableSnapshotsTotal;
+  private final Counter tableSchemaUpdatesTotal;
+
   /** Returns the singleton instance of the metrics reporter. */
   public static PrometheusMetricsReporter getInstance() {
     return Holder.INSTANCE;
@@ -279,6 +283,21 @@ public class PrometheusMetricsReporter implements MetricsReporter {
             .help(COMMIT_DURATION_HELP)
             .labelNames(COMMIT_LABELS)
             .classicUpperBounds(DURATION_BUCKETS)
+            .register();
+
+    // Table-level metrics for snapshots and schema evolution
+    this.tableSnapshotsTotal =
+        Counter.builder()
+            .name(TABLE_SNAPSHOTS_TOTAL_NAME)
+            .help(TABLE_SNAPSHOTS_TOTAL_HELP)
+            .labelNames(SCAN_LABELS)
+            .register();
+
+    this.tableSchemaUpdatesTotal =
+        Counter.builder()
+            .name(TABLE_SCHEMA_UPDATES_TOTAL_NAME)
+            .help(TABLE_SCHEMA_UPDATES_TOTAL_HELP)
+            .labelNames(SCAN_LABELS)
             .register();
 
     logger.info("Prometheus Iceberg metrics reporter initialized");
@@ -495,6 +514,16 @@ public class PrometheusMetricsReporter implements MetricsReporter {
           commitDuration.labelValues(catalog, namespace, table, operation),
           metrics.totalDuration().totalDuration());
     }
+
+    tableSnapshotsTotal.labelValues(catalog, namespace, table).inc();
+  }
+
+  /**
+   * Record a schema update for a table. Called from RESTCatalogAdapter when UpdateTableRequest
+   * contains schema-related MetadataUpdate objects (AddSchema, SetCurrentSchema, etc.).
+   */
+  public void recordSchemaUpdate(String catalog, String namespace, String table) {
+    tableSchemaUpdatesTotal.labelValues(catalog, namespace, table).inc();
   }
 
   private void observeDuration(DistributionDataPoint dataPoint, java.time.Duration duration) {

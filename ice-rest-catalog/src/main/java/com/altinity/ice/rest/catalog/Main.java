@@ -27,6 +27,7 @@ import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceScheduler;
 import com.altinity.ice.rest.catalog.internal.maintenance.ManifestCompaction;
 import com.altinity.ice.rest.catalog.internal.maintenance.OrphanCleanup;
 import com.altinity.ice.rest.catalog.internal.maintenance.SnapshotCleanup;
+import com.altinity.ice.rest.catalog.internal.metrics.CatalogMetrics;
 import com.altinity.ice.rest.catalog.internal.metrics.PrometheusMetricsReporter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAdapter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAuthorizationHandler;
@@ -52,6 +53,8 @@ import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.relocated.com.google.common.base.Function;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.eclipse.jetty.server.Server;
@@ -199,6 +202,30 @@ public final class Main implements Callable<Integer> {
       startMaintenanceScheduler(activeSchedule, maintenanceRunner);
 
       debugServer.join();
+    }
+  }
+
+  private static void initializeCatalogMetrics(Catalog catalog) {
+    try {
+      CatalogMetrics metrics = CatalogMetrics.getInstance();
+      String catalogName = catalog.name();
+
+      // Count namespaces
+      if (catalog instanceof SupportsNamespaces nsCatalog) {
+        long namespaceCount = nsCatalog.listNamespaces().size();
+        metrics.setNamespacesTotal(catalogName, namespaceCount);
+        logger.info("Initialized namespace count: {}", namespaceCount);
+
+        // Count tables across all namespaces
+        long tableCount = 0;
+        for (Namespace ns : nsCatalog.listNamespaces()) {
+          tableCount += catalog.listTables(ns).size();
+        }
+        metrics.setTablesTotal(catalogName, tableCount);
+        logger.info("Initialized table count: {}", tableCount);
+      }
+    } catch (Exception e) {
+      logger.warn("Failed to initialize catalog metrics: {}", e.getMessage());
     }
   }
 
@@ -386,6 +413,9 @@ public final class Main implements Callable<Integer> {
             .collect(Collectors.joining(", ")));
 
     var catalog = loadCatalog(config, icebergConfig);
+
+    // Initialize catalog metrics with current counts
+    initializeCatalogMetrics(catalog);
 
     ObjectMapper om = new ObjectMapper();
 

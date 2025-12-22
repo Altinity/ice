@@ -24,6 +24,7 @@ import static org.apache.iceberg.TableProperties.COMMIT_NUM_RETRIES_DEFAULT;
 import static org.apache.iceberg.TableProperties.COMMIT_TOTAL_RETRY_TIME_MS_DEFAULT;
 
 import com.altinity.ice.rest.catalog.internal.auth.Session;
+import com.altinity.ice.rest.catalog.internal.metrics.CatalogMetrics;
 import com.altinity.ice.rest.catalog.internal.metrics.PrometheusMetricsReporter;
 import java.util.Arrays;
 import java.util.List;
@@ -32,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
@@ -126,8 +128,9 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
       case CREATE_NAMESPACE:
         if (asNamespaceCatalog != null) {
           CreateNamespaceRequest request = castRequest(CreateNamespaceRequest.class, requestBody);
-          return castResponse(
-              responseType, CatalogHandlers.createNamespace(asNamespaceCatalog, request));
+          var response = CatalogHandlers.createNamespace(asNamespaceCatalog, request);
+          CatalogMetrics.getInstance().recordNamespaceCreated(catalog.name());
+          return castResponse(responseType, response);
         }
         break;
 
@@ -149,6 +152,7 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
       case DROP_NAMESPACE:
         if (asNamespaceCatalog != null) {
           CatalogHandlers.dropNamespace(asNamespaceCatalog, namespaceFromPathVars(vars));
+          CatalogMetrics.getInstance().recordNamespaceDropped(catalog.name());
           return null;
         }
         break;
@@ -186,8 +190,9 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
             return castResponse(
                 responseType, CatalogHandlers.stageTableCreate(catalog, namespace, request));
           } else {
-            return castResponse(
-                responseType, CatalogHandlers.createTable(catalog, namespace, request));
+            var response = CatalogHandlers.createTable(catalog, namespace, request);
+            CatalogMetrics.getInstance().recordTableCreated(catalog.name());
+            return castResponse(responseType, response);
           }
         }
 
@@ -198,6 +203,7 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
           } else {
             CatalogHandlers.dropTable(catalog, tableIdentFromPathVars(vars));
           }
+          CatalogMetrics.getInstance().recordTableDropped(catalog.name());
           return null;
         }
 
@@ -226,7 +232,21 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
         {
           TableIdentifier ident = tableIdentFromPathVars(vars);
           UpdateTableRequest request = castRequest(UpdateTableRequest.class, requestBody);
-          return castResponse(responseType, CatalogHandlers.updateTable(catalog, ident, request));
+          var response = CatalogHandlers.updateTable(catalog, ident, request);
+
+          // Check if this update contains schema changes
+          boolean hasSchemaUpdate =
+              request.updates().stream()
+                  .anyMatch(
+                      update ->
+                          update instanceof MetadataUpdate.AddSchema
+                              || update instanceof MetadataUpdate.SetCurrentSchema);
+          if (hasSchemaUpdate) {
+            PrometheusMetricsReporter.getInstance()
+                .recordSchemaUpdate(catalog.name(), ident.namespace().toString(), ident.name());
+          }
+
+          return castResponse(responseType, response);
         }
 
       case RENAME_TABLE:

@@ -95,6 +95,11 @@ public class InsertWatchMetrics {
   private static final String MESSAGE_PARSE_ERRORS_TOTAL_HELP =
       "Total number of message parsing errors";
 
+  // Poll requests
+  private static final String POLL_REQUESTS_TOTAL_NAME = "ice_watch_poll_requests_total";
+  private static final String POLL_REQUESTS_TOTAL_HELP =
+      "Total number of poll requests to the message queue";
+
   // ==========================================================================
   // Metrics
   // ==========================================================================
@@ -111,6 +116,7 @@ public class InsertWatchMetrics {
   private final Counter queueReceiveErrorsTotal;
   private final Counter queueDeleteErrorsTotal;
   private final Counter messageParseErrorsTotal;
+  private final Counter pollRequestsTotal;
 
   /** Returns the singleton instance of the metrics reporter. */
   public static InsertWatchMetrics getInstance() {
@@ -202,6 +208,13 @@ public class InsertWatchMetrics {
             .labelNames(WATCH_LABELS)
             .register();
 
+    this.pollRequestsTotal =
+        Counter.builder()
+            .name(POLL_REQUESTS_TOTAL_NAME)
+            .help(POLL_REQUESTS_TOTAL_HELP)
+            .labelNames(WATCH_LABELS)
+            .register();
+
     logger.info("InsertWatch Prometheus metrics initialized");
   }
 
@@ -251,5 +264,9 @@ public class InsertWatchMetrics {
 
   public void recordMessageParseError(String table, String queue, String queueType) {
     messageParseErrorsTotal.labelValues(table, queue, queueType).inc();
+  }
+
+  public void recordPollRequest(String table, String queue, String queueType) {
+    pollRequestsTotal.labelValues(table, queue, queueType).inc();
   }
 }

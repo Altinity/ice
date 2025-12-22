@@ -125,6 +125,9 @@ public class InsertWatch {
     do {
       List<Message> batch = new LinkedList<>();
       try {
+        if (metrics != null) {
+          metrics.recordPollRequest(tableLabel, queueLabel, queueType);
+        }
         var messages = sqs.receiveMessage(req).messages();
         batch.addAll(messages);
       } catch (SdkException e) {
