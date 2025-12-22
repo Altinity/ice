@@ -10,3 +10,12 @@ and then execute `ice-rest-catalog`.
 That's it.
 
 Examples of `.ice-rest-catalog.yaml` (as well as Kubernetes deployment manifests) can be found [here](../examples/). 
+
+## Maintenance mode
+The REST Catalog can also be run in maintenance mode to 
+perform background cleanup or optimization tasks, such as expiring snapshots and removing orphan files, at scheduled intervals. Maintenance tasks are run automatically according to the cron-like schedule you provide (e.g., `"every 1 minutes"`).
+
+
+```
+ice-rest-catalog perform-maintenance --schedule "every 1 minutes"
+```
