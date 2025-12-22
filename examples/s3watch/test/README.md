@@ -2,20 +2,17 @@
 
 The `ice insert --watch` can also be tested locally with a ElasticMQ server (which is SQS compatible)
 
-Start the ElasticMQ server
+### Start the ElasticMQ server
 `docker compose up`
 
-Start ice in insert mode.
-`insert flowers.iris -p --no-copy --skip-duplicates s3://bucket1/flowers/iris/external-data/ --watch="http://localhost:9324/000000000000/s3-events"`
-
-# for local ElasticMQ server
+### Start ice in insert mode for local ElasticMQ server
 `ice insert flowers.iris -p --no-copy --skip-duplicates \
   s3://bucket1/flowers/iris/external-data/ \
   --watch="http://localhost:9324/000000000000/s3-events" \
   --watch-endpoint="http://localhost:9324"
   `
   
-Insert a S3 notification message(test) to ElasticMQ
+### Insert a S3 notification message(test) to ElasticMQ
 ```
 export AWS_ACCESS_KEY_ID=x
 export AWS_SECRET_ACCESS_KEY=x
