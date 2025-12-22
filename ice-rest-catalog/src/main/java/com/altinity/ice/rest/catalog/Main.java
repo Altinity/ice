@@ -252,7 +252,7 @@ public final class Main implements Callable<Integer> {
     if (requireAuth) {
       mux.insertHandler(createAuthorizationHandler(config.bearerTokens(), config));
 
-      restCatalogAdapter = new RESTCatalogAdapter(catalog, metricsReporter);
+      restCatalogAdapter = new RESTCatalogAdapter(catalog);
       var globalConfig = config.toIcebergConfigDefaults();
       if (!globalConfig.isEmpty()) {
         restCatalogAdapter = new RESTCatalogMiddlewareConfig(restCatalogAdapter, globalConfig);
@@ -272,7 +272,7 @@ public final class Main implements Callable<Integer> {
                 new RESTCatalogMiddlewareCredentials(restCatalogAdapter, auth), auth);
       }
     } else {
-      restCatalogAdapter = new RESTCatalogAdapter(catalog, metricsReporter);
+      restCatalogAdapter = new RESTCatalogAdapter(catalog);
       var globalConfig = config.toIcebergConfigDefaults();
       if (!globalConfig.isEmpty()) {
         restCatalogAdapter = new RESTCatalogMiddlewareConfig(restCatalogAdapter, globalConfig);

@@ -67,18 +67,12 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
   private final Catalog catalog;
   private final SupportsNamespaces asNamespaceCatalog;
   private final ViewCatalog asViewCatalog;
-  private final PrometheusMetricsReporter metricsReporter;
 
   public RESTCatalogAdapter(Catalog catalog) {
-    this(catalog, null);
-  }
-
-  public RESTCatalogAdapter(Catalog catalog, PrometheusMetricsReporter metricsReporter) {
     this.catalog = catalog;
     this.asNamespaceCatalog =
         catalog instanceof SupportsNamespaces ? (SupportsNamespaces) catalog : null;
     this.asViewCatalog = catalog instanceof ViewCatalog ? (ViewCatalog) catalog : null;
-    this.metricsReporter = metricsReporter;
   }
 
   @Override
@@ -245,6 +239,7 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
       case REPORT_METRICS:
         {
           ReportMetricsRequest request = castRequest(ReportMetricsRequest.class, requestBody);
+          PrometheusMetricsReporter metricsReporter = PrometheusMetricsReporter.getInstance();
           if (metricsReporter != null && request.report() != null) {
             String catalogName = catalog.name();
             metricsReporter.report(catalogName, request.report());
