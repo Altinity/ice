@@ -45,6 +45,7 @@ public class InsertWatch {
 
   private static final Logger logger = LoggerFactory.getLogger(InsertWatch.class);
   private static final ObjectMapper objectMapper = new ObjectMapper();
+  private static final String QUEUE_TYPE_SQS = "sqs";
 
   public static void run(
       RESTCatalog catalog,
@@ -95,6 +96,7 @@ public class InsertWatch {
     InsertWatchMetrics metrics = metricsEnabled ? InsertWatchMetrics.getInstance() : null;
     String tableLabel = nsTable.toString();
     String queueLabel = sqsQueueURL;
+    String queueType = QUEUE_TYPE_SQS;
 
     final SqsClient sqs = buildSqsClient(sqsOverrideEndpoint);
     ReceiveMessageRequest req =
@@ -127,8 +129,8 @@ public class InsertWatch {
         batch.addAll(messages);
       } catch (SdkException e) {
         if (metrics != null) {
-          metrics.recordSqsReceiveError(tableLabel, queueLabel);
-          metrics.recordRetryAttempt(tableLabel, queueLabel);
+          metrics.recordQueueReceiveError(tableLabel, queueLabel, queueType);
+          metrics.recordRetryAttempt(tableLabel, queueLabel, queueType);
         }
         if (!e.retryable()) {
           throw e; // TODO: should we really?
@@ -149,26 +151,26 @@ public class InsertWatch {
           } while (!tailMessages.isEmpty() && batch.size() < maxBatchSize);
 
           if (metrics != null) {
-            metrics.recordMessagesReceived(tableLabel, queueLabel, batch.size());
+            metrics.recordMessagesReceived(tableLabel, queueLabel, queueType, batch.size());
           }
 
           logger.info("Processing {} message(s)", batch.size());
           // FIXME: handle files not found
 
-          var insertBatch = filter(batch, matchers, metrics, tableLabel, queueLabel);
+          var insertBatch = filter(batch, matchers, metrics, tableLabel, queueLabel, queueType);
           if (!insertBatch.isEmpty()) {
             logger.info("Inserting {}", insertBatch);
 
             try {
               Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
               if (metrics != null) {
-                metrics.recordFilesInserted(tableLabel, queueLabel, insertBatch.size());
-                metrics.recordTransactionSuccess(tableLabel, queueLabel);
+                metrics.recordFilesInserted(tableLabel, queueLabel, queueType, insertBatch.size());
+                metrics.recordTransactionSuccess(tableLabel, queueLabel, queueType);
               }
             } catch (NoSuchTableException e) {
               if (!createTableIfNotExists) {
                 if (metrics != null) {
-                  metrics.recordTransactionFailed(tableLabel, queueLabel);
+                  metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
                 }
                 throw e;
               }
@@ -187,7 +189,7 @@ public class InsertWatch {
               } catch (NotFoundException nfe) {
                 if (!options.ignoreNotFound()) {
                   if (metrics != null) {
-                    metrics.recordTransactionFailed(tableLabel, queueLabel);
+                    metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
                   }
                   throw nfe;
                 }
@@ -197,22 +199,23 @@ public class InsertWatch {
               if (retryInsert) {
                 Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
                 if (metrics != null) {
-                  metrics.recordFilesInserted(tableLabel, queueLabel, insertBatch.size());
-                  metrics.recordTransactionSuccess(tableLabel, queueLabel);
+                  metrics.recordFilesInserted(
+                      tableLabel, queueLabel, queueType, insertBatch.size());
+                  metrics.recordTransactionSuccess(tableLabel, queueLabel, queueType);
                 }
               }
             }
           }
 
-          confirmProcessed(sqs, sqsQueueURL, batch, metrics, tableLabel, queueLabel);
+          confirmProcessed(sqs, sqsQueueURL, batch, metrics, tableLabel, queueLabel, queueType);
         } catch (InterruptedException e) {
           // terminate
           Thread.currentThread().interrupt();
           throw new InterruptedException();
         } catch (Exception e) {
           if (metrics != null) {
-            metrics.recordTransactionFailed(tableLabel, queueLabel);
-            metrics.recordRetryAttempt(tableLabel, queueLabel);
+            metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
+            metrics.recordRetryAttempt(tableLabel, queueLabel, queueType);
           }
           Duration delay = backoff.get();
           logger.error("Failed to process batch of messages (retry in {})", delay, e);
@@ -229,7 +232,8 @@ public class InsertWatch {
       Collection<Matcher> matchers,
       InsertWatchMetrics metrics,
       String tableLabel,
-      String queueLabel) {
+      String queueLabel,
+      String queueType) {
     Collection<String> r = new LinkedHashSet<>();
     for (Message message : messages) {
       // Message body() example:
@@ -257,7 +261,7 @@ public class InsertWatch {
       } catch (JsonProcessingException e) {
         logger.error("Failed to parse message#{} body", message.messageId(), e);
         if (metrics != null) {
-          metrics.recordMessageParseError(tableLabel, queueLabel);
+          metrics.recordMessageParseError(tableLabel, queueLabel, queueType);
         }
         // TODO: dlq?
         continue;
@@ -265,7 +269,7 @@ public class InsertWatch {
       // TODO: use type
       for (JsonNode record : root.path("Records")) {
         if (metrics != null) {
-          metrics.recordEventsReceived(tableLabel, queueLabel, 1);
+          metrics.recordEventsReceived(tableLabel, queueLabel, queueType, 1);
         }
         String eventName = record.path("eventName").asText();
         String bucketName = record.at("/s3/bucket/name").asText();
@@ -279,17 +283,17 @@ public class InsertWatch {
           if (matchers.stream().anyMatch(matcher -> matcher.test(target))) {
             r.add(target);
             if (metrics != null) {
-              metrics.recordEventMatched(tableLabel, queueLabel);
+              metrics.recordEventMatched(tableLabel, queueLabel, queueType);
             }
           } else {
             logger.info("Target did not match any input pattern: {}", target);
             if (metrics != null) {
-              metrics.recordEventNotMatched(tableLabel, queueLabel);
+              metrics.recordEventNotMatched(tableLabel, queueLabel, queueType);
             }
           }
         } else {
           if (metrics != null) {
-            metrics.recordEventSkipped(tableLabel, queueLabel);
+            metrics.recordEventSkipped(tableLabel, queueLabel, queueType);
           }
           if (logger.isTraceEnabled()) {
             logger.trace("Message skipped: {} {}", eventName, target);
@@ -306,7 +310,8 @@ public class InsertWatch {
       List<Message> messages,
       InsertWatchMetrics metrics,
       String tableLabel,
-      String queueLabel) {
+      String queueLabel,
+      String queueType) {
     int failedCount = 0;
     int len = messages.size();
     for (int i = 0; i < len; i = i + 10) {
@@ -316,7 +321,7 @@ public class InsertWatch {
         List<BatchResultErrorEntry> failed = res.failed();
         failedCount += failed.size();
         if (metrics != null) {
-          metrics.recordSqsDeleteError(tableLabel, queueLabel, failed.size());
+          metrics.recordQueueDeleteError(tableLabel, queueLabel, queueType, failed.size());
         }
       }
     }

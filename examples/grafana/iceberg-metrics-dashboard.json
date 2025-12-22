@@ -3463,10 +3463,10 @@
         "current": {
           "selected": true,
           "text": [
-            "All"
+            "http://localhost:9324/000000000000/s3-events"
           ],
           "value": [
-            "$__all"
+            "http://localhost:9324/000000000000/s3-events"
           ]
         },
         "datasource": {
@@ -3525,13 +3525,13 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Iceberg REST Catalog Metrics",
   "uid": "iceberg-rest-catalog-metrics",
-  "version": 40,
+  "version": 41,
   "weekStart": ""
 }

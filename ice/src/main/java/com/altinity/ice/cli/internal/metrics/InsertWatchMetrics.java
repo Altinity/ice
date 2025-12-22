@@ -33,8 +33,9 @@ public class InsertWatchMetrics {
 
   private static final String LABEL_TABLE = "table";
   private static final String LABEL_QUEUE = "queue";
+  private static final String LABEL_QUEUE_TYPE = "queue_type";
 
-  private static final String[] WATCH_LABELS = {LABEL_TABLE, LABEL_QUEUE};
+  private static final String[] WATCH_LABELS = {LABEL_TABLE, LABEL_QUEUE, LABEL_QUEUE_TYPE};
 
   // Messages/Files processed
   private static final String MESSAGES_RECEIVED_TOTAL_NAME = "ice_watch_messages_received_total";
@@ -77,14 +78,16 @@ public class InsertWatchMetrics {
   private static final String RETRY_ATTEMPTS_TOTAL_HELP =
       "Total number of retry attempts due to failures";
 
-  // SQS errors
-  private static final String SQS_RECEIVE_ERRORS_TOTAL_NAME = "ice_watch_sqs_receive_errors_total";
-  private static final String SQS_RECEIVE_ERRORS_TOTAL_HELP =
-      "Total number of errors when receiving messages from SQS";
+  // Queue errors (SQS, Kafka, etc.)
+  private static final String QUEUE_RECEIVE_ERRORS_TOTAL_NAME =
+      "ice_watch_queue_receive_errors_total";
+  private static final String QUEUE_RECEIVE_ERRORS_TOTAL_HELP =
+      "Total number of errors when receiving messages from queue";
 
-  private static final String SQS_DELETE_ERRORS_TOTAL_NAME = "ice_watch_sqs_delete_errors_total";
-  private static final String SQS_DELETE_ERRORS_TOTAL_HELP =
-      "Total number of errors when deleting messages from SQS";
+  private static final String QUEUE_DELETE_ERRORS_TOTAL_NAME =
+      "ice_watch_queue_delete_errors_total";
+  private static final String QUEUE_DELETE_ERRORS_TOTAL_HELP =
+      "Total number of errors when deleting/acknowledging messages from queue";
 
   // Parse errors
   private static final String MESSAGE_PARSE_ERRORS_TOTAL_NAME =
@@ -105,8 +108,8 @@ public class InsertWatchMetrics {
   private final Counter transactionsTotal;
   private final Counter transactionsFailedTotal;
   private final Counter retryAttemptsTotal;
-  private final Counter sqsReceiveErrorsTotal;
-  private final Counter sqsDeleteErrorsTotal;
+  private final Counter queueReceiveErrorsTotal;
+  private final Counter queueDeleteErrorsTotal;
   private final Counter messageParseErrorsTotal;
 
   /** Returns the singleton instance of the metrics reporter. */
@@ -178,17 +181,17 @@ public class InsertWatchMetrics {
             .labelNames(WATCH_LABELS)
             .register();
 
-    this.sqsReceiveErrorsTotal =
+    this.queueReceiveErrorsTotal =
         Counter.builder()
-            .name(SQS_RECEIVE_ERRORS_TOTAL_NAME)
-            .help(SQS_RECEIVE_ERRORS_TOTAL_HELP)
+            .name(QUEUE_RECEIVE_ERRORS_TOTAL_NAME)
+            .help(QUEUE_RECEIVE_ERRORS_TOTAL_HELP)
             .labelNames(WATCH_LABELS)
             .register();
 
-    this.sqsDeleteErrorsTotal =
+    this.queueDeleteErrorsTotal =
         Counter.builder()
-            .name(SQS_DELETE_ERRORS_TOTAL_NAME)
-            .help(SQS_DELETE_ERRORS_TOTAL_HELP)
+            .name(QUEUE_DELETE_ERRORS_TOTAL_NAME)
+            .help(QUEUE_DELETE_ERRORS_TOTAL_HELP)
             .labelNames(WATCH_LABELS)
             .register();
 
@@ -202,51 +205,51 @@ public class InsertWatchMetrics {
     logger.info("InsertWatch Prometheus metrics initialized");
   }
 
-  public void recordMessagesReceived(String table, String queue, int count) {
-    messagesReceivedTotal.labelValues(table, queue).inc(count);
+  public void recordMessagesReceived(String table, String queue, String queueType, int count) {
+    messagesReceivedTotal.labelValues(table, queue, queueType).inc(count);
   }
 
-  public void recordEventsReceived(String table, String queue, int count) {
-    eventsReceivedTotal.labelValues(table, queue).inc(count);
+  public void recordEventsReceived(String table, String queue, String queueType, int count) {
+    eventsReceivedTotal.labelValues(table, queue, queueType).inc(count);
   }
 
-  public void recordEventMatched(String table, String queue) {
-    eventsMatchedTotal.labelValues(table, queue).inc();
+  public void recordEventMatched(String table, String queue, String queueType) {
+    eventsMatchedTotal.labelValues(table, queue, queueType).inc();
   }
 
-  public void recordEventNotMatched(String table, String queue) {
-    eventsNotMatchedTotal.labelValues(table, queue).inc();
+  public void recordEventNotMatched(String table, String queue, String queueType) {
+    eventsNotMatchedTotal.labelValues(table, queue, queueType).inc();
   }
 
-  public void recordEventSkipped(String table, String queue) {
-    eventsSkippedTotal.labelValues(table, queue).inc();
+  public void recordEventSkipped(String table, String queue, String queueType) {
+    eventsSkippedTotal.labelValues(table, queue, queueType).inc();
   }
 
-  public void recordFilesInserted(String table, String queue, int count) {
-    filesInsertedTotal.labelValues(table, queue).inc(count);
+  public void recordFilesInserted(String table, String queue, String queueType, int count) {
+    filesInsertedTotal.labelValues(table, queue, queueType).inc(count);
   }
 
-  public void recordTransactionSuccess(String table, String queue) {
-    transactionsTotal.labelValues(table, queue).inc();
+  public void recordTransactionSuccess(String table, String queue, String queueType) {
+    transactionsTotal.labelValues(table, queue, queueType).inc();
   }
 
-  public void recordTransactionFailed(String table, String queue) {
-    transactionsFailedTotal.labelValues(table, queue).inc();
+  public void recordTransactionFailed(String table, String queue, String queueType) {
+    transactionsFailedTotal.labelValues(table, queue, queueType).inc();
   }
 
-  public void recordRetryAttempt(String table, String queue) {
-    retryAttemptsTotal.labelValues(table, queue).inc();
+  public void recordRetryAttempt(String table, String queue, String queueType) {
+    retryAttemptsTotal.labelValues(table, queue, queueType).inc();
   }
 
-  public void recordSqsReceiveError(String table, String queue) {
-    sqsReceiveErrorsTotal.labelValues(table, queue).inc();
+  public void recordQueueReceiveError(String table, String queue, String queueType) {
+    queueReceiveErrorsTotal.labelValues(table, queue, queueType).inc();
   }
 
-  public void recordSqsDeleteError(String table, String queue, int count) {
-    sqsDeleteErrorsTotal.labelValues(table, queue).inc(count);
+  public void recordQueueDeleteError(String table, String queue, String queueType, int count) {
+    queueDeleteErrorsTotal.labelValues(table, queue, queueType).inc(count);
   }
 
-  public void recordMessageParseError(String table, String queue) {
-    messageParseErrorsTotal.labelValues(table, queue).inc();
+  public void recordMessageParseError(String table, String queue, String queueType) {
+    messageParseErrorsTotal.labelValues(table, queue, queueType).inc();
   }
 }
