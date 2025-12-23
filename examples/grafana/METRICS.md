@@ -66,6 +66,25 @@ These metrics are reported by Iceberg clients when they perform operations on ta
 | `iceberg_metrics_reporter_active` | Counter | - | Iceberg metrics reporter status (value 1 means reporter is active) |
 | `iceberg_metrics_report_errors_total` | Counter | type | Total number of errors while processing metrics reports |
 
+### Catalog Metrics
+
+These metrics track catalog-level statistics.
+
+| Metric Name | Type | Labels | Description |
+|-------------|------|--------|-------------|
+| `iceberg_catalog_tables` | Gauge | catalog | Current number of tables in the catalog |
+| `iceberg_catalog_namespaces` | Gauge | catalog | Current number of namespaces in the catalog |
+| `iceberg_catalog_operations_total` | Counter | catalog, operation | Total number of catalog operations (create_table, drop_table, create_namespace, drop_namespace) |
+
+### Table Metrics
+
+These metrics track table-level statistics from commit reports.
+
+| Metric Name | Type | Labels | Description |
+|-------------|------|--------|-------------|
+| `iceberg_table_snapshots_total` | Counter | catalog, namespace, table | Total number of snapshots created per table |
+| `iceberg_table_schema_updates_total` | Counter | catalog, namespace, table | Total number of schema evolutions per table |
+
 ### HTTP/REST API Metrics
 
 These metrics track HTTP requests to the REST catalog API.
@@ -84,12 +103,19 @@ These metrics track S3 event-driven file insertions.
 
 | Metric Name | Type | Labels | Description |
 |-------------|------|--------|-------------|
-| `ice_watch_messages_received_total` | Counter | table, queue, instance | Total SQS messages received |
-| `ice_watch_files_inserted_total` | Counter | table, queue, instance | Total files inserted from S3 events |
-| `ice_watch_transactions_total` | Counter | table, queue, instance | Total insert transactions committed |
-| `ice_watch_transactions_failed_total` | Counter | table, queue, instance | Total failed transactions |
-| `ice_watch_retry_attempts_total` | Counter | table, queue, instance | Total retry attempts |
-| `ice_watch_events_by_status_total` | Counter | table, queue, instance, status | Events by match status (matched/unmatched) |
+| `ice_watch_poll_requests_total` | Counter | table, queue, queue_type | Total poll requests to the message queue |
+| `ice_watch_messages_received_total` | Counter | table, queue, queue_type | Total messages received from queue |
+| `ice_watch_events_received_total` | Counter | table, queue, queue_type | Total S3 events received (one message may contain multiple events) |
+| `ice_watch_events_matched_total` | Counter | table, queue, queue_type | Total S3 events that matched the pattern |
+| `ice_watch_events_not_matched_total` | Counter | table, queue, queue_type | Total S3 events that did not match any input pattern |
+| `ice_watch_events_skipped_total` | Counter | table, queue, queue_type | Total S3 events skipped (non-ObjectCreated events) |
+| `ice_watch_files_inserted_total` | Counter | table, queue, queue_type | Total files inserted from S3 events |
+| `ice_watch_transactions_total` | Counter | table, queue, queue_type | Total insert transactions committed |
+| `ice_watch_transactions_failed_total` | Counter | table, queue, queue_type | Total failed transactions |
+| `ice_watch_retry_attempts_total` | Counter | table, queue, queue_type | Total retry attempts |
+| `ice_watch_queue_receive_errors_total` | Counter | table, queue, queue_type | Total errors when receiving messages from queue |
+| `ice_watch_queue_delete_errors_total` | Counter | table, queue, queue_type | Total errors when deleting/acknowledging messages |
+| `ice_watch_message_parse_errors_total` | Counter | table, queue, queue_type | Total message parsing errors |
 
 ### Maintenance Metrics
 
@@ -125,8 +151,8 @@ These metrics track background maintenance operations.
 | `status_class` | HTTP status code class (200, 400, 404, 500, etc.) |
 | `status` | Maintenance run status (success, failure) or event match status |
 | `type` | Error type for metrics report errors |
-| `queue` | SQS queue name for InsertWatch |
-| `instance` | Instance identifier for InsertWatch |
+| `queue` | Queue URL for InsertWatch |
+| `queue_type` | Queue type (e.g., "sqs", "kafka") for InsertWatch |
 
 
 ## Grafana Dashboard
