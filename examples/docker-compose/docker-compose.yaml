@@ -40,7 +40,7 @@ services:
     depends_on:
       - minio-init
   clickhouse:
-    image: altinity/clickhouse-server:25.3.3.20186.altinityantalya-alpine
+    image: altinity/clickhouse-server:25.8.9.20496.altinityantalya-alpine
     restart: unless-stopped
     environment:
       CLICKHOUSE_SKIP_USER_SETUP: "1" # insecure
@@ -53,8 +53,9 @@ services:
     volumes:
       # for access to clickhouse-logs
       - ./data/docker-compose/clickhouse/var/log/clickhouse-server:/var/log/clickhouse-server
-    depends_on:
-      - ice-rest-catalog
+      - ./config.xml:/etc/clickhouse-server/conf.d/config.xml
+     depends_on:
+       - ice-rest-catalog
 configs:
   clickhouse-init:
     content: |
