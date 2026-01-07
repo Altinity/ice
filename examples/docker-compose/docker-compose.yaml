@@ -53,9 +53,9 @@ services:
     volumes:
       # for access to clickhouse-logs
       - ./data/docker-compose/clickhouse/var/log/clickhouse-server:/var/log/clickhouse-server
-      - ./config.xml:/etc/clickhouse-server/conf.d/config.xml
-     depends_on:
-       - ice-rest-catalog
+      # - ./config.xml:/etc/clickhouse-server/conf.d/config.xml
+    depends_on:
+      - ice-rest-catalog
 configs:
   clickhouse-init:
     content: |
