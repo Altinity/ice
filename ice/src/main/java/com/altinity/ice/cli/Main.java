@@ -268,10 +268,15 @@ public final class Main {
               description = "Create table if not exists")
           boolean createTableIfNotExists,
       @CommandLine.Parameters(
-              arity = "1..*",
+              arity = "0..*",
               paramLabel = "<files>",
               description = "/path/to/file.parquet")
           String[] dataFiles,
+      @CommandLine.Option(
+              names = "--from-file",
+              description =
+                  "Read list of parquet files from the specified file (one file per line)")
+          String fromFile,
       @CommandLine.Option(
               names = "--no-copy",
               description = "Add files to catalog without copying them")
@@ -358,12 +363,25 @@ public final class Main {
     }
     setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog()) {
-      if (dataFiles.length == 1 && "-".equals(dataFiles[0])) {
+      // Handle --from-file option
+      if (!Strings.isNullOrEmpty(fromFile)) {
+        if (dataFiles != null && dataFiles.length > 0) {
+          throw new IllegalArgumentException("Cannot specify both --from-file and file arguments");
+        }
+        dataFiles = readInputFromFile(fromFile).toArray(new String[0]);
+        if (dataFiles.length == 0) {
+          logger.info("Nothing to insert (file empty)");
+          return;
+        }
+      } else if (dataFiles != null && dataFiles.length == 1 && "-".equals(dataFiles[0])) {
         dataFiles = readInput().toArray(new String[0]);
         if (dataFiles.length == 0) {
           logger.info("Nothing to insert (stdin empty)");
           return;
         }
+      } else if (dataFiles == null || dataFiles.length == 0) {
+        throw new IllegalArgumentException(
+            "No files specified. Provide files as arguments or use --from-file");
       }
 
       List<IcePartition> partitions = null;
@@ -418,7 +436,13 @@ public final class Main {
               .build();
 
       if (!watchMode) {
-        Insert.run(catalog, tableId, dataFiles, options);
+        Insert.Result result = Insert.run(catalog, tableId, dataFiles, options);
+        if (result.anyFilesFailed()) {
+          logger.error(
+              "{} file(s) failed to insert. Check logs or retry list for details.",
+              result.failedCount());
+          System.exit(1);
+        }
       } else {
         if (!Strings.isNullOrEmpty(watchDebugAddr)) {
           JvmMetrics.builder().register();
@@ -450,6 +474,19 @@ public final class Main {
   private static List<String> readInput() {
     List<String> r = new ArrayList<>();
     try (Scanner scanner = new Scanner(System.in)) {
+      while (scanner.hasNextLine()) {
+        String line = scanner.nextLine();
+        if (!line.isBlank()) {
+          r.add(line);
+        }
+      }
+    }
+    return r;
+  }
+
+  private static List<String> readInputFromFile(String filePath) throws IOException {
+    List<String> r = new ArrayList<>();
+    try (Scanner scanner = new Scanner(new java.io.File(filePath))) {
       while (scanner.hasNextLine()) {
         String line = scanner.nextLine();
         if (!line.isBlank()) {
