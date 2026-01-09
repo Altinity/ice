@@ -99,6 +99,69 @@ select * from ice.`flowers.iris_no_copy` limit 10 FORMAT CSVWithNamesAndTypes;
 
 > To clean up simply terminate processes and `rm -rf data/`.
 
+### Inserting Multiple Files
+
+You can insert multiple parquet files at once by piping a list of files to the insert command:
+
+```shell
+# insert multiple files from stdin
+cat filelist | ice insert flowers.iris -
+```
+
+where `filelist` is the list of filenames
+```
+iris1.parquet
+iris3.parquet
+iris2.parquet
+```
+
+When inserting multiple files to the same table, all files are processed as a **single transaction**. If any file fails (e.g., doesn't exist or has schema issues), **none of the files are committed** to the table:
+
+```
+cat filelist| insert flowers.iris -                                       
+2026-01-09 11:28:02 [-5-thread-3] INFO c.a.i.c.internal.cmd.Insert > file://iris2.parquet: processing
+2026-01-09 11:28:02 [-5-thread-1] INFO c.a.i.c.internal.cmd.Insert > file://iris.parquet: processing
+2026-01-09 11:28:02 [-5-thread-2] INFO c.a.i.c.internal.cmd.Insert > file://iris3.parquet: processing
+2026-01-09 11:28:03 [-5-thread-1] INFO c.a.i.c.internal.cmd.Insert > file://iris.parquet: copying to s3://bucket1/flowers/iris/data/...parquet
+2026-01-09 11:28:03 [-5-thread-3] INFO c.a.i.c.internal.cmd.Insert > file://iris2.parquet: copying to s3://bucket1/flowers/iris/data/...parquet
+2026-01-09 11:28:03 [-5-thread-3] INFO c.a.i.c.internal.cmd.Insert > file://iris2.parquet: adding data file (copy took 0s)
+2026-01-09 11:28:03 [-5-thread-1] INFO c.a.i.c.internal.cmd.Insert > file://iris.parquet: adding data file (copy took 0s)
+2026-01-09 11:28:03 [main] ERROR com.altinity.ice.cli.Main > Fatal
+java.io.IOException: Error processing file(s)
+    ...
+Caused by: java.io.FileNotFoundException: iris3.parquet (No such file or directory)
+    ...
+```
+
+```sql
+-- query shows 0 rows because iris3.parquet failed and the entire transaction was rolled back
+select count(*) from `flowers.iris`;
+   ┌─count()─┐
+1. │       0 │
+   └─────────┘
+```
+
+When all files are valid, the transaction commits successfully:
+
+```
+cat filelist| insert flowers.iris -
+2026-01-09 11:29:03 [-5-thread-2] INFO c.a.i.c.internal.cmd.Insert > file://iris2.parquet: processing
+2026-01-09 11:29:03 [-5-thread-1] INFO c.a.i.c.internal.cmd.Insert > file://iris.parquet: processing
+2026-01-09 11:29:04 [-5-thread-2] INFO c.a.i.c.internal.cmd.Insert > file://iris2.parquet: copying to s3://bucket1/flowers/iris/data/...parquet
+2026-01-09 11:29:04 [-5-thread-1] INFO c.a.i.c.internal.cmd.Insert > file://iris.parquet: copying to s3://bucket1/flowers/iris/data/...parquet
+2026-01-09 11:29:04 [-5-thread-2] INFO c.a.i.c.internal.cmd.Insert > file://iris2.parquet: adding data file (copy took 0s)
+2026-01-09 11:29:04 [-5-thread-1] INFO c.a.i.c.internal.cmd.Insert > file://iris.parquet: adding data file (copy took 0s)
+2026-01-09 11:29:04 [main] INFO o.a.i.SnapshotProducer > Committed snapshot 2260546103981693696 (MergeAppend)
+```
+
+```sql
+-- query shows 300 rows (150 from each file) after successful commit
+select count(*) from `flowers.iris`;
+   ┌─count()─┐
+1. │     300 │
+   └─────────┘
+```
+
 ### Troubleshooting
 
 1. `Code: 336. DB::Exception: Unknown database engine: DataLakeCatalog. (UNKNOWN_DATABASE_ENGINE)`
