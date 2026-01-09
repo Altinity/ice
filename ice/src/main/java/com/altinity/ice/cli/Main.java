@@ -271,12 +271,12 @@ public final class Main {
               arity = "0..*",
               paramLabel = "<files>",
               description = "/path/to/file.parquet")
-          String[] dataFiles,
+          String[] files,
       @CommandLine.Option(
-              names = "--from-file",
+              names = "--files-from",
               description =
                   "Read list of parquet files from the specified file (one file per line)")
-          String fromFile,
+          String filesFrom,
       @CommandLine.Option(
               names = "--no-copy",
               description = "Add files to catalog without copying them")
@@ -325,6 +325,11 @@ public final class Main {
                       + " (useful for retrying partially failed insert using `cat ice.retry | ice insert - --retry-list=ice.retry`)")
           String retryList,
       @CommandLine.Option(
+              names = {"--retry-list-exit-code"},
+              description =
+                  "Exit code to return when insert produces non-empty --retry-list file (default: 0)")
+          int retryListExitCode,
+      @CommandLine.Option(
               names = {"--partition"},
               description =
                   "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
@@ -361,27 +366,30 @@ public final class Main {
       throw new UnsupportedOperationException(
           "--s3-no-sign-request + --s3-copy-object is not supported by AWS (see --help for details)");
     }
+    boolean filesSet = files != null && files.length > 0;
+    boolean filesFromSet = !Strings.isNullOrEmpty(filesFrom);
+    if (!filesSet && !filesFromSet) {
+      throw new IllegalArgumentException(
+          "At least one <files> argument or --files-from is required");
+    }
+    if (filesSet && filesFromSet) {
+      throw new IllegalArgumentException(
+          "<files> arguments and --files-from are mutually exclusive");
+    }
     setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog()) {
-      // Handle --from-file option
-      if (!Strings.isNullOrEmpty(fromFile)) {
-        if (dataFiles != null && dataFiles.length > 0) {
-          throw new IllegalArgumentException("Cannot specify both --from-file and file arguments");
-        }
-        dataFiles = readInputFromFile(fromFile).toArray(new String[0]);
-        if (dataFiles.length == 0) {
+      if (filesFromSet) {
+        files = readInputFromFile(filesFrom).toArray(new String[0]);
+        if (files.length == 0) {
           logger.info("Nothing to insert (file empty)");
           return;
         }
-      } else if (dataFiles != null && dataFiles.length == 1 && "-".equals(dataFiles[0])) {
-        dataFiles = readInput().toArray(new String[0]);
-        if (dataFiles.length == 0) {
+      } else if (files.length == 1 && "-".equals(files[0])) {
+        files = readInput().toArray(new String[0]);
+        if (files.length == 0) {
           logger.info("Nothing to insert (stdin empty)");
           return;
         }
-      } else if (dataFiles == null || dataFiles.length == 0) {
-        throw new IllegalArgumentException(
-            "No files specified. Provide files as arguments or use --from-file");
       }
 
       List<IcePartition> partitions = null;
@@ -405,7 +413,7 @@ public final class Main {
         CreateTable.run(
             catalog,
             tableId,
-            dataFiles[0],
+            files[0],
             null,
             createTableIfNotExists,
             useVendedCredentials,
@@ -436,12 +444,14 @@ public final class Main {
               .build();
 
       if (!watchMode) {
-        Insert.Result result = Insert.run(catalog, tableId, dataFiles, options);
-        if (result.anyFilesFailed()) {
+        Insert.Result result = Insert.run(catalog, tableId, files, options);
+        if (!result.ok()) {
           logger.error(
-              "{} file(s) failed to insert. Check logs or retry list for details.",
-              result.failedCount());
-          System.exit(1);
+              "{}/{} file(s) failed to insert (see {})",
+              result.totalNumberOfFiles(),
+              result.numberOfFilesFailedToInsert(),
+              retryList);
+          System.exit(retryListExitCode);
         }
       } else {
         if (!Strings.isNullOrEmpty(watchDebugAddr)) {
@@ -459,7 +469,7 @@ public final class Main {
         }
 
         InsertWatch.run(
-            catalog, tableId, dataFiles, watch, watchFireOnce, createTableIfNotExists, options);
+            catalog, tableId, files, watch, watchFireOnce, createTableIfNotExists, options);
       }
     }
   }
