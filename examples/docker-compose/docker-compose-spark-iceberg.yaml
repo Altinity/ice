@@ -33,4 +33,5 @@ configs:
       spark.eventLog.dir                        /home/iceberg/spark-events
       spark.history.fs.logDirectory             /home/iceberg/spark-events
       spark.sql.catalogImplementation           in-memory
+      # spark.sql.session.timeZone                America/Chicago
       # spark.log.level                         DEBUG
