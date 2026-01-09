@@ -1,0 +1,590 @@
+# =============================================================================
+# ice-rest-catalog Kubernetes Manifests
+# =============================================================================
+# Deploy with: kubectl apply -f ice-rest-catalog-k8s.yaml
+# 
+# For kind cluster access (run these commands to access services locally):
+# kubectl port-forward svc/ice-rest-catalog 8181:8181 -n iceberg-system &
+# kubectl port-forward svc/minio 9000:9000 -n iceberg-system &
+# kubectl port-forward svc/minio 9001:9001 -n iceberg-system &
+#
+# Access URLs:
+# - ice-rest-catalog: http://localhost:8181
+# - minio API: http://localhost:9000  
+# - minio console: http://localhost:9001
+#
+# For production use, consider using LoadBalancer or Ingress instead of NodePort
+# =============================================================================
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iceberg-system
+  labels:
+    app.kubernetes.io/name: iceberg-system
+    app.kubernetes.io/part-of: ice-rest-catalog
+
+---
+# =============================================================================
+# SECRETS & CONFIGMAPS
+# =============================================================================
+
+# MinIO Credentials Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-credentials
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/part-of: ice-rest-catalog
+type: Opaque
+stringData:
+  MINIO_ROOT_USER: "minio"
+  MINIO_ROOT_PASSWORD: "minio123"
+
+---
+# ice-rest-catalog Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ice-rest-catalog-config
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: ice-rest-catalog
+data:
+  config.yaml: |
+    # etcd connection - uses DNS SRV discovery via headless service
+    uri: etcd:http://etcd.iceberg-system.svc.cluster.local:2379
+    
+    # S3/MinIO warehouse configuration
+    warehouse: s3://warehouse
+    
+    # S3 settings for MinIO
+    s3:
+      endpoint: http://minio.iceberg-system.svc.cluster.local:9000
+      pathStyleAccess: true
+      accessKeyID: minio
+      secretAccessKey: minio123
+      region: us-east-1
+    
+    # Server address
+    addr: 0.0.0.0:8181
+    
+    # Anonymous access for development/testing
+    anonymousAccess:
+      enabled: true
+      accessConfig: {}
+
+---
+# ice-rest-catalog Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ice-rest-catalog-secrets
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: ice-rest-catalog
+type: Opaque
+stringData:
+  S3_ACCESS_KEY_ID: "minio"
+  S3_SECRET_ACCESS_KEY: "minio123"
+
+---
+# =============================================================================
+# ETCD CLUSTER
+# =============================================================================
+
+# etcd Headless Service for DNS SRV discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: etcd
+    app.kubernetes.io/part-of: ice-rest-catalog
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: client
+      port: 2379
+      targetPort: 2379
+    - name: peer
+      port: 2380
+      targetPort: 2380
+  selector:
+    app.kubernetes.io/name: etcd
+
+---
+# etcd StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: etcd
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: etcd
+    app.kubernetes.io/part-of: ice-rest-catalog
+spec:
+  serviceName: etcd
+  replicas: 3
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: etcd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: etcd
+        app.kubernetes.io/part-of: ice-rest-catalog
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: etcd
+          image: quay.io/coreos/etcd:v3.5.12
+          ports:
+            - name: client
+              containerPort: 2379
+            - name: peer
+              containerPort: 2380
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: ETCD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: ETCD_DATA_DIR
+              value: /var/lib/etcd
+            - name: ETCD_INITIAL_CLUSTER_STATE
+              value: new
+            - name: ETCD_INITIAL_CLUSTER_TOKEN
+              value: etcd-cluster-iceberg
+            - name: ETCD_LISTEN_PEER_URLS
+              value: http://0.0.0.0:2380
+            - name: ETCD_LISTEN_CLIENT_URLS
+              value: http://0.0.0.0:2379
+            - name: ETCD_ADVERTISE_CLIENT_URLS
+              value: http://$(POD_NAME).etcd.$(POD_NAMESPACE).svc.cluster.local:2379
+            - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
+              value: http://$(POD_NAME).etcd.$(POD_NAMESPACE).svc.cluster.local:2380
+            - name: ETCD_INITIAL_CLUSTER
+              value: etcd-0=http://etcd-0.etcd.iceberg-system.svc.cluster.local:2380,etcd-1=http://etcd-1.etcd.iceberg-system.svc.cluster.local:2380,etcd-2=http://etcd-2.etcd.iceberg-system.svc.cluster.local:2380
+          volumeMounts:
+            - name: etcd-data
+              mountPath: /var/lib/etcd
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 2379
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 2379
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+  volumeClaimTemplates:
+    - metadata:
+        name: etcd-data
+        labels:
+          app.kubernetes.io/name: etcd
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+
+---
+# =============================================================================
+# MINIO (S3-Compatible Storage)
+# =============================================================================
+
+# MinIO NodePort Service for external access
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/part-of: ice-rest-catalog
+spec:
+  type: NodePort
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+      nodePort: 30900
+    - name: console
+      port: 9001
+      targetPort: 9001
+      nodePort: 30901
+  selector:
+    app.kubernetes.io/name: minio
+
+---
+# MinIO Headless Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-headless
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: minio
+spec:
+  clusterIP: None
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+  selector:
+    app.kubernetes.io/name: minio
+
+---
+# MinIO StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/part-of: ice-rest-catalog
+spec:
+  serviceName: minio-headless
+  replicas: 1
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/part-of: ice-rest-catalog
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2024-01-31T20-20-33Z
+          args:
+            - server
+            - /data
+            - --console-address
+            - ":9001"
+          ports:
+            - name: api
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_PASSWORD
+          volumeMounts:
+            - name: minio-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: minio-data
+        labels:
+          app.kubernetes.io/name: minio
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+
+---
+# MinIO Bucket Setup Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-bucket-setup
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: minio-setup
+    app.kubernetes.io/part-of: ice-rest-catalog
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio-setup
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-minio
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MinIO to be ready..."
+              until wget -q --spider http://minio.iceberg-system.svc.cluster.local:9000/minio/health/ready; do
+                echo "MinIO not ready, waiting..."
+                sleep 5
+              done
+              echo "MinIO is ready!"
+      containers:
+        - name: mc
+          image: minio/mc:RELEASE.2024-01-31T08-59-40Z
+          command:
+            - sh
+            - -c
+            - |
+              mc alias set myminio http://minio.iceberg-system.svc.cluster.local:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD
+              mc mb --ignore-existing myminio/warehouse
+              echo "Bucket 'warehouse' created successfully!"
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_PASSWORD
+
+---
+# =============================================================================
+# ICE-REST-CATALOG
+# =============================================================================
+
+# ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ice-rest-catalog
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: ice-rest-catalog
+
+---
+# ice-rest-catalog NodePort Service for external access
+apiVersion: v1
+kind: Service
+metadata:
+  name: ice-rest-catalog
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: ice-rest-catalog
+    app.kubernetes.io/part-of: ice-rest-catalog
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 8181
+      targetPort: 8181
+      nodePort: 30181
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: ice-rest-catalog
+
+---
+# ice-rest-catalog Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ice-rest-catalog
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: ice-rest-catalog
+    app.kubernetes.io/part-of: ice-rest-catalog
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ice-rest-catalog
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ice-rest-catalog
+        app.kubernetes.io/part-of: ice-rest-catalog
+    spec:
+      terminationGracePeriodSeconds: 30
+      serviceAccountName: ice-rest-catalog
+      initContainers:
+        - name: wait-for-etcd
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for etcd cluster to be ready..."
+              until wget -q --spider http://etcd.iceberg-system.svc.cluster.local:2379/health; do
+                echo "etcd not ready, waiting..."
+                sleep 5
+              done
+              echo "etcd is ready!"
+        - name: wait-for-minio
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MinIO to be ready..."
+              until wget -q --spider http://minio.iceberg-system.svc.cluster.local:9000/minio/health/ready; do
+                echo "MinIO not ready, waiting..."
+                sleep 5
+              done
+              echo "MinIO is ready!"
+      containers:
+        - name: ice-rest-catalog
+          image: altinity/ice-rest-catalog:latest
+          ports:
+            - name: http
+              containerPort: 8181
+              protocol: TCP
+          args:
+            - "-c"
+            - "/etc/ice-rest-catalog/config.yaml"
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ice-rest-catalog-secrets
+                  key: S3_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ice-rest-catalog-secrets
+                  key: S3_SECRET_ACCESS_KEY
+            - name: AWS_REGION
+              value: "us-east-1"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ice-rest-catalog
+              readOnly: true
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /v1/config
+              port: 8181
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /v1/config
+              port: 8181
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: config
+          configMap:
+            name: ice-rest-catalog-config
+
+---
+# PodDisruptionBudget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ice-rest-catalog
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: ice-rest-catalog
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ice-rest-catalog
+
+---
+# HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ice-rest-catalog
+  namespace: iceberg-system
+  labels:
+    app.kubernetes.io/name: ice-rest-catalog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ice-rest-catalog
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
