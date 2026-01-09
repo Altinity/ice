@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/altinity/ice/compare/v0.10.1...master)
 
+## [0.11.0](https://github.com/altinity/ice/compare/v0.10.1...v0.11.0)
+
+### Added
+- ice `--files-from` & `--retry-list-exit-code` cli options. 
+
+### Fixed
+- TZ information getting lost when partitioning ([#85](https://github.com/Altinity/ice/issues/85)).
+
 ## [0.10.1](https://github.com/altinity/ice/compare/v0.10.0...v0.10.1)
 
 ### Fixed
