@@ -141,12 +141,18 @@ public final class Partitioning {
       boolean same = true;
 
       for (BlockMetaData block : blocks) {
-        Statistics<?> stats =
+        ColumnChunkMetaData columnMeta =
             block.getColumns().stream()
                 .filter(c -> c.getPath().toDotString().equals(sourceName))
                 .findFirst()
-                .map(ColumnChunkMetaData::getStatistics)
                 .orElse(null);
+
+        if (columnMeta == null) {
+          same = false;
+          break;
+        }
+
+        Statistics<?> stats = columnMeta.getStatistics();
 
         if (stats == null
             || !stats.hasNonNullValue()
@@ -159,7 +165,7 @@ public final class Partitioning {
         Transform<Object, Object> transform = (Transform<Object, Object>) field.transform();
         SerializableFunction<Object, Object> boundTransform = transform.bind(type);
 
-        PrimitiveType parquetType = stats.type();
+        PrimitiveType parquetType = columnMeta.getPrimitiveType();
 
         Comparable<?> parquetMin = stats.genericGetMin();
         var min = fromParquetPrimitive(type, parquetType, parquetMin);
