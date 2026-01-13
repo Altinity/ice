@@ -49,6 +49,13 @@ public final class Partitioning {
 
   private Partitioning() {}
 
+  public record InferPartitionKeyResult(
+      @Nullable PartitionKey partitionKey, @Nullable String failureReason) {
+    public boolean success() {
+      return partitionKey != null;
+    }
+  }
+
   public static PartitionSpec newPartitionSpec(Schema schema, List<Main.IcePartition> columns) {
     final PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
     if (!columns.isEmpty()) {
@@ -123,7 +130,7 @@ public final class Partitioning {
   }
 
   // TODO: fall back to path when statistics is not available
-  public static @Nullable PartitionKey inferPartitionKey(
+  public static InferPartitionKeyResult inferPartitionKey(
       ParquetMetadata metadata, PartitionSpec spec) {
     Schema schema = spec.schema();
 
@@ -138,7 +145,7 @@ public final class Partitioning {
 
       Object value = null;
       Object valueTransformed = null;
-      boolean same = true;
+      String failureReason = null;
 
       for (BlockMetaData block : blocks) {
         ColumnChunkMetaData columnMeta =
@@ -148,7 +155,7 @@ public final class Partitioning {
                 .orElse(null);
 
         if (columnMeta == null) {
-          same = false;
+          failureReason = String.format("Column '%s' not found in file metadata", sourceName);
           break;
         }
 
@@ -158,7 +165,7 @@ public final class Partitioning {
             || !stats.hasNonNullValue()
             || stats.genericGetMin() == null
             || stats.genericGetMax() == null) {
-          same = false;
+          failureReason = String.format("Column '%s' has no statistics", sourceName);
           break;
         }
 
@@ -176,7 +183,11 @@ public final class Partitioning {
         Object maxTransformed = boundTransform.apply(max);
 
         if (!minTransformed.equals(maxTransformed)) {
-          same = false;
+          failureReason =
+              String.format(
+                  "File contains multiple partition values for '%s' (min: %s, max: %s). "
+                      + "In force-no-copy mode, each file must contain data for only one partition value",
+                  sourceName, minTransformed, maxTransformed);
           break;
         }
 
@@ -184,21 +195,25 @@ public final class Partitioning {
           valueTransformed = minTransformed;
           value = min;
         } else if (!valueTransformed.equals(minTransformed)) {
-          same = false;
+          failureReason =
+              String.format(
+                  "File contains multiple partition values for '%s' (e.g., %s and %s). "
+                      + "In force-no-copy mode, each file must contain data for only one partition value",
+                  sourceName, valueTransformed, minTransformed);
           break;
         }
       }
 
-      if (same && value != null) {
+      if (failureReason == null && value != null) {
         partitionRecord.setField(sourceName, decodeStatValue(value, type));
       } else {
-        return null;
+        return new InferPartitionKeyResult(null, failureReason);
       }
     }
 
     PartitionKey partitionKey = new PartitionKey(spec, schema);
     partitionKey.wrap(partitionRecord);
-    return partitionKey;
+    return new InferPartitionKeyResult(partitionKey, null);
   }
 
   // Copied from org.apache.iceberg.parquet.ParquetConversions.
