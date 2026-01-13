@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+echo "Verifying insert and scan test..."
+
+# Check that scan output file was created and contains data
+if [ ! -f /tmp/scan_output.txt ]; then
+  echo "✗ Scan output file not found"
+  exit 1
+fi
+
+if [ ! -s /tmp/scan_output.txt ]; then
+  echo "✗ Scan output file is empty"
+  exit 1
+fi
+
+echo "✓ Scan output file exists and contains data"
+
+# Cleanup temp file
+rm -f /tmp/scan_output.txt
+
+echo "✓ Verification passed"
+exit 0
+
+
+
