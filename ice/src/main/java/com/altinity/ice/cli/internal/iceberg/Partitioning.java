@@ -185,8 +185,7 @@ public final class Partitioning {
         if (!minTransformed.equals(maxTransformed)) {
           failureReason =
               String.format(
-                  "File contains multiple partition values for '%s' (min: %s, max: %s). "
-                      + "In force-no-copy mode, each file must contain data for only one partition value",
+                  "File contains multiple partition values for '%s' (min: %s, max: %s)",
                   sourceName, minTransformed, maxTransformed);
           break;
         }
@@ -197,8 +196,7 @@ public final class Partitioning {
         } else if (!valueTransformed.equals(minTransformed)) {
           failureReason =
               String.format(
-                  "File contains multiple partition values for '%s' (e.g., %s and %s). "
-                      + "In force-no-copy mode, each file must contain data for only one partition value",
+                  "File contains multiple partition values for '%s' (e.g., %s and %s)",
                   sourceName, valueTransformed, minTransformed);
           break;
         }

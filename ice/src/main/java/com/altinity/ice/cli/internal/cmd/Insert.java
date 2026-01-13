@@ -427,7 +427,9 @@ public final class Insert {
       if (!inferResult.success()) {
         if (options.noCopy || options.s3CopyObject) {
           throw new BadRequestException(
-              String.format("%s: %s", inputFile.location(), inferResult.failureReason()));
+              String.format(
+                  "%s: %s. In no-copy mode, each file must contain data for only one partition value",
+                  inputFile.location(), inferResult.failureReason()));
         }
         logger.warn(
             "{}: {}. Falling back to full scan (slow)",
