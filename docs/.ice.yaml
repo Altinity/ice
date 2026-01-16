@@ -1,0 +1,7 @@
+uri: http://localhost:8181
+s3:
+  endpoint: http://localhost:9000
+  pathStyleAccess: true
+  accessKeyID: minio
+  secretAccessKey: minio123
+  region: us-east-1
