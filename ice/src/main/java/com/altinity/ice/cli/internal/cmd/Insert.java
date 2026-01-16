@@ -423,17 +423,20 @@ public final class Insert {
 
     PartitionKey partitionKey = null;
     if (partitionSpec.isPartitioned()) {
-      partitionKey = Partitioning.inferPartitionKey(metadata, partitionSpec);
-      if (partitionKey == null) {
+      var inferResult = Partitioning.inferPartitionKey(metadata, partitionSpec);
+      if (!inferResult.success()) {
         if (options.noCopy || options.s3CopyObject) {
           throw new BadRequestException(
               String.format(
-                  "Cannot infer partition key of %s from the metadata", inputFile.location()));
+                  "%s: %s. In no-copy mode, each file must contain data for only one partition value",
+                  inputFile.location(), inferResult.failureReason()));
         }
         logger.warn(
-            "{} does not appear to be partitioned. Falling back to full scan (slow)",
-            inputFile.location());
+            "{}: {}. Falling back to full scan (slow)",
+            inputFile.location(),
+            inferResult.failureReason());
       } else {
+        partitionKey = inferResult.partitionKey();
         logger.info("{}: using inferred partition key {}", file, partitionKey);
       }
     }

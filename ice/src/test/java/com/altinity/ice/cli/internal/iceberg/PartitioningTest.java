@@ -90,7 +90,7 @@ public class PartitioningTest {
       throws IOException {
     Map<PartitionKey, List<Record>> partition =
         Partitioning.partition(inputFile, partitionSpec.schema(), partitionSpec);
-    PartitionKey result = Partitioning.inferPartitionKey(metadata, partitionSpec);
+    PartitionKey result = Partitioning.inferPartitionKey(metadata, partitionSpec).partitionKey();
     if (result != null) {
       assertThat(partition.size()).isEqualTo(1);
       PartitionKey expected = partition.keySet().stream().findFirst().get();
