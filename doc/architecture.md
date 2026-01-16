@@ -35,6 +35,29 @@ The service provides a round-robin approach to access the nodes in the cluster.
 - Persistent volumes for etcd data
 - S3 for durable object storage
 
+## Backup/Recovery
+All state information for the catalog is maintained in etcd. To back up the ICE REST Catalog state, you can use standard etcd snapshot tools. The official etcd documentation provides guidance on [snapshotting and recovery](https://etcd.io/docs/v3.5/op-guide/recovery/).
+
+**Backup etcd Example**:
+```shell
+etcdctl --endpoints=<etcd-endpoint> \
+  --cacert=<trusted-ca-file> \
+  --cert=<cert-file> \
+  --key=<key-file> \
+  snapshot save /path/to/backup.db
+```
+
+Replace the arguments as appropriate for your deployment (for example, endpoints, authentication, and TLS options).
+
+**Restore etcd Example**:
+```shell
+etcdctl snapshot restore /path/to/backup.db \
+  --data-dir /var/lib/etcd
+```
+
+The ICE REST Catalog is designed such that if you restore etcd and point the catalog services at the restored etcd cluster, all catalog state (databases, tables, schemas, snapshots) will be recovered automatically.
+  
+**Note:** Data files themselves (table/parquet data) are stored in Object Storage (e.g., S3, MinIO), and should be backed up or protected in accordance with your object storage vendor's recommendations.
 
 ### k8s Manifest Files
 
