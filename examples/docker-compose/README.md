@@ -50,25 +50,16 @@ volumes:
 3. Restart the containers: `docker compose down && docker compose up`
 
 #### Querying data using Spark
-To set the session timezone in Spark, add the following configuration under the `configs` section in `docker-compose-spark-iceberg.yaml`:
-
-```yaml
-    configs:
-      - spark.sql.session.timeZone=America/Chicago
+To set the session timezone in spark, uncomment and set the value for the variable `spark.sql.session.timeZone` 
+under the section.
+```
+configs:
+  spark-defaults.conf:
+    content: |
 ```
 
-Replace `America/Chicago` with your desired timezone.
-
-For example, your Spark service definition might look like:
-
-```yaml
-  spark-iceberg:
-    image: ...
-    environment:
-      - ...
-    configs:
-      - spark.sql.session.timeZone=America/Chicago
-    ...
+```
+ # spark.sql.session.timeZone                America/Chicago
 ```
 
 This ensures that Spark SQL sessions will use the specified timezone.
