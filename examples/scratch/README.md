@@ -105,7 +105,7 @@ You can insert multiple parquet files at once by piping a list of files to the i
 
 ```shell
 # insert multiple files from stdin
-cat filelist | ice insert flowers.iris -
+cat filelist | ice insert -p flowers.iris -
 ```
 
 where `filelist` is the list of filenames
