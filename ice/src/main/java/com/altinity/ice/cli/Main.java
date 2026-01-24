@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.apache.curator.shaded.com.google.common.net.HostAndPort;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -674,7 +675,18 @@ public final class Main {
                         : e.getKey())
             .sorted()
             .collect(Collectors.joining(", ")));
-    catalog.initialize("default", icebergConfig);
+    String catalogUri = icebergConfig.get(CatalogProperties.URI);
+    try {
+      catalog.initialize("default", icebergConfig);
+    } catch (org.apache.iceberg.exceptions.RESTException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to connect to REST catalog at '%s'. "
+                  + "Please check that the catalog server is running and the URL is correct. "
+                  + "Configure via: .ice.yaml 'uri' field, ICE_URI env var, or --config flag.",
+              catalogUri),
+          e);
+    }
     return catalog;
   }
 
