@@ -282,8 +282,6 @@ public final class Partitioning {
           }
           String transformName = transform.toString();
 
-          // Handle parameterized transforms (bucket[N], truncate[N])
-          // PartitionKey.partition() applies the transform, so we store the original value
           if (transformName.startsWith("bucket[") || transformName.startsWith("truncate[")) {
             partitionRecord.setField(
                 sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
