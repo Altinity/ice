@@ -38,7 +38,7 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 ## Running
 
 ```bash
-java -jar ice-rest-catalog-0.0.0-SNAPSHOT-shaded.jar -c .ice-rest-catalog.yaml
+ice-rest-catalog -c .ice-rest-catalog.yaml
 ```
 
 ## Configuration Options
