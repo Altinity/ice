@@ -171,5 +171,3 @@ public class ScenarioConfig {
     this.phases = phases;
   }
 }
-
-
