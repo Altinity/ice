@@ -118,11 +118,11 @@ public class ScenarioTestRunner {
       ScriptExecutionResult runResult = executeScript(runScriptTemplate, templateVars);
       result.setRunScriptResult(runResult);
 
-      if (runResult.getExitCode() != 0) {
+      if (runResult.exitCode() != 0) {
         logger.error("Run script failed for scenario: {}", scenarioName);
-        logger.error("Exit code: {}", runResult.getExitCode());
-        logger.error("stdout:\n{}", runResult.getStdout());
-        logger.error("stderr:\n{}", runResult.getStderr());
+        logger.error("Exit code: {}", runResult.exitCode());
+        logger.error("stdout:\n{}", runResult.stdout());
+        logger.error("stderr:\n{}", runResult.stderr());
         return result;
       }
     } else {
@@ -136,11 +136,11 @@ public class ScenarioTestRunner {
       ScriptExecutionResult verifyResult = executeScript(verifyScriptTemplate, templateVars);
       result.setVerifyScriptResult(verifyResult);
 
-      if (verifyResult.getExitCode() != 0) {
+      if (verifyResult.exitCode() != 0) {
         logger.error("Verify script failed for scenario: {}", scenarioName);
-        logger.error("Exit code: {}", verifyResult.getExitCode());
-        logger.error("stdout:\n{}", verifyResult.getStdout());
-        logger.error("stderr:\n{}", verifyResult.getStderr());
+        logger.error("Exit code: {}", verifyResult.exitCode());
+        logger.error("stdout:\n{}", verifyResult.stdout());
+        logger.error("stderr:\n{}", verifyResult.stderr());
       }
     }
 
@@ -285,34 +285,12 @@ public class ScenarioTestRunner {
     }
 
     public boolean isSuccess() {
-      boolean runSuccess = runScriptResult == null || runScriptResult.getExitCode() == 0;
-      boolean verifySuccess = verifyScriptResult == null || verifyScriptResult.getExitCode() == 0;
+      boolean runSuccess = runScriptResult == null || runScriptResult.exitCode() == 0;
+      boolean verifySuccess = verifyScriptResult == null || verifyScriptResult.exitCode() == 0;
       return runSuccess && verifySuccess;
     }
   }
 
   /** Result of executing a single script. */
-  public static class ScriptExecutionResult {
-    private final int exitCode;
-    private final String stdout;
-    private final String stderr;
-
-    public ScriptExecutionResult(int exitCode, String stdout, String stderr) {
-      this.exitCode = exitCode;
-      this.stdout = stdout;
-      this.stderr = stderr;
-    }
-
-    public int getExitCode() {
-      return exitCode;
-    }
-
-    public String getStdout() {
-      return stdout;
-    }
-
-    public String getStderr() {
-      return stderr;
-    }
-  }
+  public record ScriptExecutionResult(int exitCode, String stdout, String stderr) {}
 }

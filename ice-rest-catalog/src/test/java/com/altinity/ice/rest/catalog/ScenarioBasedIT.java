@@ -71,11 +71,11 @@ public class ScenarioBasedIT extends RESTCatalogTestBase {
 
     // Log results
     if (result.getRunScriptResult() != null) {
-      logger.info("Run script exit code: {}", result.getRunScriptResult().getExitCode());
+      logger.info("Run script exit code: {}", result.getRunScriptResult().exitCode());
     }
 
     if (result.getVerifyScriptResult() != null) {
-      logger.info("Verify script exit code: {}", result.getVerifyScriptResult().getExitCode());
+      logger.info("Verify script exit code: {}", result.getVerifyScriptResult().exitCode());
     }
 
     // Assert success
@@ -83,23 +83,23 @@ public class ScenarioBasedIT extends RESTCatalogTestBase {
       StringBuilder errorMessage = new StringBuilder();
       errorMessage.append("Scenario '").append(scenarioName).append("' failed:\n");
 
-      if (result.getRunScriptResult() != null && result.getRunScriptResult().getExitCode() != 0) {
+      if (result.getRunScriptResult() != null && result.getRunScriptResult().exitCode() != 0) {
         errorMessage.append("\nRun script failed with exit code: ");
-        errorMessage.append(result.getRunScriptResult().getExitCode());
+        errorMessage.append(result.getRunScriptResult().exitCode());
         errorMessage.append("\nStdout:\n");
-        errorMessage.append(result.getRunScriptResult().getStdout());
+        errorMessage.append(result.getRunScriptResult().stdout());
         errorMessage.append("\nStderr:\n");
-        errorMessage.append(result.getRunScriptResult().getStderr());
+        errorMessage.append(result.getRunScriptResult().stderr());
       }
 
       if (result.getVerifyScriptResult() != null
-          && result.getVerifyScriptResult().getExitCode() != 0) {
+          && result.getVerifyScriptResult().exitCode() != 0) {
         errorMessage.append("\nVerify script failed with exit code: ");
-        errorMessage.append(result.getVerifyScriptResult().getExitCode());
+        errorMessage.append(result.getVerifyScriptResult().exitCode());
         errorMessage.append("\nStdout:\n");
-        errorMessage.append(result.getVerifyScriptResult().getStdout());
+        errorMessage.append(result.getVerifyScriptResult().stdout());
         errorMessage.append("\nStderr:\n");
-        errorMessage.append(result.getVerifyScriptResult().getStderr());
+        errorMessage.append(result.getVerifyScriptResult().stderr());
       }
 
       throw new AssertionError(errorMessage.toString());
