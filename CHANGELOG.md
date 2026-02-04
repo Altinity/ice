@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/altinity/ice/compare/v0.10.1...master)
 
+## [0.12.0](https://github.com/altinity/ice/compare/v0.11.1...v0.12.0)
+
+### Added
+- `ice` - Added drop partition field in alter table.
+
+### Changed
+- `ice` - Logic to throw exception when the user tries to use -force-no-copy for file(row group/block) 
+with multiple partitions.
+- `ice` - User friendly message in REST catalog initialization if server cannot be reached.
+
+### Fixed
+• `ice` - Parquet conversion to iceberg for long data type.
+
+### Documentation
+- Added High level k8s architecture diagram.
+- Documented inserting multiple files (and transaction support).
+
 ## [0.11.0](https://github.com/altinity/ice/compare/v0.10.1...v0.11.0)
 
 ### Added
