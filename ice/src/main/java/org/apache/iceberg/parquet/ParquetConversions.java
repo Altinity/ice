@@ -44,7 +44,7 @@ class ParquetConversions {
       case DATE:
         return (Literal<T>) Literal.of((Integer) value);
       case LONG:
-        return (Literal<T>) Literal.of((Long) value);
+        return (Literal<T>) Literal.of(((Number) value).longValue());
       case TIME:
       case TIMESTAMP:
         // time & timestamp/timestamptz are stored in microseconds
