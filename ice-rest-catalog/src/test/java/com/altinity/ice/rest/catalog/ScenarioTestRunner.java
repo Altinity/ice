@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,12 +62,14 @@ public class ScenarioTestRunner {
       return new ArrayList<>();
     }
 
-    return Files.list(scenariosDir)
-        .filter(Files::isDirectory)
-        .map(path -> path.getFileName().toString())
-        .filter(name -> !name.startsWith(".")) // Ignore hidden directories
-        .sorted()
-        .collect(Collectors.toList());
+    try (Stream<Path> stream = Files.list(scenariosDir)) {
+      return stream
+          .filter(Files::isDirectory)
+          .map(path -> path.getFileName().toString())
+          .filter(name -> !name.startsWith(".")) // Ignore hidden directories
+          .sorted()
+          .collect(Collectors.toList());
+    }
   }
 
   /**
@@ -105,25 +108,25 @@ public class ScenarioTestRunner {
     templateVars.put("SCENARIO_DIR", scenarioDir.toAbsolutePath().toString());
 
     // Add environment variables from scenario config
-    if (config.getEnv() != null) {
-      templateVars.putAll(config.getEnv());
+    if (config.env() != null) {
+      templateVars.putAll(config.env());
     }
 
-    ScenarioResult result = new ScenarioResult(scenarioName);
+    ScriptExecutionResult runScriptResult = null;
+    ScriptExecutionResult verifyScriptResult = null;
 
     // Execute run.sh.tmpl
     Path runScriptTemplate = scenarioDir.resolve("run.sh.tmpl");
     if (Files.exists(runScriptTemplate)) {
       logger.info("Executing run script for scenario: {}", scenarioName);
-      ScriptExecutionResult runResult = executeScript(runScriptTemplate, templateVars);
-      result.setRunScriptResult(runResult);
+      runScriptResult = executeScript(runScriptTemplate, templateVars);
 
-      if (runResult.exitCode() != 0) {
+      if (runScriptResult.exitCode() != 0) {
         logger.error("Run script failed for scenario: {}", scenarioName);
-        logger.error("Exit code: {}", runResult.exitCode());
-        logger.error("stdout:\n{}", runResult.stdout());
-        logger.error("stderr:\n{}", runResult.stderr());
-        return result;
+        logger.error("Exit code: {}", runScriptResult.exitCode());
+        logger.error("stdout:\n{}", runScriptResult.stdout());
+        logger.error("stderr:\n{}", runScriptResult.stderr());
+        return new ScenarioResult(scenarioName, runScriptResult, verifyScriptResult);
       }
     } else {
       logger.warn("No run.sh.tmpl found for scenario: {}", scenarioName);
@@ -133,18 +136,17 @@ public class ScenarioTestRunner {
     Path verifyScriptTemplate = scenarioDir.resolve("verify.sh.tmpl");
     if (Files.exists(verifyScriptTemplate)) {
       logger.info("Executing verify script for scenario: {}", scenarioName);
-      ScriptExecutionResult verifyResult = executeScript(verifyScriptTemplate, templateVars);
-      result.setVerifyScriptResult(verifyResult);
+      verifyScriptResult = executeScript(verifyScriptTemplate, templateVars);
 
-      if (verifyResult.exitCode() != 0) {
+      if (verifyScriptResult.exitCode() != 0) {
         logger.error("Verify script failed for scenario: {}", scenarioName);
-        logger.error("Exit code: {}", verifyResult.exitCode());
-        logger.error("stdout:\n{}", verifyResult.stdout());
-        logger.error("stderr:\n{}", verifyResult.stderr());
+        logger.error("Exit code: {}", verifyScriptResult.exitCode());
+        logger.error("stdout:\n{}", verifyScriptResult.stdout());
+        logger.error("stderr:\n{}", verifyScriptResult.stderr());
       }
     }
 
-    return result;
+    return new ScenarioResult(scenarioName, runScriptResult, verifyScriptResult);
   }
 
   /**
@@ -167,7 +169,9 @@ public class ScenarioTestRunner {
     Path tempScript = Files.createTempFile("scenario-script-", ".sh");
     try {
       Files.writeString(tempScript, processedScript);
-      tempScript.toFile().setExecutable(true);
+      if (!tempScript.toFile().setExecutable(true)) {
+        logger.warn("Could not set script as executable: {}", tempScript);
+      }
 
       // Execute the script
       ProcessBuilder processBuilder = new ProcessBuilder("/bin/bash", tempScript.toString());
@@ -255,34 +259,10 @@ public class ScenarioTestRunner {
   }
 
   /** Result of executing a scenario. */
-  public static class ScenarioResult {
-    private final String scenarioName;
-    private ScriptExecutionResult runScriptResult;
-    private ScriptExecutionResult verifyScriptResult;
-
-    public ScenarioResult(String scenarioName) {
-      this.scenarioName = scenarioName;
-    }
-
-    public String getScenarioName() {
-      return scenarioName;
-    }
-
-    public ScriptExecutionResult getRunScriptResult() {
-      return runScriptResult;
-    }
-
-    public void setRunScriptResult(ScriptExecutionResult runScriptResult) {
-      this.runScriptResult = runScriptResult;
-    }
-
-    public ScriptExecutionResult getVerifyScriptResult() {
-      return verifyScriptResult;
-    }
-
-    public void setVerifyScriptResult(ScriptExecutionResult verifyScriptResult) {
-      this.verifyScriptResult = verifyScriptResult;
-    }
+  public record ScenarioResult(
+      String scenarioName,
+      ScriptExecutionResult runScriptResult,
+      ScriptExecutionResult verifyScriptResult) {
 
     public boolean isSuccess() {
       boolean runSuccess = runScriptResult == null || runScriptResult.exitCode() == 0;
