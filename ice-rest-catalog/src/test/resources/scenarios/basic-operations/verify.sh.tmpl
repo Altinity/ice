@@ -3,17 +3,37 @@ set -e
 
 # Verification script - checks that the test completed successfully
 # Exit code 0 = success, non-zero = failure
+# Expects run.sh to have written: basic_ops_describe.txt, basic_ops_scan_iris.txt,
+# basic_ops_scan_partitioned.txt, basic_ops_scan_sorted.txt under /tmp
 
 echo "Verifying basic operations test..."
 
-# For this simple test, the run.sh itself does the verification
-# by successfully creating and deleting the namespace
-# More complex scenarios can add additional verification here
+for f in /tmp/basic_ops_describe.txt /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt; do
+  if [ ! -f "$f" ]; then
+    echo "FAIL Output file not found: $f"
+    exit 1
+  fi
+  if [ ! -s "$f" ]; then
+    echo "FAIL Output file is empty: $f"
+    exit 1
+  fi
+done
 
-echo "✓ Verification passed"
+# Verify scan outputs contain expected columns (scan outputs use dots: sepal.length)
+for f in /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt; do
+  if ! grep -q "sepal.length" "$f"; then
+    echo "FAIL $f does not contain expected column 'sepal.length'"
+    exit 1
+  fi
+  if ! grep -q "variety" "$f"; then
+    echo "FAIL $f does not contain expected column 'variety'"
+    exit 1
+  fi
+done
+
+# Cleanup temp files
+rm -f /tmp/basic_ops_describe.txt /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt
+
+echo "OK Verification passed"
 exit 0
-
-
-
-
 

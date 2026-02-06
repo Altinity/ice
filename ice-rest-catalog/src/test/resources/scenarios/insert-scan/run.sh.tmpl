@@ -5,7 +5,7 @@ echo "Running insert and scan test..."
 
 # Create namespace
 {{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
-echo "✓ Created namespace: ${NAMESPACE_NAME}"
+echo "OK Created namespace: ${NAMESPACE_NAME}"
 
 # Get the full path to the input file (relative to scenario directory)
 SCENARIO_DIR="{{SCENARIO_DIR}}"
@@ -13,33 +13,33 @@ INPUT_PATH="${SCENARIO_DIR}/${INPUT_FILE}"
 
 # Create table and insert data
 {{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} ${INPUT_PATH}
-echo "✓ Inserted data from ${INPUT_FILE} into table ${TABLE_NAME}"
+echo "OK Inserted data from ${INPUT_FILE} into table ${TABLE_NAME}"
 
 # Scan the table to verify data was inserted
 {{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_NAME} > /tmp/scan_output.txt
-echo "✓ Scanned table ${TABLE_NAME}"
+echo "OK Scanned table ${TABLE_NAME}"
 
 # Check that scan output contains expected data
 if ! grep -q "sepal" /tmp/scan_output.txt; then
-  echo "✗ Scan output does not contain expected column 'sepal'"
+  echo "FAIL Scan output does not contain expected column 'sepal'"
   cat /tmp/scan_output.txt
   exit 1
 fi
 
 if ! grep -q "variety" /tmp/scan_output.txt; then
-  echo "✗ Scan output does not contain expected column 'variety'"
+  echo "FAIL Scan output does not contain expected column 'variety'"
   cat /tmp/scan_output.txt
   exit 1
 fi
 
-echo "✓ Scan output contains expected columns"
+echo "OK Scan output contains expected columns"
 
 # Cleanup
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
-echo "✓ Deleted table: ${TABLE_NAME}"
+echo "OK Deleted table: ${TABLE_NAME}"
 
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
-echo "✓ Deleted namespace: ${NAMESPACE_NAME}"
+echo "OK Deleted namespace: ${NAMESPACE_NAME}"
 
 echo "Insert and scan test completed successfully"
 

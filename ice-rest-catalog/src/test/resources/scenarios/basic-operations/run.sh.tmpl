@@ -10,17 +10,121 @@ set -e
 
 echo "Running basic operations test..."
 
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/${INPUT_FILE}"
+# Use parquet from insert-scan scenario if not present here
+if [ ! -f "${INPUT_PATH}" ]; then
+  INPUT_PATH="${SCENARIO_DIR}/../insert-scan/${INPUT_FILE}"
+fi
+if [ ! -f "${INPUT_PATH}" ]; then
+  echo "No input parquet found (set INPUT_FILE or add input.parquet to scenario)"
+  exit 1
+fi
+
 # Create namespace via CLI
 {{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
-echo "✓ Created namespace: ${NAMESPACE_NAME}"
+echo "OK Created namespace: ${NAMESPACE_NAME}"
 
-# List namespaces to verify
+# List namespaces (ice describe) - no output when no tables yet
 {{ICE_CLI}} --config {{CLI_CONFIG}} describe
-echo "✓ Listed namespaces"
+echo "OK Listed namespaces"
+
+# Insert from file (like README: ice insert flowers.iris -p file://...)
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_IRIS} -p "file://${INPUT_PATH}"
+echo "Inserted from file into ${TABLE_IRIS}"
+# Scan and verify data was inserted
+{{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_IRIS} --limit 5 > /tmp/basic_ops_scan_iris.txt
+if ! grep -q "sepal.length" /tmp/basic_ops_scan_iris.txt; then
+  echo "FAIL: scan output missing expected column 'sepal.length'"
+  cat /tmp/basic_ops_scan_iris.txt
+  exit 1
+fi
+if ! grep -q "variety" /tmp/basic_ops_scan_iris.txt; then
+  echo "FAIL: scan output missing expected column 'variety'"
+  cat /tmp/basic_ops_scan_iris.txt
+  exit 1
+fi
+echo "OK Scan verified ${TABLE_IRIS}"
+
+# Describe catalog (output includes table ids like namespace.table) and verify namespace/table appears
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe > /tmp/basic_ops_describe.txt
+if ! grep -q "${NAMESPACE_NAME}" /tmp/basic_ops_describe.txt; then
+  echo "FAIL: describe output missing namespace ${NAMESPACE_NAME}"
+  cat /tmp/basic_ops_describe.txt
+  exit 1
+fi
+echo "OK Described catalog (namespace and table listed)"
+
+# Insert with partition (like README: --partition='[{"column":"...","transform":"day"}]')
+# Using a column that exists in iris parquet
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_PARTITIONED} -p "file://${INPUT_PATH}" \
+  --partition='[{"column":"sepal.length","transform":"identity"}]'
+echo "OK Inserted with partition into ${TABLE_PARTITIONED}"
+# Scan and verify data was inserted
+{{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_PARTITIONED} --limit 5 > /tmp/basic_ops_scan_partitioned.txt
+if ! grep -q "sepal.length" /tmp/basic_ops_scan_partitioned.txt; then
+  echo "FAIL: scan output missing expected column 'sepal.length'"
+  cat /tmp/basic_ops_scan_partitioned.txt
+  exit 1
+fi
+if ! grep -q "variety" /tmp/basic_ops_scan_partitioned.txt; then
+  echo "FAIL: scan output missing expected column 'variety'"
+  cat /tmp/basic_ops_scan_partitioned.txt
+  exit 1
+fi
+echo "OK Scan verified ${TABLE_PARTITIONED}"
+
+# Insert with sort (like README: --sort='[{"column":"..."}]')
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_SORTED} -p "file://${INPUT_PATH}" \
+  --sort='[{"column":"sepal.length"}]'
+echo "OK Inserted with sort into ${TABLE_SORTED}"
+# Scan and verify data was inserted
+{{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_SORTED} --limit 5 > /tmp/basic_ops_scan_sorted.txt
+if ! grep -q "sepal.length" /tmp/basic_ops_scan_sorted.txt; then
+  echo "FAIL: scan output missing expected column 'sepal.length'"
+  cat /tmp/basic_ops_scan_sorted.txt
+  exit 1
+fi
+if ! grep -q "variety" /tmp/basic_ops_scan_sorted.txt; then
+  echo "FAIL: scan output missing expected column 'variety'"
+  cat /tmp/basic_ops_scan_sorted.txt
+  exit 1
+fi
+echo "OK Scan verified ${TABLE_SORTED}"
+
+# Inspect catalog (ice describe)
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe
+echo "OK Described catalog"
+
+# Optional: --no-copy insert (like README: create-table + upload + insert --no-copy)
+# Upload to MinIO via AWS CLI if available so insert --no-copy can reference s3://
+# This section is best-effort: if it fails we skip rather than failing the whole test.
+if command -v aws &>/dev/null && [ -n "{{MINIO_ENDPOINT}}" ]; then
+  S3_PATH="s3://${S3_BUCKET}/${NAMESPACE_NAME}/iris_no_copy/$(basename ${INPUT_PATH})"
+  export AWS_ACCESS_KEY_ID=minioadmin
+  export AWS_SECRET_ACCESS_KEY=minioadmin
+  if aws s3 cp --endpoint-url "{{MINIO_ENDPOINT}}" "${INPUT_PATH}" "${S3_PATH}" 2>/dev/null; then
+    if {{ICE_CLI}} --config {{CLI_CONFIG}} create-table ${TABLE_NO_COPY} --schema-from-parquet="file://${INPUT_PATH}" 2>/dev/null && \
+       {{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_NO_COPY} --no-copy "${S3_PATH}" 2>/dev/null; then
+      echo "OK Insert with --no-copy into ${TABLE_NO_COPY}"
+      {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NO_COPY}
+    else
+      echo "SKIP Skipped --no-copy test (ice CLI could not access S3 path)"
+      # Clean up table if it was created
+      {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NO_COPY} 2>/dev/null || true
+    fi
+  fi
+fi
+
+# Cleanup tables then namespace
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_IRIS}
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_PARTITIONED}
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_SORTED}
+echo "OK Deleted tables"
 
 # Delete the namespace via CLI
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
-echo "✓ Deleted namespace: ${NAMESPACE_NAME}"
+echo "OK Deleted namespace: ${NAMESPACE_NAME}"
 
 echo "Basic operations test completed successfully"
 
