@@ -124,21 +124,5 @@ To run a specific scenario:
 mvn test -Dtest=ScenarioBasedIT#testScenario[basic-operations]
 ```
 
-## Best Practices
-
-1. **Keep scenarios focused**: Each scenario should test one specific feature or workflow
-2. **Make scripts idempotent**: Scripts should be able to run multiple times
-3. **Clean up resources**: Always clean up namespaces, tables, etc. in the run script
-4. **Use descriptive names**: Scenario directory names should clearly indicate what is being tested
-5. **Document assumptions**: Add comments in scripts about data format expectations
-6. **Avoid hardcoded paths**: Use template variables and environment variables
-7. **Test both success and failure cases**: Create separate scenarios for error conditions
-
-## Example Scenarios
-
-- `basic-operations/` - Tests namespace creation and deletion
-- `insert-scan/` - Tests data insertion and scanning
-- `insert-partitioned/` - Tests partitioned table creation
-
 
 
