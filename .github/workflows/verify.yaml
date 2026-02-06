@@ -19,5 +19,5 @@ jobs:
         run: ./mvnw install
       # TODO: check native-image can build ice
       - name: Run Scenario-Based Integration Tests
-        run: ./mvnw test -Dtest=ScenarioBasedIT
+        run: ../mvnw test -Dtest=ScenarioBasedIT
         working-directory: ice-rest-catalog
