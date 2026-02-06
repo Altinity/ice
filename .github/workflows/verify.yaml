@@ -16,3 +16,5 @@ jobs:
           cache: maven
       - run: ./mvnw clean verify
       # TODO: check native-image can build ice
+      - name: Run Scenario-Based Integration Tests
+        run: ./mvnw test -Dtest=ScenarioBasedIT
