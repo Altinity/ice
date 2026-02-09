@@ -657,5 +657,111 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>native</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>${native.maven.plugin.version}</version>
+            <extensions>true</extensions>
+            <executions>
+              <execution>
+                <id>build-native</id>
+                <goals>
+                  <goal>compile-no-fork</goal>
+                </goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+            <configuration>
+              <imageName>ice</imageName>
+              <mainClass>com.altinity.ice.cli.Main</mainClass>
+              <buildArgs>
+                <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/reflection-config.json</buildArg>
+                <buildArg>--initialize-at-run-time=io.netty</buildArg>
+                <buildArg>--initialize-at-run-time=ch.qos.logback</buildArg>
+                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+              </buildArgs>
+
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>native-amd64-static</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>${native.maven.plugin.version}</version>
+            <extensions>true</extensions>
+            <executions>
+              <execution>
+                <id>build-native</id>
+                <goals>
+                  <goal>compile-no-fork</goal>
+                </goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+            <configuration>
+              <imageName>ice</imageName>
+              <mainClass>com.altinity.ice.cli.Main</mainClass>
+              <buildArgs>
+                <!-- Base configuration -->
+                <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/reflection-config.json</buildArg>
+                <buildArg>--initialize-at-run-time=io.netty</buildArg>
+                <buildArg>--initialize-at-run-time=ch.qos.logback</buildArg>
+                <!-- Static linking with musl for truly standalone binary (amd64 only) -->
+                <buildArg>--static</buildArg>
+                <buildArg>--libc=musl</buildArg>
+                <!-- Additional optimizations -->
+                <buildArg>-H:+RemoveUnusedSymbols</buildArg>
+                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+              </buildArgs>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>native-arm64</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>${native.maven.plugin.version}</version>
+            <extensions>true</extensions>
+            <executions>
+              <execution>
+                <id>build-native</id>
+                <goals>
+                  <goal>compile-no-fork</goal>
+                </goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+            <configuration>
+              <imageName>ice</imageName>
+              <mainClass>com.altinity.ice.cli.Main</mainClass>
+              <buildArgs>
+                <!-- Base configuration -->
+                <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/reflection-config.json</buildArg>
+                <buildArg>--initialize-at-run-time=io.netty</buildArg>
+                <buildArg>--initialize-at-run-time=ch.qos.logback</buildArg>
+                <!-- ARM64 optimizations (no static musl support yet) -->
+                <buildArg>-H:+RemoveUnusedSymbols</buildArg>
+                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+              </buildArgs>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 </project>
