@@ -16,7 +16,7 @@
     <sqlite.version>3.46.1.0</sqlite.version>
     <jetcd.version>0.8.5</jetcd.version>
     <grpc.version>1.70.0</grpc.version>
-    <testcontainers.version>1.20.2</testcontainers.version>
+    <testcontainers.version>1.21.4</testcontainers.version>
   </properties>
 
   <dependencies>
@@ -388,6 +388,12 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
       <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-yaml</artifactId>
+      <version>${jackson.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.etcd</groupId>
