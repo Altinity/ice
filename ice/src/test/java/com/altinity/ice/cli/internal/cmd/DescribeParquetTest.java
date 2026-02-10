@@ -15,7 +15,6 @@ import com.altinity.ice.test.Resource;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
-import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.testng.annotations.Test;
 
 public class DescribeParquetTest {
@@ -27,9 +26,6 @@ public class DescribeParquetTest {
     System.setOut(new PrintStream(outContent));
 
     try {
-      InMemoryCatalog catalog = new InMemoryCatalog();
-      catalog.initialize("test", java.util.Map.of());
-
       var sampleFile =
           Resource.asInputFile("com/altinity/ice/cli/internal/iceberg/parquet/sample-001.parquet");
 

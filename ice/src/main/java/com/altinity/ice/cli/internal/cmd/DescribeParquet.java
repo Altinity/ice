@@ -29,6 +29,7 @@ import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.Type;
 import software.amazon.awssdk.services.s3.internal.crossregion.S3CrossRegionSyncClient;
 import software.amazon.awssdk.utils.Lazy;
+import software.amazon.awssdk.services.s3.S3Client;
 
 public final class DescribeParquet {
 
@@ -50,7 +51,7 @@ public final class DescribeParquet {
       Option... options)
       throws IOException {
 
-    Lazy<software.amazon.awssdk.services.s3.S3Client> s3ClientLazy =
+    Lazy<S3Client> s3ClientLazy =
         new Lazy<>(
             () ->
                 new S3CrossRegionSyncClient(
@@ -61,7 +62,6 @@ public final class DescribeParquet {
   }
 
   public static void run(InputFile inputFile, boolean json, Option... options) throws IOException {
-
     ParquetMetadata metadata = Metadata.read(inputFile);
 
     ParquetInfo info = extractParquetInfo(metadata, options);
