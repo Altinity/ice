@@ -203,7 +203,6 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
 
   @Override
   public List<Namespace> listNamespaces(Namespace namespace) throws NoSuchNamespaceException {
-    validateNamespace(namespace);
     String prefix = namespaceKey(namespace);
     prefix = prefix.endsWith("/") ? prefix : prefix + "/";
     GetResponse res = unwrap(kv.get(byteSeq(prefix), GetOption.builder().isPrefix(true).build()));
@@ -241,11 +240,11 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
 
   @Override
   public boolean dropNamespace(Namespace namespace) throws NamespaceNotEmptyException {
-    validateNamespace(namespace);
     if (!namespaceExists(namespace)) {
       throw new NoSuchNamespaceException("Namespace does not exist: %s", namespace);
     }
-    if (!listNamespaces(namespace).isEmpty() || !listTables(namespace).isEmpty()) {
+    if (!namespace.level(0).isEmpty()
+        && (!listNamespaces(namespace).isEmpty() || !listTables(namespace).isEmpty())) {
       throw new NamespaceNotEmptyException("Cannot drop non-empty namespace: " + namespace);
     }
     // FIXME: child ns/table might have been created since check ^
@@ -336,7 +335,6 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
 
   @Override
   public List<TableIdentifier> listTables(Namespace namespace) {
-    validateNamespace(namespace);
     String prefix = tableKey(namespace);
     prefix = prefix.endsWith("/") ? prefix : prefix + "/";
     GetResponse res = unwrap(kv.get(byteSeq(prefix), GetOption.builder().isPrefix(true).build()));
