@@ -5,7 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/altinity/ice/compare/v0.9.0...master)
+## [Unreleased](https://github.com/altinity/ice/compare/v0.10.1...master)
+
+## [0.12.0](https://github.com/altinity/ice/compare/v0.11.1...v0.12.0)
+
+### Added
+- `ice` - Added drop partition field in alter table.
+
+### Changed
+- `ice` - Logic to throw exception when the user tries to use -force-no-copy for file(row group/block) 
+with multiple partitions.
+- `ice` - User friendly message in REST catalog initialization if server cannot be reached.
+
+### Fixed
+• `ice` - Parquet conversion to iceberg for long data type.
+
+### Documentation
+- Added High level k8s architecture diagram.
+- Documented inserting multiple files (and transaction support).
+
+## [0.11.0](https://github.com/altinity/ice/compare/v0.10.1...v0.11.0)
+
+### Added
+- ice `--files-from` & `--retry-list-exit-code` cli options. 
+
+### Fixed
+- TZ information getting lost when partitioning ([#85](https://github.com/Altinity/ice/issues/85)).
+
+## [0.10.1](https://github.com/altinity/ice/compare/v0.10.0...v0.10.1)
+
+### Fixed
+- Data partitioning based on time/timestamp* columns with millisecond precision. 
+
+## [0.10.0](https://github.com/altinity/ice/compare/v0.9.0...v0.10.0)
+
+### Added
+- `ice --insecure` CLI option.
+
+### Changed
+- `ice describe` output to include `error`(s) when table(s) cannot be read due to the internal server error(s).  
+
+### Fixed
+- ice-rest-catalog/etcd: dropTable failing when table files are missing/corrupted.
 
 ## [0.9.0](https://github.com/altinity/ice/compare/v0.8.1...v0.9.0)
 

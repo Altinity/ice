@@ -29,6 +29,9 @@ public record Config(
         String caCrt,
     @JsonPropertyDescription("Bearer token to authorizer requests with") String bearerToken,
     @JsonPropertyDescription(
+            "Skip SSL certificate verification (WARNING: insecure, use only for development)")
+        Boolean sslVerify,
+    @JsonPropertyDescription(
             "/path/to/dir where to store downloaded files when `ice insert`ing from http:// & https://")
         String httpCacheDir,
     @JsonPropertyDescription("Path to warehouse, e.g. s3://..., file://...") String warehouse,

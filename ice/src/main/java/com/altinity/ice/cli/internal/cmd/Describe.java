@@ -29,6 +29,7 @@ import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.types.Conversions;
@@ -74,42 +75,17 @@ public final class Describe {
         if (targetTable != null && !targetTable.equals(tableId.name())) {
           continue;
         }
-        org.apache.iceberg.Table table = catalog.loadTable(tableId);
-        Snapshot snapshot = table.currentSnapshot();
-        Table.Snapshot snapshotInfo = null;
-        if (snapshot != null) {
-          snapshotInfo =
-              new Table.Snapshot(
-                  snapshot.sequenceNumber(),
-                  snapshot.snapshotId(),
-                  snapshot.parentId(),
-                  snapshot.timestampMillis(),
-                  Instant.ofEpochMilli(snapshot.timestampMillis()).toString(),
-                  Instant.ofEpochMilli(snapshot.timestampMillis())
-                      .atZone(ZoneId.systemDefault())
-                      .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
-                  snapshot.operation(),
-                  snapshot.summary(),
-                  snapshot.manifestListLocation());
+
+        Describe.Table.Data tableData = null;
+        Table.Error tableError = null;
+        try {
+          tableData = gatherTableData(catalog, tableId, optionsSet);
+        } catch (ServiceFailureException e) {
+          tableError = new Table.Error(e.getMessage());
         }
 
-        List<Table.Metrics> metrics = null;
-        if (optionsSet.contains(Option.INCLUDE_METRICS)) {
-          metrics = gatherTableMetrics(table);
-        }
-
-        boolean includeSchema = optionsSet.contains(Option.INCLUDE_SCHEMA);
-        Table.Data tableData =
-            new Table.Data(
-                includeSchema ? table.schema().toString() : null,
-                includeSchema ? table.spec().toString() : null,
-                includeSchema ? table.sortOrder().toString() : null,
-                optionsSet.contains(Option.INCLUDE_PROPERTIES) ? table.properties() : null,
-                table.location(),
-                snapshotInfo,
-                metrics);
-
-        tablesMetadata.add(new Table("Table", new Table.Metadata(tableId.toString()), tableData));
+        tablesMetadata.add(
+            new Table("Table", new Table.Metadata(tableId.toString()), tableData, tableError));
       }
     }
 
@@ -123,6 +99,45 @@ public final class Describe {
       String output = mapper.writeValueAsString(tablesMetadata);
       System.out.println(output);
     }
+  }
+
+  private static Table.Data gatherTableData(
+      RESTCatalog catalog, TableIdentifier tableId, Set<Describe.Option> optionsSet)
+      throws IOException {
+
+    org.apache.iceberg.Table table = catalog.loadTable(tableId);
+    Snapshot snapshot = table.currentSnapshot();
+    Table.Snapshot snapshotInfo = null;
+    if (snapshot != null) {
+      snapshotInfo =
+          new Table.Snapshot(
+              snapshot.sequenceNumber(),
+              snapshot.snapshotId(),
+              snapshot.parentId(),
+              snapshot.timestampMillis(),
+              Instant.ofEpochMilli(snapshot.timestampMillis()).toString(),
+              Instant.ofEpochMilli(snapshot.timestampMillis())
+                  .atZone(ZoneId.systemDefault())
+                  .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+              snapshot.operation(),
+              snapshot.summary(),
+              snapshot.manifestListLocation());
+    }
+
+    List<Table.Metrics> metrics = null;
+    if (optionsSet.contains(Option.INCLUDE_METRICS)) {
+      metrics = gatherTableMetrics(table);
+    }
+
+    boolean includeSchema = optionsSet.contains(Option.INCLUDE_SCHEMA);
+    return new Table.Data(
+        includeSchema ? table.schema().toString() : null,
+        includeSchema ? table.spec().toString() : null,
+        includeSchema ? table.sortOrder().toString() : null,
+        optionsSet.contains(Option.INCLUDE_PROPERTIES) ? table.properties() : null,
+        table.location(),
+        snapshotInfo,
+        metrics);
   }
 
   private static List<Table.Metrics> gatherTableMetrics(org.apache.iceberg.Table table)
@@ -211,7 +226,7 @@ public final class Describe {
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  record Table(String kind, Table.Metadata metadata, Table.Data data) {
+  record Table(String kind, Table.Metadata metadata, Table.Data data, Table.Error error) {
     public Table {
       if (kind == null) {
         kind = "Table";
@@ -219,6 +234,8 @@ public final class Describe {
     }
 
     record Metadata(String id) {}
+
+    record Error(String message) {}
 
     record Data(
         String schemaRaw,

@@ -13,8 +13,10 @@ import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.internal.strings.Strings;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -87,15 +89,8 @@ public final class Input {
         Path dst = Paths.get(httpCachePath, name);
         if (!Files.exists(dst)) {
           createParentDirs(dst.toFile());
-          String tempName = name + "~";
-          Path tmp = Paths.get(httpCachePath, tempName);
-          // Clean up any existing temp file from previous interrupted runs
-          if (Files.exists(tmp)) {
-            Files.delete(tmp);
-          }
-          try (InputStream in = URI.create(s).toURL().openStream()) {
-            Files.copy(in, tmp);
-          }
+          Path tmp = Paths.get(httpCachePath, name + "~");
+          downloadFile(s, tmp);
           Files.move(tmp, dst);
         }
         yield org.apache.iceberg.Files.localInput(dst.toFile());
@@ -116,6 +111,37 @@ public final class Input {
         yield org.apache.iceberg.Files.localInput(p);
       }
     };
+  }
+
+  private static void downloadFile(String url, Path destination) throws IOException {
+    try (HttpClient client =
+        HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build()) {
+      HttpRequest request =
+          HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("User-Agent", "ice-cli/1.0")
+              .GET()
+              .build();
+
+      HttpResponse<Path> response;
+      try {
+        response = client.send(request, HttpResponse.BodyHandlers.ofFile(destination));
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Download interrupted: " + url, e);
+      }
+
+      if (response.statusCode() != 200) {
+        Files.deleteIfExists(destination);
+        throw new IOException("HTTP " + response.statusCode() + " downloading: " + url);
+      }
+
+      long size = Files.size(destination);
+      if (size == 0) {
+        Files.deleteIfExists(destination);
+        throw new IOException("Downloaded file is empty (0 bytes): " + url);
+      }
+    }
   }
 
   // TODO: just use guava
