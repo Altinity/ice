@@ -17,6 +17,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -73,7 +74,7 @@ public final class DescribeParquet {
   }
 
   private static ParquetInfo extractParquetInfo(ParquetMetadata metadata, Option... options) {
-    var optionsSet = java.util.Set.of(options);
+    var optionsSet = Set.of(options);
     boolean includeAll = optionsSet.contains(Option.ALL);
 
     FileMetaData fileMetadata = metadata.getFileMetaData();

@@ -182,7 +182,7 @@ public final class Main {
       throws IOException {
     setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog()) {
-      var options = new java.util.ArrayList<DescribeParquet.Option>();
+      var options = new ArrayList<DescribeParquet.Option>();
       if (showAll || showSummary) {
         options.add(DescribeParquet.Option.SUMMARY);
       }
