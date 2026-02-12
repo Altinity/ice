@@ -12,14 +12,6 @@ echo "Running basic operations test..."
 
 SCENARIO_DIR="{{SCENARIO_DIR}}"
 INPUT_PATH="${SCENARIO_DIR}/${INPUT_FILE}"
-# Use parquet from insert-scan scenario if not present here
-if [ ! -f "${INPUT_PATH}" ]; then
-  INPUT_PATH="${SCENARIO_DIR}/../insert-scan/${INPUT_FILE}"
-fi
-if [ ! -f "${INPUT_PATH}" ]; then
-  echo "No input parquet found (set INPUT_FILE or add input.parquet to scenario)"
-  exit 1
-fi
 
 # Create namespace via CLI
 {{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}

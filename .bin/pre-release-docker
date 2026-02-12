@@ -8,6 +8,11 @@ export SKIP_VERIFY=1
 
 export PATH="$(pwd)/.bin:$PATH"
 
+echo >&2 'Building ice Docker image'
+docker-build-ice
+echo >&2 'Building ice-rest-catalog Docker image'
+docker-build-ice-rest-catalog
+
 echo >&2 'Pushing ice Docker image'
 docker-build-ice --push
 echo >&2 'Pushing ice-rest-catalog Docker image'

@@ -32,26 +32,6 @@ env:
   NAMESPACE_NAME: "test_ns"
   TABLE_NAME: "test_ns.table1"
   INPUT_FILE: "input.parquet"
-
-# Optional: Cloud resources needed (for future provisioning)
-cloudResources:
-  s3:
-    buckets:
-      - "test-bucket"
-  sqs:
-    queues:
-      - "test-queue"
-
-# Optional: Test execution phases
-phases:
-  - name: "setup"
-    description: "Initialize resources"
-  - name: "run"
-    description: "Execute main test logic"
-  - name: "verify"
-    description: "Verify results"
-  - name: "cleanup"
-    description: "Clean up resources"
 ```
 
 ## Script Templates

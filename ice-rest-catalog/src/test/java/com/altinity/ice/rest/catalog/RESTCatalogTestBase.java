@@ -14,7 +14,12 @@ import static com.altinity.ice.rest.catalog.Main.createServer;
 import com.altinity.ice.rest.catalog.internal.config.Config;
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.catalog.Catalog;
 import org.eclipse.jetty.server.Server;
@@ -23,6 +28,8 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
+import org.testng.annotations.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -151,5 +158,95 @@ public abstract class RESTCatalogTestBase {
   /** Get the REST catalog URI */
   protected String getCatalogUri() {
     return "http://localhost:8080";
+  }
+
+  /**
+   * Get the path to the scenarios directory.
+   *
+   * @return Path to scenarios directory
+   * @throws URISyntaxException If the resource URL cannot be converted to a path
+   */
+  protected Path getScenariosDirectory() throws URISyntaxException {
+    URL scenariosUrl = getClass().getClassLoader().getResource("scenarios");
+    if (scenariosUrl == null) {
+      return Paths.get("src/test/resources/scenarios");
+    }
+    return Paths.get(scenariosUrl.toURI());
+  }
+
+  /**
+   * Create a ScenarioTestRunner for the given scenario. Subclasses provide host or container-based
+   * CLI and config.
+   *
+   * @param scenarioName Name of the scenario (e.g. for container path resolution)
+   * @return Configured ScenarioTestRunner
+   * @throws Exception If there's an error creating the runner
+   */
+  protected abstract ScenarioTestRunner createScenarioRunner(String scenarioName) throws Exception;
+
+  /** Data provider that discovers all test scenarios. */
+  @DataProvider(name = "scenarios")
+  public Object[][] scenarioProvider() throws Exception {
+    Path scenariosDir = getScenariosDirectory();
+    ScenarioTestRunner runner = new ScenarioTestRunner(scenariosDir, Map.of());
+    List<String> scenarios = runner.discoverScenarios();
+
+    if (scenarios.isEmpty()) {
+      logger.warn("No test scenarios found in: {}", scenariosDir);
+      return new Object[0][0];
+    }
+
+    logger.info("Discovered {} test scenario(s): {}", scenarios.size(), scenarios);
+
+    Object[][] data = new Object[scenarios.size()][1];
+    for (int i = 0; i < scenarios.size(); i++) {
+      data[i][0] = scenarios.get(i);
+    }
+    return data;
+  }
+
+  /** Parameterized test that executes a single scenario. */
+  @Test(dataProvider = "scenarios")
+  public void testScenario(String scenarioName) throws Exception {
+    logger.info("====== Starting scenario test: {} ======", scenarioName);
+
+    ScenarioTestRunner runner = createScenarioRunner(scenarioName);
+    ScenarioTestRunner.ScenarioResult result = runner.executeScenario(scenarioName);
+
+    if (result.runScriptResult() != null) {
+      logger.info("Run script exit code: {}", result.runScriptResult().exitCode());
+    }
+    if (result.verifyScriptResult() != null) {
+      logger.info("Verify script exit code: {}", result.verifyScriptResult().exitCode());
+    }
+
+    assertScenarioSuccess(scenarioName, result);
+    logger.info("====== Scenario test passed: {} ======", scenarioName);
+  }
+
+  /** Assert that the scenario result indicates success; otherwise throw AssertionError. */
+  protected void assertScenarioSuccess(
+      String scenarioName, ScenarioTestRunner.ScenarioResult result) {
+    if (result.isSuccess()) {
+      return;
+    }
+    StringBuilder errorMessage = new StringBuilder();
+    errorMessage.append("Scenario '").append(scenarioName).append("' failed:\n");
+
+    if (result.runScriptResult() != null && result.runScriptResult().exitCode() != 0) {
+      errorMessage.append("\nRun script failed with exit code: ");
+      errorMessage.append(result.runScriptResult().exitCode());
+      errorMessage.append("\nStdout:\n").append(result.runScriptResult().stdout());
+      errorMessage.append("\nStderr:\n").append(result.runScriptResult().stderr());
+    }
+
+    if (result.verifyScriptResult() != null && result.verifyScriptResult().exitCode() != 0) {
+      errorMessage.append("\nVerify script failed with exit code: ");
+      errorMessage.append(result.verifyScriptResult().exitCode());
+      errorMessage.append("\nStdout:\n").append(result.verifyScriptResult().stdout());
+      errorMessage.append("\nStderr:\n").append(result.verifyScriptResult().stderr());
+    }
+
+    throw new AssertionError(errorMessage.toString());
   }
 }
