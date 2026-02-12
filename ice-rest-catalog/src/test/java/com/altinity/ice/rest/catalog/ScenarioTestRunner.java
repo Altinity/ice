@@ -105,7 +105,9 @@ public class ScenarioTestRunner {
 
     // Build template variables map
     Map<String, String> templateVars = new HashMap<>(globalTemplateVars);
-    templateVars.put("SCENARIO_DIR", scenarioDir.toAbsolutePath().toString());
+    if (!templateVars.containsKey("SCENARIO_DIR")) {
+      templateVars.put("SCENARIO_DIR", scenarioDir.toAbsolutePath().toString());
+    }
 
     // Add environment variables from scenario config
     if (config.env() != null) {

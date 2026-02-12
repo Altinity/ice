@@ -17,22 +17,3 @@ env:
   # Optional: set MC_ALIAS (e.g. "minio") to run --no-copy test; requires mc configured for MinIO
   # MC_ALIAS: "minio"
 
-# Cloud resources needed for this scenario (future use for provisioning)
-cloudResources:
-  s3:
-    buckets:
-      - "test-bucket"
-
-# Test phases
-phases:
-  - name: "setup"
-    description: "Create namespace"
-  - name: "verify"
-    description: "Verify namespace exists and can be deleted"
-  - name: "cleanup"
-    description: "Delete namespace"
-
-
-
-
-

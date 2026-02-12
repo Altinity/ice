@@ -9,7 +9,6 @@
  */
 package com.altinity.ice.rest.catalog;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -18,20 +17,7 @@ import java.util.Map;
  * <p>This class uses Jackson/SnakeYAML annotations for YAML deserialization.
  */
 public record ScenarioConfig(
-    String name,
-    String description,
-    CatalogConfig catalogConfig,
-    Map<String, String> env,
-    CloudResources cloudResources,
-    List<Phase> phases) {
+    String name, String description, CatalogConfig catalogConfig, Map<String, String> env) {
 
   public record CatalogConfig(String warehouse, String name, String uri) {}
-
-  public record CloudResources(S3Resources s3, SqsResources sqs) {}
-
-  public record S3Resources(List<String> buckets) {}
-
-  public record SqsResources(List<String> queues) {}
-
-  public record Phase(String name, String description) {}
 }

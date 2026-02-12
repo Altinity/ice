@@ -1,0 +1,12 @@
+uri: "jdbc:sqlite::memory:"
+warehouse: "s3://test-bucket/warehouse"
+s3:
+  endpoint: "http://minio:9000"
+  pathStyleAccess: true
+  accessKeyID: "minioadmin"
+  secretAccessKey: "minioadmin"
+  region: "us-east-1"
+anonymousAccess:
+  enabled: true
+  accessConfig:
+    readOnly: false

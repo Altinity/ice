@@ -9,20 +9,3 @@ env:
   TABLE_NAME: "test_scan.users"
   INPUT_FILE: "input.parquet"
 
-cloudResources:
-  s3:
-    buckets:
-      - "test-bucket"
-
-phases:
-  - name: "setup"
-    description: "Create namespace and table with data"
-  - name: "verify"
-    description: "Scan table and verify data"
-  - name: "cleanup"
-    description: "Delete table and namespace"
-
-
-
-
-
