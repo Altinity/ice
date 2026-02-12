@@ -15,9 +15,23 @@ jobs:
           distribution: 'graalvm'
           cache: maven
       - run: ./mvnw clean verify
-      - name: Install 
+      - name: Install
         run: ./mvnw install
       # TODO: check native-image can build ice
       - name: Run Scenario-Based Integration Tests
         run: ../mvnw test -Dtest=ScenarioBasedIT
         working-directory: ice-rest-catalog
+      - name: Build Docker images
+        run: |
+          export VERSION=0.0.0-latest-master+$(git rev-parse --short HEAD)
+          export IMAGE_TAG="latest-master"
+          export SKIP_VERIFY=1
+          export PATH="$(pwd)/.bin:$PATH"
+          docker-build-ice
+          docker-build-ice-rest-catalog
+      - name: Run Docker integration tests
+        run: >
+          ./mvnw -pl ice-rest-catalog install -Dmaven.test.skip=true -Pno-check &&
+          ./mvnw -pl ice-rest-catalog failsafe:integration-test failsafe:verify
+          -Dit.test=DockerScenarioBasedIT
+          -Ddocker.image=altinity/ice-rest-catalog:debug-with-ice-latest-master-amd64

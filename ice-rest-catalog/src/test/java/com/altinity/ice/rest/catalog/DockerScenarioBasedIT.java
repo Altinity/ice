@@ -10,8 +10,11 @@
 package com.altinity.ice.rest.catalog;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import org.testcontainers.containers.GenericContainer;
@@ -20,6 +23,11 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.MountableFile;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 
 /**
  * Docker-based integration tests for ICE REST Catalog.
@@ -37,6 +45,7 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
 
   @Override
   @BeforeClass
+  @SuppressWarnings("resource")
   public void setUp() throws Exception {
     String dockerImage =
         System.getProperty("docker.image", "altinity/ice-rest-catalog:debug-with-ice-0.12.0");
@@ -59,39 +68,28 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
     // Create test bucket via MinIO's host-mapped port
     String minioHostEndpoint = "http://" + minio.getHost() + ":" + minio.getMappedPort(9000);
     try (var s3Client =
-        software.amazon.awssdk.services.s3.S3Client.builder()
-            .endpointOverride(java.net.URI.create(minioHostEndpoint))
-            .region(software.amazon.awssdk.regions.Region.US_EAST_1)
+        S3Client.builder()
+            .endpointOverride(URI.create(minioHostEndpoint))
+            .region(Region.US_EAST_1)
             .credentialsProvider(
-                software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(
-                    software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create(
+                StaticCredentialsProvider.create(
+                    AwsBasicCredentials.create(
                         "minioadmin", "minioadmin")))
             .forcePathStyle(true)
             .build()) {
       s3Client.createBucket(
-          software.amazon.awssdk.services.s3.model.CreateBucketRequest.builder()
+          CreateBucketRequest.builder()
               .bucket("test-bucket")
               .build());
       logger.info("Created test-bucket in MinIO");
     }
 
-    // Build YAML config for the catalog container (using the Docker network alias for MinIO)
-    String catalogConfig =
-        String.join(
-            "\n",
-            "uri: \"jdbc:sqlite::memory:\"",
-            "warehouse: \"s3://test-bucket/warehouse\"",
-            "s3:",
-            "  endpoint: \"http://minio:9000\"",
-            "  pathStyleAccess: true",
-            "  accessKeyID: \"minioadmin\"",
-            "  secretAccessKey: \"minioadmin\"",
-            "  region: \"us-east-1\"",
-            "anonymousAccess:",
-            "  enabled: true",
-            "  accessConfig:",
-            "    readOnly: false",
-            "");
+    // Load YAML config for the catalog container (MinIO via Docker network alias "minio")
+    URL configResource = getClass().getClassLoader().getResource("docker-catalog-config.yaml");
+    if (configResource == null) {
+      throw new IllegalStateException("docker-catalog-config.yaml not found on classpath");
+    }
+    String catalogConfig = Files.readString(Paths.get(configResource.toURI()));
 
     Path scenariosDir = getScenariosDirectory().toAbsolutePath();
     if (!Files.exists(scenariosDir) || !Files.isDirectory(scenariosDir)) {
@@ -109,16 +107,17 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
     }
 
     // Start the ice-rest-catalog container (debug-with-ice has ice CLI at /usr/local/bin/ice)
-    GenericContainer<?> catalogContainer =
+    catalog =
         new GenericContainer<>(dockerImage)
             .withNetwork(network)
             .withExposedPorts(5000)
             .withEnv("ICE_REST_CATALOG_CONFIG", "")
             .withEnv("ICE_REST_CATALOG_CONFIG_YAML", catalogConfig)
-            .withFileSystemBind(scenariosDir.toString(), "/scenarios")
+            .withCopyFileToContainer(
+                MountableFile.forHostPath(scenariosDir),
+                "/scenarios")
             .waitingFor(Wait.forHttp("/v1/config").forPort(5000).forStatusCode(200));
 
-    catalog = catalogContainer;
     try {
       catalog.start();
     } catch (Exception e) {
@@ -145,11 +144,11 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
   @Override
   @AfterClass
   public void tearDown() {
-    if (catalog != null && catalog.isRunning()) {
-      catalog.stop();
+    if (catalog != null) {
+      catalog.close();
     }
-    if (minio != null && minio.isRunning()) {
-      minio.stop();
+    if (minio != null) {
+      minio.close();
     }
     if (network != null) {
       network.close();
