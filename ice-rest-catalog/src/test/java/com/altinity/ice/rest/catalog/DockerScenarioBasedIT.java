@@ -73,14 +73,10 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
             .region(Region.US_EAST_1)
             .credentialsProvider(
                 StaticCredentialsProvider.create(
-                    AwsBasicCredentials.create(
-                        "minioadmin", "minioadmin")))
+                    AwsBasicCredentials.create("minioadmin", "minioadmin")))
             .forcePathStyle(true)
             .build()) {
-      s3Client.createBucket(
-          CreateBucketRequest.builder()
-              .bucket("test-bucket")
-              .build());
+      s3Client.createBucket(CreateBucketRequest.builder().bucket("test-bucket").build());
       logger.info("Created test-bucket in MinIO");
     }
 
@@ -113,9 +109,7 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
             .withExposedPorts(5000)
             .withEnv("ICE_REST_CATALOG_CONFIG", "")
             .withEnv("ICE_REST_CATALOG_CONFIG_YAML", catalogConfig)
-            .withCopyFileToContainer(
-                MountableFile.forHostPath(scenariosDir),
-                "/scenarios")
+            .withCopyFileToContainer(MountableFile.forHostPath(scenariosDir), "/scenarios")
             .waitingFor(Wait.forHttp("/v1/config").forPort(5000).forStatusCode(200));
 
     try {
