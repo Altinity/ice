@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+
+echo "Running empty namespace test..."
+
+for namespace in $INVALID_NAMESPACES; do
+  if ! {{ICE_CLI}} -c {{CLI_CONFIG}} create-namespace "$namespace"; then
+    echo "OK create-namespace failed as expected"
+  else
+    echo "FAIL create-namespace should have failed with invalid namespace: $namespace"
+    exit 1
+  fi
+done
+
+namespaces=$(curl {{CATALOG_URI}}/v1/namespaces)
+expected='{"namespaces":[],"next-page-token":null}'
+
+if [ "$namespaces" == "$expected" ]; then
+  echo "OK list of namespaces is empty"
+else
+  echo "FAIL list of namespaces is not empty: $namespaces"
+  exit 1
+fi

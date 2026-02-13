@@ -1,0 +1,6 @@
+name: "Empty Namespace Creation"
+description: "Ensures empty namespaces cannot be created"
+
+env:
+  # space-separate list of namespaces that should cause an error with create-namespace
+  INVALID_NAMESPACES: ".. .test .a. a..b"
