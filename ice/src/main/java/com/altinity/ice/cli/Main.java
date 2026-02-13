@@ -635,6 +635,9 @@ public final class Main {
               "Invalid namespace name: '.' cannot separate empty names");
         }
       }
+      if (split.length == 0) {
+        throw new IllegalArgumentException("Invalid namespace name: name cannot be empty");
+      }
 
       CreateNamespace.run(catalog, Namespace.of(split), createNamespaceIfNotExists);
     }
