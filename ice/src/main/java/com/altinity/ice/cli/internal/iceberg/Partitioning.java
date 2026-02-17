@@ -387,6 +387,9 @@ public final class Partitioning {
     if (transform.isIdentity() || !(value instanceof String s)) {
       return null;
     }
+    if (s.isEmpty()) {
+      return null;
+    }
 
     Type sourceType = table.schema().findType(partitionField.sourceId());
     if (!(sourceType instanceof Types.TimestampType)) {
