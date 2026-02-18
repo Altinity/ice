@@ -49,6 +49,13 @@ public final class Partitioning {
 
   private Partitioning() {}
 
+  public record InferPartitionKeyResult(
+      @Nullable PartitionKey partitionKey, @Nullable String failureReason) {
+    public boolean success() {
+      return partitionKey != null;
+    }
+  }
+
   public static PartitionSpec newPartitionSpec(Schema schema, List<Main.IcePartition> columns) {
     final PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
     if (!columns.isEmpty()) {
@@ -123,7 +130,7 @@ public final class Partitioning {
   }
 
   // TODO: fall back to path when statistics is not available
-  public static @Nullable PartitionKey inferPartitionKey(
+  public static InferPartitionKeyResult inferPartitionKey(
       ParquetMetadata metadata, PartitionSpec spec) {
     Schema schema = spec.schema();
 
@@ -138,28 +145,34 @@ public final class Partitioning {
 
       Object value = null;
       Object valueTransformed = null;
-      boolean same = true;
+      String failureReason = null;
 
       for (BlockMetaData block : blocks) {
-        Statistics<?> stats =
+        ColumnChunkMetaData columnMeta =
             block.getColumns().stream()
                 .filter(c -> c.getPath().toDotString().equals(sourceName))
                 .findFirst()
-                .map(ColumnChunkMetaData::getStatistics)
                 .orElse(null);
+
+        if (columnMeta == null) {
+          failureReason = String.format("Column '%s' not found in file metadata", sourceName);
+          break;
+        }
+
+        Statistics<?> stats = columnMeta.getStatistics();
 
         if (stats == null
             || !stats.hasNonNullValue()
             || stats.genericGetMin() == null
             || stats.genericGetMax() == null) {
-          same = false;
+          failureReason = String.format("Column '%s' has no statistics", sourceName);
           break;
         }
 
         Transform<Object, Object> transform = (Transform<Object, Object>) field.transform();
         SerializableFunction<Object, Object> boundTransform = transform.bind(type);
 
-        PrimitiveType parquetType = stats.type();
+        PrimitiveType parquetType = columnMeta.getPrimitiveType();
 
         Comparable<?> parquetMin = stats.genericGetMin();
         var min = fromParquetPrimitive(type, parquetType, parquetMin);
@@ -170,7 +183,10 @@ public final class Partitioning {
         Object maxTransformed = boundTransform.apply(max);
 
         if (!minTransformed.equals(maxTransformed)) {
-          same = false;
+          failureReason =
+              String.format(
+                  "File contains multiple partition values for '%s' (min: %s, max: %s)",
+                  sourceName, minTransformed, maxTransformed);
           break;
         }
 
@@ -178,21 +194,24 @@ public final class Partitioning {
           valueTransformed = minTransformed;
           value = min;
         } else if (!valueTransformed.equals(minTransformed)) {
-          same = false;
+          failureReason =
+              String.format(
+                  "File contains multiple partition values for '%s' (e.g., %s and %s)",
+                  sourceName, valueTransformed, minTransformed);
           break;
         }
       }
 
-      if (same && value != null) {
+      if (failureReason == null && value != null) {
         partitionRecord.setField(sourceName, decodeStatValue(value, type));
       } else {
-        return null;
+        return new InferPartitionKeyResult(null, failureReason);
       }
     }
 
     PartitionKey partitionKey = new PartitionKey(spec, schema);
     partitionKey.wrap(partitionRecord);
-    return partitionKey;
+    return new InferPartitionKeyResult(partitionKey, null);
   }
 
   // Copied from org.apache.iceberg.parquet.ParquetConversions.

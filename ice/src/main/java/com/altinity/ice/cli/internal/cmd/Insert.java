@@ -92,13 +92,20 @@ public final class Insert {
 
   private Insert() {}
 
+  public record Result(int totalNumberOfFiles, int numberOfFilesFailedToInsert) {
+
+    public boolean ok() {
+      return numberOfFilesFailedToInsert == 0;
+    }
+  }
+
   // TODO: refactor
-  public static void run(
+  public static Result run(
       RESTCatalog catalog, TableIdentifier nsTable, String[] files, Options options)
       throws NoSuchTableException, IOException, InterruptedException {
     if (files.length == 0) {
       // no work to be done
-      return;
+      return new Result(0, 0);
     }
 
     Table table = catalog.loadTable(nsTable);
@@ -169,6 +176,7 @@ public final class Insert {
 
           int numThreads = Math.min(options.threadCount(), filesExpanded.size());
           ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+          int failed = 0;
           try {
             var futures = new ArrayList<Future<List<DataFile>>>();
             for (final String file : filesExpanded) {
@@ -218,6 +226,7 @@ public final class Insert {
                   appendOp.appendFile(df); // Only main thread appends now
                 }
               } catch (ExecutionException e) {
+                failed++;
                 if (retryLog == null) {
                   throw new IOException("Error processing file(s)", e.getCause());
                 }
@@ -245,6 +254,8 @@ public final class Insert {
           } else {
             logger.warn("Table commit skipped (--no-commit)");
           }
+
+          return new Result(filesExpanded.size(), failed);
         }
       } finally {
         if (s3ClientLazy.hasValue()) {
@@ -412,17 +423,20 @@ public final class Insert {
 
     PartitionKey partitionKey = null;
     if (partitionSpec.isPartitioned()) {
-      partitionKey = Partitioning.inferPartitionKey(metadata, partitionSpec);
-      if (partitionKey == null) {
+      var inferResult = Partitioning.inferPartitionKey(metadata, partitionSpec);
+      if (!inferResult.success()) {
         if (options.noCopy || options.s3CopyObject) {
           throw new BadRequestException(
               String.format(
-                  "Cannot infer partition key of %s from the metadata", inputFile.location()));
+                  "%s: %s. In no-copy mode, each file must contain data for only one partition value",
+                  inputFile.location(), inferResult.failureReason()));
         }
         logger.warn(
-            "{} does not appear to be partitioned. Falling back to full scan (slow)",
-            inputFile.location());
+            "{}: {}. Falling back to full scan (slow)",
+            inputFile.location(),
+            inferResult.failureReason());
       } else {
+        partitionKey = inferResult.partitionKey();
         logger.info("{}: using inferred partition key {}", file, partitionKey);
       }
     }

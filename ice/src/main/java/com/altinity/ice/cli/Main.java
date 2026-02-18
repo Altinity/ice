@@ -18,6 +18,7 @@ import com.altinity.ice.cli.internal.cmd.Delete;
 import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
+import com.altinity.ice.cli.internal.cmd.DescribeParquet;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
 import com.altinity.ice.cli.internal.cmd.Scan;
@@ -41,6 +42,7 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.apache.curator.shaded.com.google.common.net.HostAndPort;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -141,6 +143,68 @@ public final class Main {
     }
   }
 
+  @CommandLine.Command(name = "describe-parquet", description = "Describe parquet file metadata.")
+  void describeParquet(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<target>",
+              description = "Path to parquet file")
+          String target,
+      @CommandLine.Option(
+              names = {"-a", "--all"},
+              description = "Show everything")
+          boolean showAll,
+      @CommandLine.Option(
+              names = {"-s", "--summary"},
+              description = "Show size, rows, number of row groups, size, compress_size, etc.")
+          boolean showSummary,
+      @CommandLine.Option(
+              names = {"--columns"},
+              description = "Show columns")
+          boolean showColumns,
+      @CommandLine.Option(
+              names = {"-r", "--row-groups"},
+              description = "Show row groups")
+          boolean showRowGroups,
+      @CommandLine.Option(
+              names = {"-d", "--row-group-details"},
+              description = "Show column stats within row group")
+          boolean showRowGroupDetails,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json,
+      @CommandLine.Option(names = {"--s3-region"}) String s3Region,
+      @CommandLine.Option(
+              names = {"--s3-no-sign-request"},
+              description = "Access S3 files without authentication")
+          boolean s3NoSignRequest)
+      throws IOException {
+    setAWSRegion(s3Region);
+    try (RESTCatalog catalog = loadCatalog()) {
+      var options = new ArrayList<DescribeParquet.Option>();
+      if (showAll || showSummary) {
+        options.add(DescribeParquet.Option.SUMMARY);
+      }
+      if (showAll || showColumns) {
+        options.add(DescribeParquet.Option.COLUMNS);
+      }
+      if (showAll || showRowGroups) {
+        options.add(DescribeParquet.Option.ROW_GROUPS);
+      }
+      if (showAll || showRowGroupDetails) {
+        options.add(DescribeParquet.Option.ROW_GROUP_DETAILS);
+      }
+
+      if (options.isEmpty()) {
+        options.add(DescribeParquet.Option.SUMMARY);
+      }
+
+      DescribeParquet.run(
+          catalog, target, json, s3NoSignRequest, options.toArray(new DescribeParquet.Option[0]));
+    }
+  }
+
   public record IceSortOrder(
       @JsonProperty("column") String column,
       @JsonProperty("desc") boolean desc,
@@ -238,12 +302,13 @@ public final class Main {
                   e.g. [{"op":"drop_column","name":"foo"}]
 
                   Supported operations:
-                    - add_column      (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional))
-                    - alter_column    (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types))
-                    - rename_column   (params: "name", "new_name")
-                    - drop_column     (params: "name")
-                    - set_tblproperty (params: "key", "value" (set to null to remove table property))
-                    - rename_to       (params: "new_name")
+                    - add_column           (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional))
+                    - alter_column         (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types))
+                    - rename_column        (params: "name", "new_name")
+                    - drop_column          (params: "name")
+                    - set_tblproperty      (params: "key", "value" (set to null to remove table property))
+                    - rename_to            (params: "new_name")
+                    - drop_partition_field (params: "name")
                   """)
           String updatesJson)
       throws IOException {
@@ -268,10 +333,15 @@ public final class Main {
               description = "Create table if not exists")
           boolean createTableIfNotExists,
       @CommandLine.Parameters(
-              arity = "1..*",
+              arity = "0..*",
               paramLabel = "<files>",
               description = "/path/to/file.parquet")
-          String[] dataFiles,
+          String[] files,
+      @CommandLine.Option(
+              names = "--files-from",
+              description =
+                  "Read list of parquet files from the specified file (one file per line)")
+          String filesFrom,
       @CommandLine.Option(
               names = "--no-copy",
               description = "Add files to catalog without copying them")
@@ -320,6 +390,11 @@ public final class Main {
                       + " (useful for retrying partially failed insert using `cat ice.retry | ice insert - --retry-list=ice.retry`)")
           String retryList,
       @CommandLine.Option(
+              names = {"--retry-list-exit-code"},
+              description =
+                  "Exit code to return when insert produces non-empty --retry-list file (default: 0)")
+          int retryListExitCode,
+      @CommandLine.Option(
               names = {"--partition"},
               description =
                   "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
@@ -360,11 +435,27 @@ public final class Main {
       throw new UnsupportedOperationException(
           "--s3-no-sign-request + --s3-copy-object is not supported by AWS (see --help for details)");
     }
+    boolean filesSet = files != null && files.length > 0;
+    boolean filesFromSet = !Strings.isNullOrEmpty(filesFrom);
+    if (!filesSet && !filesFromSet) {
+      throw new IllegalArgumentException(
+          "At least one <files> argument or --files-from is required");
+    }
+    if (filesSet && filesFromSet) {
+      throw new IllegalArgumentException(
+          "<files> arguments and --files-from are mutually exclusive");
+    }
     setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog()) {
-      if (dataFiles.length == 1 && "-".equals(dataFiles[0])) {
-        dataFiles = readInput().toArray(new String[0]);
-        if (dataFiles.length == 0) {
+      if (filesFromSet) {
+        files = readInputFromFile(filesFrom).toArray(new String[0]);
+        if (files.length == 0) {
+          logger.info("Nothing to insert (file empty)");
+          return;
+        }
+      } else if (files.length == 1 && "-".equals(files[0])) {
+        files = readInput().toArray(new String[0]);
+        if (files.length == 0) {
           logger.info("Nothing to insert (stdin empty)");
           return;
         }
@@ -391,7 +482,7 @@ public final class Main {
         CreateTable.run(
             catalog,
             tableId,
-            dataFiles[0],
+            files[0],
             null,
             createTableIfNotExists,
             useVendedCredentials,
@@ -422,7 +513,15 @@ public final class Main {
               .build();
 
       if (!watchMode) {
-        Insert.run(catalog, tableId, dataFiles, options);
+        Insert.Result result = Insert.run(catalog, tableId, files, options);
+        if (!result.ok()) {
+          logger.error(
+              "{}/{} file(s) failed to insert (see {})",
+              result.totalNumberOfFiles(),
+              result.numberOfFilesFailedToInsert(),
+              retryList);
+          System.exit(retryListExitCode);
+        }
       } else {
         boolean metricsEnabled = false;
         if (!Strings.isNullOrEmpty(watchDebugAddr)) {
@@ -441,15 +540,8 @@ public final class Main {
         }
 
         InsertWatch.run(
-            catalog,
-            tableId,
-            dataFiles,
-            watch,
-            watchEndpoint,
-            watchFireOnce,
-            createTableIfNotExists,
-            options,
-            metricsEnabled);
+            catalog, tableId, files, watch, watchFireOnce, createTableIfNotExists, options,
+          metricsEnabled);
       }
     }
   }
@@ -464,6 +556,19 @@ public final class Main {
   private static List<String> readInput() {
     List<String> r = new ArrayList<>();
     try (Scanner scanner = new Scanner(System.in)) {
+      while (scanner.hasNextLine()) {
+        String line = scanner.nextLine();
+        if (!line.isBlank()) {
+          r.add(line);
+        }
+      }
+    }
+    return r;
+  }
+
+  private static List<String> readInputFromFile(String filePath) throws IOException {
+    List<String> r = new ArrayList<>();
+    try (Scanner scanner = new Scanner(new java.io.File(filePath))) {
       while (scanner.hasNextLine()) {
         String line = scanner.nextLine();
         if (!line.isBlank()) {
@@ -640,7 +745,18 @@ public final class Main {
                         : e.getKey())
             .sorted()
             .collect(Collectors.joining(", ")));
-    catalog.initialize("default", icebergConfig);
+    String catalogUri = icebergConfig.get(CatalogProperties.URI);
+    try {
+      catalog.initialize("default", icebergConfig);
+    } catch (org.apache.iceberg.exceptions.RESTException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to connect to REST catalog at '%s'. "
+                  + "Please check that the catalog server is running and the URL is correct. "
+                  + "Configure via: .ice.yaml 'uri' field, ICE_URI env var, or --config flag.",
+              catalogUri),
+          e);
+    }
     return catalog;
   }
 

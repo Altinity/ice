@@ -1,0 +1,19 @@
+name: "Basic Catalog Operations"
+description: "Tests fundamental catalog operations like namespace and table management"
+
+# Configuration for ICE REST catalog server (optional overrides from defaults)
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+# Environment variables that will be available to scripts
+env:
+  NAMESPACE_NAME: "test_ns"
+  INPUT_FILE: "input.parquet"
+  TABLE_IRIS: "test_ns.iris"
+  TABLE_PARTITIONED: "test_ns.taxis_p_by_day"
+  TABLE_SORTED: "test_ns.taxis_s_by_day"
+  TABLE_NO_COPY: "test_ns.iris_no_copy"
+  S3_BUCKET: "test-bucket"
+  # Optional: set MC_ALIAS (e.g. "minio") to run --no-copy test; requires mc configured for MinIO
+  # MC_ALIAS: "minio"
+

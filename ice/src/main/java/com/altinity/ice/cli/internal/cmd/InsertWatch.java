@@ -9,13 +9,11 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
-import com.altinity.ice.cli.internal.metrics.InsertWatchMetrics;
 import com.altinity.ice.internal.io.Matcher;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -165,10 +163,17 @@ public class InsertWatch {
             logger.info("Inserting {}", insertBatch);
 
             try {
-              Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
+              Insert.Result result =
+                  Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
               if (metrics != null) {
                 metrics.recordFilesInserted(tableLabel, queueLabel, queueType, insertBatch.size());
                 metrics.recordTransactionSuccess(tableLabel, queueLabel, queueType);
+              }
+              if (!result.ok()) {
+                logger.warn(
+                    "{}/{} file(s) failed to insert in this batch",
+                    result.totalNumberOfFiles(),
+                    result.numberOfFilesFailedToInsert());
               }
             } catch (NoSuchTableException e) {
               if (!createTableIfNotExists) {

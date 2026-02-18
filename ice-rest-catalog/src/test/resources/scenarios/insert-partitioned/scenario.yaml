@@ -1,0 +1,12 @@
+name: "Insert with Partitioning"
+description: "Tests inserting data with partitioning specifications"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_insert_partitioned"
+  TABLE_NAME: "test_insert_partitioned.iris_partitioned"
+  INPUT_FILE: "input.parquet"
+  PARTITION_SPEC: '[{"column":"variety","transform":"identity"}]'
+

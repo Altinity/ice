@@ -1,0 +1,3 @@
+<clickhouse replace="true">
+    <timezone>America/Chicago</timezone>
+</clickhouse>
