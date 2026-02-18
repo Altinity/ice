@@ -15,4 +15,45 @@ jobs:
           distribution: 'graalvm'
           cache: maven
       - run: ./mvnw clean verify
+      - name: Install
+        run: ./mvnw install
       # TODO: check native-image can build ice
+      - name: Run Scenario-Based Integration Tests
+        run: ../mvnw test -Dtest=ScenarioBasedIT
+        working-directory: ice-rest-catalog
+  docker-integration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # https://github.com/docker/setup-buildx-action
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@ce5fd131e371ffcdd7508b478cb223b3511a9183
+      - name: regctl login
+        uses: regclient/actions/regctl-login@ce5fd131e371ffcdd7508b478cb223b3511a9183
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'graalvm'
+          cache: maven
+      - name: Build Docker images
+        run: |
+          export VERSION=0.0.0-latest-master+$(git rev-parse --short HEAD)
+          export IMAGE_TAG="latest-master"
+          export SKIP_VERIFY=1
+          export PATH="$(pwd)/.bin:$PATH"
+          docker-build-ice
+          docker-build-ice-rest-catalog
+      - name: Run Docker integration tests
+        run: >
+          ./mvnw -pl ice-rest-catalog -am install -DskipTests=true -Pno-check &&
+          ./mvnw -pl ice-rest-catalog failsafe:integration-test failsafe:verify
+          -Dit.test=DockerScenarioBasedIT
+          -Ddocker.image=altinity/ice-rest-catalog:debug-with-ice-latest-master-amd64

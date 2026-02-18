@@ -1,0 +1,12 @@
+uri: jdbc:sqlite:file:data/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500
+
+
+s3:
+  endpoint: http://minio:9000
+  pathStyleAccess: true
+  accessKeyID: minioadmin
+  secretAccessKey: minioadmin
+  region: minio
+
+bearerTokens:
+  - value: foo
