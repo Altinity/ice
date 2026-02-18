@@ -9,11 +9,13 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
+import com.altinity.ice.cli.internal.metrics.InsertWatchMetrics;
 import com.altinity.ice.internal.io.Matcher;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

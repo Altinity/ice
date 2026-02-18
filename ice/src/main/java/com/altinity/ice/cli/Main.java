@@ -544,6 +544,7 @@ public final class Main {
             tableId,
             files,
             watch,
+            watchEndpoint,
             watchFireOnce,
             createTableIfNotExists,
             options,

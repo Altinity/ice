@@ -110,7 +110,7 @@ public abstract class RESTCatalogTestBase {
         org.apache.iceberg.CatalogUtil.buildIcebergCatalog("backend", icebergConfig, null);
 
     // Start ICE REST catalog server
-    server = createServer("localhost", 8080, backendCatalog, config, icebergConfig);
+    server = createServer("localhost", 8080, backendCatalog, config, icebergConfig, null);
     server.start();
 
     // Wait for server to be ready

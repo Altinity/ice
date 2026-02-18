@@ -229,7 +229,7 @@ public final class Main implements Callable<Integer> {
     }
   }
 
-  private static Server createServer(
+  static Server createServer(
       String host,
       int port,
       Catalog catalog,
