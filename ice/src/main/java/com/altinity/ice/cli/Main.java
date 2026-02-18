@@ -540,8 +540,14 @@ public final class Main {
         }
 
         InsertWatch.run(
-            catalog, tableId, files, watch, watchFireOnce, createTableIfNotExists, options,
-          metricsEnabled);
+            catalog,
+            tableId,
+            files,
+            watch,
+            watchFireOnce,
+            createTableIfNotExists,
+            options,
+            metricsEnabled);
       }
     }
   }
