@@ -628,7 +628,18 @@ public final class Main {
           boolean createNamespaceIfNotExists)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
-      CreateNamespace.run(catalog, Namespace.of(name.split("[.]")), createNamespaceIfNotExists);
+      String[] split = name.split("[.]");
+      for (String level : split) {
+        if (level.isEmpty()) {
+          throw new IllegalArgumentException(
+              "Invalid namespace name: '.' cannot separate empty names");
+        }
+      }
+      if (split.length == 0) {
+        throw new IllegalArgumentException("Invalid namespace name: name cannot be empty");
+      }
+
+      CreateNamespace.run(catalog, Namespace.of(split), createNamespaceIfNotExists);
     }
   }
 
