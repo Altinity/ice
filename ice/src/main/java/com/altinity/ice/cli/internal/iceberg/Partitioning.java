@@ -16,6 +16,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +30,7 @@ import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionKey;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.UpdatePartitionSpec;
 import org.apache.iceberg.data.GenericRecord;
 import org.apache.iceberg.data.Record;
@@ -37,6 +41,7 @@ import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.transforms.Transform;
 import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.SerializableFunction;
 import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
@@ -48,6 +53,23 @@ import org.apache.parquet.schema.PrimitiveType;
 public final class Partitioning {
 
   private Partitioning() {}
+
+  // Formatter with optional time component (2025-01-01 or 2025-01-01T00:00:00)
+  private static final DateTimeFormatter DATE_TIME_INPUT_FORMATTER =
+      new DateTimeFormatterBuilder()
+          .append(DateTimeFormatter.ISO_LOCAL_DATE)
+          .optionalStart()
+          .appendLiteral("T")
+          .append(DateTimeFormatter.ISO_LOCAL_TIME)
+          .optionalEnd()
+          .optionalStart()
+          .appendOffsetId()
+          .optionalEnd()
+          .parseDefaulting(ChronoField.HOUR_OF_DAY, 0)
+          .parseDefaulting(ChronoField.MINUTE_OF_HOUR, 0)
+          .parseDefaulting(ChronoField.SECOND_OF_MINUTE, 0)
+          .parseDefaulting(ChronoField.NANO_OF_SECOND, 0)
+          .toFormatter();
 
   public record InferPartitionKeyResult(
       @Nullable PartitionKey partitionKey, @Nullable String failureReason) {
@@ -346,5 +368,49 @@ public final class Partitioning {
       default ->
           throw new UnsupportedOperationException("unexpected value type: " + tsValue.getClass());
     }
+  }
+
+  /**
+   * Converts a datetime string input value to the table's partition transform unit if it is a
+   * timestamp transform. The transformed value is the Iceberg internal representation (e.g. days
+   * since Unix epoch).
+   *
+   * @return The timestamp converted to the partition unit as an integer, or null if not
+   *     convertible.
+   */
+  @Nullable
+  public static Integer applyTimestampTransform(Table table, String fieldName, Object value) {
+    PartitionField partitionField = getPartitionField(table, fieldName);
+    if (partitionField == null) return null;
+
+    Transform<?, ?> transform = partitionField.transform();
+    if (transform.isIdentity() || !(value instanceof String s)) {
+      return null;
+    }
+    if (s.isEmpty()) {
+      return null;
+    }
+
+    Type sourceType = table.schema().findType(partitionField.sourceId());
+    if (!(sourceType instanceof Types.TimestampType)) {
+      return null;
+    }
+
+    long timestampMicros = toEpochMicros(LocalDateTime.parse(s, DATE_TIME_INPUT_FORMATTER));
+
+    @SuppressWarnings("unchecked")
+    Transform<Long, Integer> typedTransform = (Transform<Long, Integer>) transform;
+
+    return typedTransform.bind(sourceType).apply(timestampMicros);
+  }
+
+  @Nullable
+  private static PartitionField getPartitionField(Table table, String fieldName) {
+    for (PartitionField field : table.spec().fields()) {
+      if (field.name().equals(fieldName)) {
+        return field;
+      }
+    }
+    return null;
   }
 }
