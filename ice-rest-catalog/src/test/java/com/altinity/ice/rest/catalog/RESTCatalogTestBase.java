@@ -11,6 +11,7 @@ package com.altinity.ice.rest.catalog;
 
 import static com.altinity.ice.rest.catalog.Main.createServer;
 
+import com.altinity.ice.internal.jetty.DebugServer;
 import com.altinity.ice.rest.catalog.internal.config.Config;
 import java.io.File;
 import java.net.URI;
@@ -44,6 +45,7 @@ public abstract class RESTCatalogTestBase {
 
   protected static final Logger logger = LoggerFactory.getLogger(RESTCatalogTestBase.class);
   protected Server server;
+  protected Server debugServer;
 
   @SuppressWarnings("rawtypes")
   protected final GenericContainer minio =
@@ -113,6 +115,10 @@ public abstract class RESTCatalogTestBase {
     server = createServer("localhost", 8080, backendCatalog, config, icebergConfig, null);
     server.start();
 
+    // Start DebugServer for /metrics endpoint (used by MetricsScenarioBasedIT)
+    debugServer = DebugServer.create("localhost", 8081);
+    debugServer.start();
+
     // Wait for server to be ready
     while (!server.isStarted()) {
       Thread.sleep(100);
@@ -123,6 +129,15 @@ public abstract class RESTCatalogTestBase {
 
   @AfterClass
   public void tearDown() {
+
+    // Stop the Debug server
+    if (debugServer != null) {
+      try {
+        debugServer.stop();
+      } catch (Exception e) {
+        logger.error("Error stopping debug server: {}", e.getMessage(), e);
+      }
+    }
 
     // Stop the REST catalog server
     if (server != null) {
