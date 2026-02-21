@@ -108,6 +108,12 @@ if command -v aws &>/dev/null && [ -n "{{MINIO_ENDPOINT}}" ]; then
   fi
 fi
 
+# Check for files(snapshot and manifest) in the table and write to /tmp/basic_ops_files.txt
+{{ICE_CLI}} --config {{CLI_CONFIG}} files ${TABLE_IRIS} > /tmp/basic_ops_files.txt
+{{ICE_CLI}} --config {{CLI_CONFIG}} files ${TABLE_PARTITIONED} >> /tmp/basic_ops_files.txt
+{{ICE_CLI}} --config {{CLI_CONFIG}} files ${TABLE_SORTED} >> /tmp/basic_ops_files.txt
+echo "OK Listed files in tables"
+
 # Cleanup tables then namespace
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_IRIS}
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_PARTITIONED}
