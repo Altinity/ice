@@ -19,6 +19,7 @@ import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.DescribeParquet;
+import com.altinity.ice.cli.internal.cmd.Files;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
 import com.altinity.ice.cli.internal.cmd.Scan;
@@ -140,6 +141,19 @@ public final class Main {
         options.add(Describe.Option.INCLUDE_METRICS);
       }
       Describe.run(catalog, target, json, options.toArray(new Describe.Option[0]));
+    }
+  }
+
+  @CommandLine.Command(name = "files", description = "List files in current snapshot.")
+  void files(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      Files.run(catalog, TableIdentifier.parse(name));
     }
   }
 
