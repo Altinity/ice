@@ -39,8 +39,7 @@ public final class Files {
     String tableName = tableId.toString();
     int schemaId = snapshot.schemaId() != null ? snapshot.schemaId() : 0;
     String manifestListLocation = snapshot.manifestListLocation();
-    String locationStr =
-        manifestListLocation != null ? manifestListLocation : "(embedded)";
+    String locationStr = manifestListLocation != null ? manifestListLocation : "(embedded)";
 
     System.out.println("Snapshots: " + tableName);
     System.out.println(
@@ -76,8 +75,7 @@ public final class Files {
       for (int f = 0; f < dataFileLocations.size(); f++) {
         boolean isLastFile = (f == dataFileLocations.size() - 1);
         String filePrefix = isLastFile ? "└── " : "├── ";
-        System.out.println(
-            dataFileIndent + filePrefix + "Datafile: " + dataFileLocations.get(f));
+        System.out.println(dataFileIndent + filePrefix + "Datafile: " + dataFileLocations.get(f));
       }
     }
   }
