@@ -28,8 +28,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -76,6 +78,7 @@ import org.apache.iceberg.mapping.NameMappingParser;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.parquet.ParquetUtil;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 import org.slf4j.Logger;
@@ -106,6 +109,22 @@ public final class Insert {
     if (files.length == 0) {
       // no work to be done
       return new Result(0, 0);
+    }
+
+    if (options.compression() != null) {
+      Set<String> valid =
+          Arrays.stream(CompressionCodecName.values())
+              .map(c -> c.name().toLowerCase(Locale.ENGLISH))
+              .collect(Collectors.toCollection(HashSet::new));
+      valid.add("as-source");
+      if (!valid.contains(options.compression().toLowerCase(Locale.ENGLISH))) {
+        String accepted = String.join(", ", new TreeSet<>(valid));
+        throw new IllegalArgumentException(
+            "Unknown --compression value: "
+                + options.compression()
+                + ". Accepted: "
+                + accepted);
+      }
     }
 
     Table table = catalog.loadTable(nsTable);
@@ -501,66 +520,91 @@ public final class Insert {
               .build());
       dataFileSizeInBytes = inputFile.getLength();
       dataFile = dstDataFile;
-    } else if (partitionSpec.isPartitioned() && partitionKey == null) {
-      return copyPartitionedAndSorted(
-          file,
-          tableSchema,
-          partitionSpec,
-          sortOrder,
-          metricsConfig,
-          tableIO,
-          inputFile,
-          dstDataFileSource);
-    } else if (sortOrder.isSorted() && !sorted) {
-      return Collections.singletonList(
-          copySorted(
-              file,
-              dstDataFileSource.get(file),
-              tableSchema,
-              partitionSpec,
-              sortOrder,
-              metricsConfig,
-              tableIO,
-              inputFile,
-              dataFileNamingStrategy,
-              partitionKey));
     } else {
-      // Table isn't partitioned or sorted. Copy as is.
-      String dstDataFile = dstDataFileSource.get(file);
-      if (checkNotExists.apply(dstDataFile)) {
-        return Collections.emptyList();
-      }
-      OutputFile outputFile =
-          tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
-      // TODO: support transferTo below (note that compression, etc. might be different)
-      // try (var d = outputFile.create()) {
-      //   try (var s = inputFile.newStream()) { s.transferTo(d); }
-      // }
-      Parquet.ReadBuilder readBuilder =
-          Parquet.read(inputFile)
-              .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
-              .project(tableSchema)
-              .reuseContainers();
-
-      Parquet.WriteBuilder writeBuilder =
-          Parquet.write(outputFile)
-              .overwrite(dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL)
-              .createWriterFunc(GenericParquetWriter::buildWriter)
-              .metricsConfig(metricsConfig)
-              .schema(tableSchema);
-
-      logger.info("{}: copying to {}", file, dstDataFile);
-
-      try (CloseableIterable<Record> parquetReader = readBuilder.build()) {
-        try (FileAppender<Record> writer = writeBuilder.build()) {
-          writer.addAll(parquetReader);
-          writer.close(); // for write.length()
-          dataFileSizeInBytes = writer.length();
-          metrics = writer.metrics();
+      // Copy path: compute compression override from CLI or as-source
+      String compressionCodecOverride = null;
+      if (options.compression() != null) {
+        if ("as-source".equalsIgnoreCase(options.compression())) {
+          var blocks = metadata.getBlocks();
+          if (!blocks.isEmpty()) {
+            compressionCodecOverride =
+                blocks.get(0).getColumns().get(0).getCodec().name().toLowerCase();
+          }
+        } else {
+          compressionCodecOverride = options.compression().toLowerCase();
         }
       }
 
-      dataFile = dstDataFile;
+      if (partitionSpec.isPartitioned() && partitionKey == null) {
+        return copyPartitionedAndSorted(
+            file,
+            tableSchema,
+            partitionSpec,
+            sortOrder,
+            metricsConfig,
+            tableIO,
+            inputFile,
+            dstDataFileSource,
+            table.properties(),
+            compressionCodecOverride);
+      } else if (sortOrder.isSorted() && !sorted) {
+        return Collections.singletonList(
+            copySorted(
+                file,
+                dstDataFileSource.get(file),
+                tableSchema,
+                partitionSpec,
+                sortOrder,
+                metricsConfig,
+                tableIO,
+                inputFile,
+                dataFileNamingStrategy,
+                partitionKey,
+                table.properties(),
+                compressionCodecOverride));
+      } else {
+        // Table isn't partitioned or sorted. Copy as is.
+        String dstDataFile = dstDataFileSource.get(file);
+        if (checkNotExists.apply(dstDataFile)) {
+          return Collections.emptyList();
+        }
+        OutputFile outputFile =
+            tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
+        // TODO: support transferTo below (note that compression, etc. might be different)
+        // try (var d = outputFile.create()) {
+        //   try (var s = inputFile.newStream()) { s.transferTo(d); }
+        // }
+        Parquet.ReadBuilder readBuilder =
+            Parquet.read(inputFile)
+                .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
+                .project(tableSchema)
+                .reuseContainers();
+
+        Parquet.WriteBuilder writeBuilder =
+            Parquet.write(outputFile)
+                .setAll(table.properties())
+                .overwrite(dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL)
+                .createWriterFunc(GenericParquetWriter::buildWriter)
+                .metricsConfig(metricsConfig)
+                .schema(tableSchema);
+        if (compressionCodecOverride != null) {
+
+          writeBuilder = writeBuilder.set(TableProperties.PARQUET_COMPRESSION, compressionCodecOverride);
+        }
+
+        logger.info("{}: copying to {}", file, dstDataFile);
+
+        try (CloseableIterable<Record> parquetReader = readBuilder.build()) {
+          try (FileAppender<Record> writer = writeBuilder.build()) {
+            writer.addAll(parquetReader);
+            writer.close(); // for write.length()
+            dataFileSizeInBytes = writer.length();
+            metrics = writer.metrics();
+          }
+        }
+
+        dataFile = dstDataFile;
+      }
     }
     logger.info(
         "{}: adding data file (copy took {}s)", file, (System.currentTimeMillis() - start) / 1000);
@@ -588,7 +632,9 @@ public final class Insert {
       MetricsConfig metricsConfig,
       FileIO tableIO,
       InputFile inputFile,
-      DataFileNamingStrategy dstDataFileSource)
+      DataFileNamingStrategy dstDataFileSource,
+      Map<String, String> tableProperties,
+      @Nullable String compressionCodecOverride)
       throws IOException {
     logger.info("{}: partitioning{}", file, sortOrder.isSorted() ? "+sorting" : "");
 
@@ -622,10 +668,14 @@ public final class Insert {
 
       Parquet.WriteBuilder writeBuilder =
           Parquet.write(outputFile)
+              .setAll(tableProperties)
               .overwrite(true) // FIXME
               .createWriterFunc(GenericParquetWriter::buildWriter)
               .metricsConfig(metricsConfig)
               .schema(tableSchema);
+      if (compressionCodecOverride != null) {
+        writeBuilder = writeBuilder.set(TableProperties.PARQUET_COMPRESSION, compressionCodecOverride);
+      }
 
       try (FileAppender<Record> writer = writeBuilder.build()) {
         for (Record record : records) {
@@ -668,7 +718,9 @@ public final class Insert {
       FileIO tableIO,
       InputFile inputFile,
       DataFileNamingStrategy.Name dataFileNamingStrategy,
-      PartitionKey partitionKey)
+      PartitionKey partitionKey,
+      Map<String, String> tableProperties,
+      @Nullable String compressionCodecOverride)
       throws IOException {
     logger.info("{}: copying (sorted) to {}", file, dstDataFile);
 
@@ -698,11 +750,15 @@ public final class Insert {
     // Write sorted records to outputFile
     Parquet.WriteBuilder writeBuilder =
         Parquet.write(outputFile)
+            .setAll(tableProperties)
             .overwrite(
                 dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL) // FIXME
             .createWriterFunc(GenericParquetWriter::buildWriter)
             .metricsConfig(metricsConfig)
             .schema(tableSchema);
+    if (compressionCodecOverride != null) {
+      writeBuilder = writeBuilder.set(TableProperties.PARQUET_COMPRESSION, compressionCodecOverride);
+    }
 
     long fileSizeInBytes;
     Metrics metrics;
@@ -793,7 +849,8 @@ public final class Insert {
       @Nullable String retryListFile,
       @Nullable List<Main.IcePartition> partitionList,
       @Nullable List<Main.IceSortOrder> sortOrderList,
-      int threadCount) {
+      int threadCount,
+      @Nullable String compression) {
 
     public static Builder builder() {
       return new Builder();
@@ -816,6 +873,7 @@ public final class Insert {
       private List<Main.IcePartition> partitionList = List.of();
       private List<Main.IceSortOrder> sortOrderList = List.of();
       private int threadCount = Runtime.getRuntime().availableProcessors();
+      private String compression;
 
       private Builder() {}
 
@@ -899,6 +957,11 @@ public final class Insert {
         return this;
       }
 
+      public Builder compression(String compression) {
+        this.compression = compression;
+        return this;
+      }
+
       public Options build() {
         return new Options(
             dataFileNamingStrategy,
@@ -916,7 +979,8 @@ public final class Insert {
             retryListFile,
             partitionList,
             sortOrderList,
-            threadCount);
+            threadCount,
+            compression);
       }
     }
   }

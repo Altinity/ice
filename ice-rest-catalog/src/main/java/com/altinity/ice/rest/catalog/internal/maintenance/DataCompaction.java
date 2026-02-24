@@ -170,6 +170,7 @@ public record DataCompaction(
 
     Parquet.WriteBuilder writeBuilder =
         Parquet.write(outputFile)
+            .setAll(table.properties())
             .overwrite(false)
             .createWriterFunc(GenericParquetWriter::buildWriter)
             .metricsConfig(metricsConfig)
