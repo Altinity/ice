@@ -29,7 +29,7 @@ public final class ListPartitions {
   private ListPartitions() {}
 
   public static void run(RESTCatalog catalog, TableIdentifier tableId, boolean json)
-    throws IOException {
+      throws IOException {
     org.apache.iceberg.Table table = catalog.loadTable(tableId);
     PartitionSpec spec = table.spec();
 
@@ -43,7 +43,7 @@ public final class ListPartitions {
     for (PartitionField field : spec.fields()) {
       String sourceColumn = table.schema().findField(field.sourceId()).name();
       partitionSpec.add(
-        new PartitionFieldInfo(sourceColumn, field.name(), field.transform().toString()));
+          new PartitionFieldInfo(sourceColumn, field.name(), field.transform().toString()));
     }
 
     TreeSet<String> partitionPaths = new TreeSet<>();
@@ -54,16 +54,15 @@ public final class ListPartitions {
       }
     }
 
-    var result =
-      new Result(tableId.toString(), partitionSpec, new ArrayList<>(partitionPaths));
+    var result = new Result(tableId.toString(), partitionSpec, new ArrayList<>(partitionPaths));
     output(result, json);
   }
 
   private static void output(Result result, boolean json) throws IOException {
     ObjectMapper mapper =
-      json
-        ? new ObjectMapper()
-        : new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
+        json
+            ? new ObjectMapper()
+            : new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
     mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
     System.out.println(mapper.writeValueAsString(result));
   }
@@ -72,5 +71,4 @@ public final class ListPartitions {
   record Result(String table, List<PartitionFieldInfo> partitionSpec, List<String> partitions) {}
 
   record PartitionFieldInfo(String sourceColumn, String name, String transform) {}
-
 }
