@@ -9,7 +9,6 @@
  */
 package com.altinity.ice.rest.catalog;
 
-import java.util.List;
 import java.util.Map;
 
 /**
