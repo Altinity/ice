@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -590,59 +591,62 @@ public final class Insert {
       InputFile inputFile,
       DataFileNamingStrategy dstDataFileSource)
       throws IOException {
-    logger.info("{}: partitioning{}", file, sortOrder.isSorted() ? "+sorting" : "");
+    if (sortOrder.isSorted()) {
+      logger.warn(
+          "{}: within-partition sorting is skipped during streaming partitioning"
+              + " (data will be partitioned but not sorted within each partition)",
+          file);
+    }
+    logger.info("{}: partitioning (streaming)", file);
 
-    // FIXME: stream to reduce memory usage
-    Map<PartitionKey, List<Record>> partitionedRecords =
-        Partitioning.partition(inputFile, tableSchema, partitionSpec);
+    Map<PartitionKey, FileAppender<Record>> writers = new HashMap<>();
+    Map<PartitionKey, OutputFile> outputFiles = new HashMap<>();
 
-    // Create a comparator based on table.sortOrder()
-    RecordComparator comparator =
-        sortOrder.isSorted() ? new RecordComparator(sortOrder, tableSchema) : null;
+    try {
+      Partitioning.partitionStreaming(
+          inputFile,
+          tableSchema,
+          partitionSpec,
+          (partitionKey, record) -> {
+            FileAppender<Record> writer = writers.get(partitionKey);
+            if (writer == null) {
+              PartitionKey key = partitionKey.copy();
+              String dstDataFile = dstDataFileSource.get(partitionSpec, key, file);
+              OutputFile outputFile =
+                  tableIO.newOutputFile(
+                      Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
+              outputFiles.put(key, outputFile);
 
-    List<DataFile> dataFiles = new ArrayList<>(partitionedRecords.size());
-
-    // Write sorted records for each partition
-    for (Map.Entry<PartitionKey, List<Record>> entry : partitionedRecords.entrySet()) {
-      PartitionKey partKey = entry.getKey();
-      List<Record> records = entry.getValue();
-      entry.setValue(List.of()); // allow "records" to be gc-ed once w're done with them
-
-      // Sort records within the partition
-      if (comparator != null) {
-        records.sort(comparator);
-      }
-
-      String dstDataFile = dstDataFileSource.get(partitionSpec, partKey, file);
-      OutputFile outputFile =
-          tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
-
-      long fileSizeInBytes;
-      Metrics metrics;
-
-      Parquet.WriteBuilder writeBuilder =
-          Parquet.write(outputFile)
-              .overwrite(true) // FIXME
-              .createWriterFunc(GenericParquetWriter::buildWriter)
-              .metricsConfig(metricsConfig)
-              .schema(tableSchema);
-
-      try (FileAppender<Record> writer = writeBuilder.build()) {
-        for (Record record : records) {
-          writer.add(record);
-        }
+              writer =
+                  Parquet.write(outputFile)
+                      .overwrite(true)
+                      .createWriterFunc(GenericParquetWriter::buildWriter)
+                      .metricsConfig(metricsConfig)
+                      .schema(tableSchema)
+                      .build();
+              writers.put(key, writer);
+            }
+            writer.add(record);
+          });
+    } finally {
+      for (FileAppender<Record> writer : writers.values()) {
         writer.close();
-        fileSizeInBytes = writer.length();
-        metrics = writer.metrics();
       }
+    }
 
-      logger.info("{}: adding data file: {}", file, dstDataFile);
+    List<DataFile> dataFiles = new ArrayList<>(writers.size());
+    for (Map.Entry<PartitionKey, FileAppender<Record>> entry : writers.entrySet()) {
+      PartitionKey partKey = entry.getKey();
+      FileAppender<Record> writer = entry.getValue();
+      OutputFile outputFile = outputFiles.get(partKey);
+
+      logger.info("{}: adding data file: {}", file, outputFile.location());
       dataFiles.add(
           DataFiles.builder(partitionSpec)
               .withPath(outputFile.location())
-              .withFileSizeInBytes(fileSizeInBytes)
+              .withFileSizeInBytes(writer.length())
               .withFormat(FileFormat.PARQUET)
-              .withMetrics(metrics)
+              .withMetrics(writer.metrics())
               .withPartition(partKey)
               .build());
     }

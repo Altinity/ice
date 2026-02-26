@@ -251,10 +251,18 @@ public final class Partitioning {
     };
   }
 
-  public static Map<PartitionKey, List<org.apache.iceberg.data.Record>> partition(
-      InputFile inputFile, Schema tableSchema, PartitionSpec partitionSpec) throws IOException {
+  @FunctionalInterface
+  public interface PartitionRecordConsumer {
+    void accept(PartitionKey partitionKey, Record record) throws IOException;
+  }
+
+  public static void partitionStreaming(
+      InputFile inputFile,
+      Schema tableSchema,
+      PartitionSpec partitionSpec,
+      PartitionRecordConsumer consumer)
+      throws IOException {
     PartitionKey partitionKeyMold = new PartitionKey(partitionSpec, tableSchema);
-    Map<PartitionKey, List<org.apache.iceberg.data.Record>> partitionedRecords = new HashMap<>();
 
     Parquet.ReadBuilder readBuilder =
         Parquet.read(inputFile)
@@ -264,48 +272,60 @@ public final class Partitioning {
     try (CloseableIterable<org.apache.iceberg.data.Record> records = readBuilder.build()) {
       org.apache.iceberg.data.Record partitionRecord = GenericRecord.create(tableSchema);
       for (org.apache.iceberg.data.Record record : records) {
-        for (PartitionField field : partitionSpec.fields()) {
-          org.apache.iceberg.types.Types.NestedField fieldSpec =
-              tableSchema.findField(field.sourceId());
-          String sourceFieldName = fieldSpec.name();
-
-          Object value = record.getField(sourceFieldName);
-          if (value == null) {
-            partitionRecord.setField(sourceFieldName, null); // reset as partitionRecord is reused
-            continue;
-          }
-          Transform<?, ?> transform = field.transform();
-          if (transform.isIdentity()) {
-            partitionRecord.setField(
-                field.name(), toGenericRecordFieldValue(value, fieldSpec.type()));
-            continue;
-          }
-          String transformName = transform.toString();
-          switch (transformName) {
-            case "hour", "day", "month", "year":
-              if (fieldSpec.type().typeId() != Type.TypeID.DATE) {
-                value = toEpochMicros(value);
-              }
-              partitionRecord.setField(
-                  sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
-              break;
-            default:
-              throw new UnsupportedOperationException(
-                  "Unsupported transformation: " + transformName);
-          }
-        }
-
+        computePartitionRecord(record, partitionRecord, tableSchema, partitionSpec);
         partitionKeyMold.partition(partitionRecord);
-
-        List<Record> r = partitionedRecords.get(partitionKeyMold);
-        if (r == null) {
-          r = new ArrayList<>();
-          partitionedRecords.put(partitionKeyMold.copy(), r);
-        }
-        r.add(record);
+        consumer.accept(partitionKeyMold, record);
       }
     }
+  }
+
+  public static Map<PartitionKey, List<org.apache.iceberg.data.Record>> partition(
+      InputFile inputFile, Schema tableSchema, PartitionSpec partitionSpec) throws IOException {
+    Map<PartitionKey, List<org.apache.iceberg.data.Record>> partitionedRecords = new HashMap<>();
+    partitionStreaming(
+        inputFile,
+        tableSchema,
+        partitionSpec,
+        (partitionKey, record) -> {
+          partitionedRecords
+              .computeIfAbsent(partitionKey.copy(), k -> new ArrayList<>())
+              .add(record);
+        });
     return partitionedRecords;
+  }
+
+  private static void computePartitionRecord(
+      Record record, Record partitionRecord, Schema tableSchema, PartitionSpec partitionSpec) {
+    for (PartitionField field : partitionSpec.fields()) {
+      org.apache.iceberg.types.Types.NestedField fieldSpec =
+          tableSchema.findField(field.sourceId());
+      String sourceFieldName = fieldSpec.name();
+
+      Object value = record.getField(sourceFieldName);
+      if (value == null) {
+        partitionRecord.setField(sourceFieldName, null);
+        continue;
+      }
+      Transform<?, ?> transform = field.transform();
+      if (transform.isIdentity()) {
+        partitionRecord.setField(
+            field.name(), toGenericRecordFieldValue(value, fieldSpec.type()));
+        continue;
+      }
+      String transformName = transform.toString();
+      switch (transformName) {
+        case "hour", "day", "month", "year":
+          if (fieldSpec.type().typeId() != Type.TypeID.DATE) {
+            value = toEpochMicros(value);
+          }
+          partitionRecord.setField(
+              sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
+          break;
+        default:
+          throw new UnsupportedOperationException(
+              "Unsupported transformation: " + transformName);
+      }
+    }
   }
 
   private static Object toGenericRecordFieldValue(Object v, Type icebergType) {
