@@ -120,10 +120,7 @@ public final class Insert {
       if (!valid.contains(options.compression().toLowerCase(Locale.ENGLISH))) {
         String accepted = String.join(", ", new TreeSet<>(valid));
         throw new IllegalArgumentException(
-            "Unknown --compression value: "
-                + options.compression()
-                + ". Accepted: "
-                + accepted);
+            "Unknown --compression value: " + options.compression() + ". Accepted: " + accepted);
       }
     }
 
@@ -589,7 +586,8 @@ public final class Insert {
                 .schema(tableSchema);
         if (compressionCodecOverride != null) {
 
-          writeBuilder = writeBuilder.set(TableProperties.PARQUET_COMPRESSION, compressionCodecOverride);
+          writeBuilder =
+              writeBuilder.set(TableProperties.PARQUET_COMPRESSION, compressionCodecOverride);
         }
 
         logger.info("{}: copying to {}", file, dstDataFile);
@@ -674,7 +672,8 @@ public final class Insert {
               .metricsConfig(metricsConfig)
               .schema(tableSchema);
       if (compressionCodecOverride != null) {
-        writeBuilder = writeBuilder.set(TableProperties.PARQUET_COMPRESSION, compressionCodecOverride);
+        writeBuilder =
+            writeBuilder.set(TableProperties.PARQUET_COMPRESSION, compressionCodecOverride);
       }
 
       try (FileAppender<Record> writer = writeBuilder.build()) {
@@ -757,7 +756,8 @@ public final class Insert {
             .metricsConfig(metricsConfig)
             .schema(tableSchema);
     if (compressionCodecOverride != null) {
-      writeBuilder = writeBuilder.set(TableProperties.PARQUET_COMPRESSION, compressionCodecOverride);
+      writeBuilder =
+          writeBuilder.set(TableProperties.PARQUET_COMPRESSION, compressionCodecOverride);
     }
 
     long fileSizeInBytes;
