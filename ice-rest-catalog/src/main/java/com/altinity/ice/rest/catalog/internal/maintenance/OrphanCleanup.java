@@ -11,6 +11,7 @@ package com.altinity.ice.rest.catalog.internal.maintenance;
 
 import com.altinity.ice.internal.iceberg.io.SchemeFileIO;
 import com.altinity.ice.internal.io.Matcher;
+import com.altinity.ice.rest.catalog.internal.metrics.MaintenanceMetrics;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayDeque;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.ManifestFile;
@@ -47,6 +49,8 @@ public record OrphanCleanup(long olderThanMillis, Matcher whitelist, boolean dry
   @Override
   public void perform(Table table) throws IOException {
     String location = table.location();
+    String tableName = table.name();
+    MaintenanceMetrics metrics = MaintenanceMetrics.getInstance();
 
     logger.info("Searching for orphaned files at {}", location);
 
@@ -64,12 +68,19 @@ public record OrphanCleanup(long olderThanMillis, Matcher whitelist, boolean dry
 
     logger.info("Found {} orphaned file(s) ({} excluded)", orphanedFiles.size(), excluded);
 
+    // Record metrics
+    metrics.recordOrphanFilesFound(tableName, orphanedFiles.size() + excluded);
+    metrics.recordOrphanFilesExcluded(tableName, excluded);
+
     if (orphanedFiles.isEmpty()) {
       return;
     }
 
     if (!dryRun) {
       FileIO tableIO = table.io();
+
+      AtomicInteger deletedCount = new AtomicInteger(0);
+      AtomicInteger failedCount = new AtomicInteger(0);
 
       int numThreads = Math.min(8, orphanedFiles.size());
       try (ExecutorService executor = Executors.newFixedThreadPool(numThreads)) {
@@ -80,12 +91,20 @@ public record OrphanCleanup(long olderThanMillis, Matcher whitelist, boolean dry
                       try {
                         logger.info("Deleting {}", file);
                         tableIO.deleteFile(file);
+                        deletedCount.incrementAndGet();
                         return file;
                       } catch (Exception e) {
                         logger.warn("Failed to delete file {}", file, e);
+                        failedCount.incrementAndGet();
                         return null;
                       }
                     }));
+      }
+
+      // Record deletion metrics
+      metrics.recordOrphanFilesDeleted(tableName, deletedCount.get());
+      if (failedCount.get() > 0) {
+        metrics.recordOrphanDeleteFailure(tableName, failedCount.get());
       }
     } else {
       orphanedFiles.stream().sorted().forEach(file -> logger.info("To be deleted: {}", file));

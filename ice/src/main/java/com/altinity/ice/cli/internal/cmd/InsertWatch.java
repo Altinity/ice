@@ -9,11 +9,13 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
+import com.altinity.ice.cli.internal.metrics.InsertWatchMetrics;
 import com.altinity.ice.internal.io.Matcher;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -31,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.SqsClientBuilder;
 import software.amazon.awssdk.services.sqs.model.BatchResultErrorEntry;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageBatchRequest;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageBatchRequestEntry;
@@ -42,6 +45,7 @@ public class InsertWatch {
 
   private static final Logger logger = LoggerFactory.getLogger(InsertWatch.class);
   private static final ObjectMapper objectMapper = new ObjectMapper();
+  private static final String QUEUE_TYPE_SQS = "sqs";
 
   public static void run(
       RESTCatalog catalog,
@@ -51,6 +55,29 @@ public class InsertWatch {
       boolean terminateAfterOneBatch,
       boolean createTableIfNotExists,
       Insert.Options options)
+      throws IOException, InterruptedException {
+    run(
+        catalog,
+        nsTable,
+        input,
+        sqsQueueURL,
+        null,
+        terminateAfterOneBatch,
+        createTableIfNotExists,
+        options,
+        false);
+  }
+
+  public static void run(
+      RESTCatalog catalog,
+      TableIdentifier nsTable,
+      String[] input,
+      String sqsQueueURL,
+      String sqsOverrideEndpoint,
+      boolean terminateAfterOneBatch,
+      boolean createTableIfNotExists,
+      Insert.Options options,
+      boolean metricsEnabled)
       throws IOException, InterruptedException {
 
     if (!options.noCopy() || !options.skipDuplicates()) {
@@ -63,8 +90,15 @@ public class InsertWatch {
     }
 
     var matchers = Arrays.stream(input).map(Matcher::from).toList();
+    logger.info("Watching for files matching: {}", Arrays.toString(input));
 
-    final SqsClient sqs = SqsClient.builder().build();
+    // Initialize metrics if enabled
+    InsertWatchMetrics metrics = metricsEnabled ? InsertWatchMetrics.getInstance() : null;
+    String tableLabel = nsTable.toString();
+    String queueLabel = sqsQueueURL;
+    String queueType = QUEUE_TYPE_SQS;
+
+    final SqsClient sqs = buildSqsClient(sqsOverrideEndpoint);
     ReceiveMessageRequest req =
         ReceiveMessageRequest.builder()
             .queueUrl(sqsQueueURL)
@@ -91,9 +125,16 @@ public class InsertWatch {
     do {
       List<Message> batch = new LinkedList<>();
       try {
+        if (metrics != null) {
+          metrics.recordPollRequest(tableLabel, queueLabel, queueType);
+        }
         var messages = sqs.receiveMessage(req).messages();
         batch.addAll(messages);
       } catch (SdkException e) {
+        if (metrics != null) {
+          metrics.recordQueueReceiveError(tableLabel, queueLabel, queueType);
+          metrics.recordRetryAttempt(tableLabel, queueLabel, queueType);
+        }
         if (!e.retryable()) {
           throw e; // TODO: should we really?
         }
@@ -112,16 +153,24 @@ public class InsertWatch {
             batch.addAll(tailMessages);
           } while (!tailMessages.isEmpty() && batch.size() < maxBatchSize);
 
+          if (metrics != null) {
+            metrics.recordMessagesReceived(tableLabel, queueLabel, queueType, batch.size());
+          }
+
           logger.info("Processing {} message(s)", batch.size());
           // FIXME: handle files not found
 
-          var insertBatch = filter(batch, matchers);
+          var insertBatch = filter(batch, matchers, metrics, tableLabel, queueLabel, queueType);
           if (!insertBatch.isEmpty()) {
             logger.info("Inserting {}", insertBatch);
 
             try {
               Insert.Result result =
                   Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
+              if (metrics != null) {
+                metrics.recordFilesInserted(tableLabel, queueLabel, queueType, insertBatch.size());
+                metrics.recordTransactionSuccess(tableLabel, queueLabel, queueType);
+              }
               if (!result.ok()) {
                 logger.warn(
                     "{}/{} file(s) failed to insert in this batch",
@@ -130,6 +179,9 @@ public class InsertWatch {
               }
             } catch (NoSuchTableException e) {
               if (!createTableIfNotExists) {
+                if (metrics != null) {
+                  metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
+                }
                 throw e;
               }
               boolean retryInsert = true;
@@ -146,30 +198,35 @@ public class InsertWatch {
                     null);
               } catch (NotFoundException nfe) {
                 if (!options.ignoreNotFound()) {
+                  if (metrics != null) {
+                    metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
+                  }
                   throw nfe;
                 }
                 logger.info("Table not created ({} don't exist)", insertBatch);
                 retryInsert = false;
               }
               if (retryInsert) {
-                Insert.Result result =
-                    Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
-                if (!result.ok()) {
-                  logger.warn(
-                      "{}/{} file(s) failed to insert in this batch",
-                      result.totalNumberOfFiles(),
-                      result.numberOfFilesFailedToInsert());
+                Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
+                if (metrics != null) {
+                  metrics.recordFilesInserted(
+                      tableLabel, queueLabel, queueType, insertBatch.size());
+                  metrics.recordTransactionSuccess(tableLabel, queueLabel, queueType);
                 }
               }
             }
           }
 
-          confirmProcessed(sqs, sqsQueueURL, batch);
+          confirmProcessed(sqs, sqsQueueURL, batch, metrics, tableLabel, queueLabel, queueType);
         } catch (InterruptedException e) {
           // terminate
           Thread.currentThread().interrupt();
           throw new InterruptedException();
         } catch (Exception e) {
+          if (metrics != null) {
+            metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
+            metrics.recordRetryAttempt(tableLabel, queueLabel, queueType);
+          }
           Duration delay = backoff.get();
           logger.error("Failed to process batch of messages (retry in {})", delay, e);
           Thread.sleep(delay);
@@ -180,7 +237,13 @@ public class InsertWatch {
     } while (!terminateAfterOneBatch);
   }
 
-  private static Collection<String> filter(List<Message> messages, Collection<Matcher> matchers) {
+  private static Collection<String> filter(
+      List<Message> messages,
+      Collection<Matcher> matchers,
+      InsertWatchMetrics metrics,
+      String tableLabel,
+      String queueLabel,
+      String queueType) {
     Collection<String> r = new LinkedHashSet<>();
     for (Message message : messages) {
       // Message body() example:
@@ -207,23 +270,41 @@ public class InsertWatch {
         root = objectMapper.readTree(message.body());
       } catch (JsonProcessingException e) {
         logger.error("Failed to parse message#{} body", message.messageId(), e);
+        if (metrics != null) {
+          metrics.recordMessageParseError(tableLabel, queueLabel, queueType);
+        }
         // TODO: dlq?
         continue;
       }
       // TODO: use type
       for (JsonNode record : root.path("Records")) {
+        if (metrics != null) {
+          metrics.recordEventsReceived(tableLabel, queueLabel, queueType, 1);
+        }
         String eventName = record.path("eventName").asText();
         String bucketName = record.at("/s3/bucket/name").asText();
         String objectKey =
             URLDecoder.decode(record.at("/s3/object/key").asText(), StandardCharsets.UTF_8);
         var target = String.format("s3://%s/%s", bucketName, objectKey);
+        logger.info("Received S3 event: {} -> {}", eventName, target);
         // s3:ObjectCreated:{Put,Post,Copy,CompleteMultipartUpload}
         if (eventName.startsWith("ObjectCreated:")) {
           // TODO: exclude metadata/data dirs by default
           if (matchers.stream().anyMatch(matcher -> matcher.test(target))) {
             r.add(target);
+            if (metrics != null) {
+              metrics.recordEventMatched(tableLabel, queueLabel, queueType);
+            }
+          } else {
+            logger.info("Target did not match any input pattern: {}", target);
+            if (metrics != null) {
+              metrics.recordEventNotMatched(tableLabel, queueLabel, queueType);
+            }
           }
         } else {
+          if (metrics != null) {
+            metrics.recordEventSkipped(tableLabel, queueLabel, queueType);
+          }
           if (logger.isTraceEnabled()) {
             logger.trace("Message skipped: {} {}", eventName, target);
           }
@@ -233,7 +314,14 @@ public class InsertWatch {
     return r;
   }
 
-  private static void confirmProcessed(SqsClient sqs, String sqsQueueURL, List<Message> messages) {
+  private static void confirmProcessed(
+      SqsClient sqs,
+      String sqsQueueURL,
+      List<Message> messages,
+      InsertWatchMetrics metrics,
+      String tableLabel,
+      String queueLabel,
+      String queueType) {
     int failedCount = 0;
     int len = messages.size();
     for (int i = 0; i < len; i = i + 10) {
@@ -242,6 +330,9 @@ public class InsertWatch {
       if (res.hasFailed()) {
         List<BatchResultErrorEntry> failed = res.failed();
         failedCount += failed.size();
+        if (metrics != null) {
+          metrics.recordQueueDeleteError(tableLabel, queueLabel, queueType, failed.size());
+        }
       }
     }
     if (failedCount > 0) {
@@ -265,5 +356,19 @@ public class InsertWatch {
                                 .build())
                     .toList())
             .build());
+  }
+
+  private static SqsClient buildSqsClient(String sqsOverrideEndpoint) {
+    SqsClientBuilder builder = SqsClient.builder();
+
+    // Use explicit endpoint if provided (e.g. for LocalStack)
+    // Otherwise, AWS SDK will use AWS_ENDPOINT_URL_SQS env var or default AWS endpoints
+    if (sqsOverrideEndpoint != null && !sqsOverrideEndpoint.isEmpty()) {
+      URI endpoint = URI.create(sqsOverrideEndpoint);
+      logger.info("Using custom SQS endpoint: {}", endpoint);
+      builder.endpointOverride(endpoint);
+    }
+
+    return builder.build();
   }
 }

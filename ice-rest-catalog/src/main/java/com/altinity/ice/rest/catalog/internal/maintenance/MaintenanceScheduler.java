@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.rest.catalog.internal.maintenance;
 
+import com.altinity.ice.rest.catalog.internal.metrics.MaintenanceMetrics;
 import com.github.shyiko.skedule.Schedule;
 import java.time.ZonedDateTime;
 import java.util.concurrent.ScheduledExecutorService;
@@ -74,22 +75,36 @@ public class MaintenanceScheduler {
   }
 
   public void performMaintenance() {
-    if (isMaintenanceMode.get()) {
-      logger.info("Skipping maintenance task as system is already in maintenance mode");
-      return;
-    }
 
+    long startTime = System.nanoTime();
+    boolean success = false;
+    MaintenanceMetrics metrics = null;
     try {
+
+      metrics = MaintenanceMetrics.getInstance();
+
+      if (isMaintenanceMode.get()) {
+        logger.info("Skipping maintenance task as system is already in maintenance mode");
+        metrics.recordMaintenanceSkipped();
+        return;
+      }
+
       logger.info("Starting scheduled maintenance task");
       setMaintenanceMode(true);
+      metrics.recordMaintenanceStarted();
 
       maintenanceRunner.run();
 
       logger.info("Scheduled maintenance task completed successfully");
+      success = true;
     } catch (Exception e) {
       logger.error("Error during scheduled maintenance task", e);
     } finally {
       setMaintenanceMode(false);
+      double durationSecs = (System.nanoTime() - startTime) / 1_000_000_000.0;
+      if (metrics != null) {
+        metrics.recordMaintenanceCompleted(success, durationSecs);
+      }
     }
   }
 
