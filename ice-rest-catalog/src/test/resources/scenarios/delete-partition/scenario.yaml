@@ -1,0 +1,14 @@
+name: Delete partition
+description: Tests deleting individual partitions by value
+
+catalogConfig:
+  warehouse: s3://test-bucket/warehouse
+
+env:
+  NAMESPACE_NAME: test_delete_partition
+  TABLE_NAME: test_delete_partition.tripdata_p_by_day
+  INPUT_FILE: tripdata.parquet
+  PARTITION_SPEC: '[{"column":"tpep_pickup_datetime","transform":"day"}]'
+  PARTITION_COLUMN: tpep_pickup_datetime
+  TRANSFORMED_PARTITION_COLUMN: tpep_pickup_datetime_day
+  DELETE_PARTITION_DAY: 2025-01-02

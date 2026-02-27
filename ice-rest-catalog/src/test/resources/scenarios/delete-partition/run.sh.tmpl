@@ -1,0 +1,44 @@
+#!/bin/bash
+set -e
+
+echo "Running delete partition test..."
+
+# Create namespace
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "OK Created namespace: ${NAMESPACE_NAME}"
+
+# Get the full path to the input file
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/${INPUT_FILE}"
+
+# Create table with partitioning and insert data
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} ${INPUT_PATH} --partition="${PARTITION_SPEC}"
+echo "OK Inserted data with partitioning into table ${TABLE_NAME}"
+
+# Delete partition for a specific day
+output=$({{ICE_CLI}} --config {{CLI_CONFIG}} delete ${TABLE_NAME} --partition "[{\"name\": \"${TRANSFORMED_PARTITION_COLUMN}\", \"values\": [\"${DELETE_PARTITION_DAY}\"]}]" 2>&1)
+
+echo "$output"
+
+line_count=$(echo "$output" | wc -l)
+
+if [ "$line_count" -ne 1 ]; then
+  echo "FAIL Expected 1 line, got $line_count"
+  exit 1
+fi
+
+if ! echo "$output" | grep -qF "${TRANSFORMED_PARTITION_COLUMN}=${DELETE_PARTITION_DAY}"; then
+  echo "FAIL Expected output to contain '${TRANSFORMED_PARTITION_COLUMN}=${DELETE_PARTITION_DAY}'"
+  exit 1
+fi
+
+echo "OK Deleted partition with value ${DELETE_PARTITION_DAY}"
+
+# Cleanup
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+echo "OK Deleted table: ${TABLE_NAME}"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "OK Deleted namespace: ${NAMESPACE_NAME}"
+
+echo "Delete partition test completed successfully"
