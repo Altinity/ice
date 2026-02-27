@@ -10,6 +10,7 @@
 package com.altinity.ice.cli.internal.cmd;
 
 import com.altinity.ice.cli.Main;
+import com.altinity.ice.cli.internal.http.MinioWildcard;
 import com.altinity.ice.cli.internal.iceberg.Partitioning;
 import com.altinity.ice.cli.internal.iceberg.RecordComparator;
 import com.altinity.ice.cli.internal.iceberg.SchemaEvolution;
@@ -126,9 +127,21 @@ public final class Insert {
                             .listWildcard(s3ClientLazy.getValue(), b.bucket(), b.path(), -1)
                             .stream();
                       }
+
+                      // HTTP(S) wildcard for Minio & etc.
+                      if ((s.startsWith("http://") || s.startsWith("https://"))
+                          && s.contains("*")) {
+                        try {
+                          return MinioWildcard.listHTTPWildcard(s).stream();
+                        } catch (Exception e) {
+                          throw new RuntimeException("Failed to expand HTTP wildcard for " + s, e);
+                        }
+                      }
+
                       return Stream.of(s);
                     })
                 .toList();
+
         if (filesExpanded.isEmpty()) {
           throw new BadRequestException("No matching files found");
         }
