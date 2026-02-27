@@ -415,6 +415,11 @@ public final class Main {
               defaultValue = "-1")
           int threadCount,
       @CommandLine.Option(
+              names = {"--compression"},
+              description =
+                  "Parquet compression codec: gzip (default), zstd, snappy, lz4, brotli, uncompressed, or as-source")
+          String compression,
+      @CommandLine.Option(
               names = {"--watch"},
               description = "Event queue. Supported: AWS SQS")
           String watch,
@@ -510,6 +515,7 @@ public final class Main {
               .sortOrderList(sortOrders)
               .threadCount(
                   threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount)
+              .compression(compression)
               .build();
 
       if (!watchMode) {
