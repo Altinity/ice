@@ -4,7 +4,7 @@ set -e
 # Verification script - checks that the test completed successfully
 # Exit code 0 = success, non-zero = failure
 # Expects run.sh to have written: basic_ops_describe.txt, basic_ops_scan_iris.txt,
-# basic_ops_scan_partitioned.txt, basic_ops_scan_sorted.txt under /tmp
+# basic_ops_scan_partitioned.txt, basic_ops_scan_sorted.txt, basic_ops_files.txt under /tmp
 
 echo "Verifying basic operations test..."
 
@@ -31,8 +31,42 @@ for f in /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/b
   fi
 done
 
+# Verify files output contains expected structure (Snapshots/Snapshot/Manifest/Datafile and S3 paths)
+F="/tmp/basic_ops_files.txt"
+if [ ! -f "$F" ] || [ ! -s "$F" ]; then
+  echo "FAIL $F not found or empty"
+  exit 1
+fi
+if ! grep -q "Snapshots:" "$F"; then
+  echo "FAIL $F does not contain expected 'Snapshots:' header"
+  exit 1
+fi
+if ! grep -qE "Snapshot [0-9]+" "$F"; then
+  echo "FAIL $F does not contain expected Snapshot entry with ID"
+  exit 1
+fi
+if ! grep -q "Manifest:" "$F"; then
+  echo "FAIL $F does not contain expected 'Manifest:' entry"
+  exit 1
+fi
+if ! grep -q "Datafile:" "$F"; then
+  echo "FAIL $F does not contain expected 'Datafile:' entry"
+  exit 1
+fi
+if ! grep -qE "s3://test-bucket/warehouse/test_ns/.*/metadata/snap-.*\.avro" "$F"; then
+  echo "FAIL $F does not contain expected snapshot metadata path pattern"
+  exit 1
+fi
+if ! grep -qE "s3://test-bucket/warehouse/test_ns/.*/metadata/.*-m0\.avro" "$F"; then
+  echo "FAIL $F does not contain expected manifest path pattern"
+  exit 1
+fi
+if ! grep -qE "s3a://test-bucket/warehouse/test_ns/.*/data/.*\.parquet" "$F"; then
+  echo "FAIL $F does not contain expected datafile path pattern"
+  exit 1
+fi
 # Cleanup temp files
-rm -f /tmp/basic_ops_describe.txt /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt
+rm -f /tmp/basic_ops_describe.txt /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt /tmp/basic_ops_files.txt
 
 echo "OK Verification passed"
 exit 0
