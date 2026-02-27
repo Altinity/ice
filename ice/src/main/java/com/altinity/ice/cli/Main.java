@@ -34,12 +34,14 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.curator.shaded.com.google.common.net.HostAndPort;
 import org.apache.iceberg.CatalogProperties;
@@ -47,10 +49,21 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.eclipse.jetty.server.Server;
+import org.jline.console.SystemRegistry;
+import org.jline.console.impl.SystemRegistryImpl;
+import org.jline.reader.EndOfFileException;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.Parser;
+import org.jline.reader.UserInterruptException;
+import org.jline.reader.impl.DefaultParser;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.AutoComplete;
 import picocli.CommandLine;
+import picocli.shell.jline3.PicocliCommands;
 
 @CommandLine.Command(
     name = "ice",
@@ -62,6 +75,8 @@ import picocli.CommandLine;
 public final class Main {
 
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
+
+  private boolean inShellMode = false;
 
   @CommandLine.Option(
       names = {"-c", "--config"},
@@ -778,6 +793,83 @@ public final class Main {
     return catalog;
   }
 
+  @CommandLine.Command(
+      name = "shell",
+      description = "Start interactive shell with tab completion.",
+      mixinStandardHelpOptions = true)
+  void shell() throws IOException {
+    if (inShellMode) {
+      logger.warn("Already in shell mode");
+      return;
+    }
+    inShellMode = true;
+
+    final String savedConfigFile = this.configFile;
+    final String savedLogLevel = this.logLevel;
+    final boolean savedInsecure = this.insecure;
+
+    Supplier<Path> workDir = () -> Path.of(System.getProperty("user.dir"));
+
+    CommandLine cmd = new CommandLine(this);
+    cmd.getSubcommands().remove("shell");
+
+    cmd.setExecutionStrategy(
+        parseResult -> {
+          Main main = (Main) parseResult.commandSpec().root().userObject();
+          if (!parseResult.hasMatchedOption("--config")) {
+            main.configFile = savedConfigFile;
+          }
+          if (!parseResult.hasMatchedOption("--log-level")) {
+            main.logLevel = savedLogLevel;
+          }
+          if (!parseResult.hasMatchedOption("--insecure")) {
+            main.insecure = savedInsecure;
+          }
+          ch.qos.logback.classic.Logger rootLogger =
+              (ch.qos.logback.classic.Logger)
+                  LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+          rootLogger.setLevel(Level.toLevel(main.logLevel.toUpperCase(), Level.INFO));
+          return new CommandLine.RunLast().execute(parseResult);
+        });
+    cmd.setExecutionExceptionHandler(
+        (Exception ex, CommandLine self, CommandLine.ParseResult res) -> {
+          logger.error("Error", ex);
+          return 1;
+        });
+
+    PicocliCommands picocliCommands = new PicocliCommands(cmd);
+
+    try (Terminal terminal = TerminalBuilder.builder().build()) {
+      Parser parser = new DefaultParser();
+      SystemRegistry systemRegistry = new SystemRegistryImpl(parser, terminal, workDir, null);
+      systemRegistry.setCommandRegistries(picocliCommands);
+
+      LineReader reader =
+          LineReaderBuilder.builder()
+              .terminal(terminal)
+              .completer(systemRegistry.completer())
+              .parser(parser)
+              .variable(LineReader.LIST_MAX, 50)
+              .build();
+
+      String prompt = "ice> ";
+
+      while (true) {
+        try {
+          systemRegistry.cleanUp();
+          String line = reader.readLine(prompt);
+          systemRegistry.execute(line);
+        } catch (UserInterruptException e) {
+          // Ctrl+C - ignore
+        } catch (EndOfFileException e) {
+          return;
+        } catch (Exception e) {
+          systemRegistry.trace(e);
+        }
+      }
+    }
+  }
+
   public static void main(String[] args) {
     CommandLine cmd = new CommandLine(new Main());
     CommandLine.IExecutionStrategy defaultExecutionStrategy = cmd.getExecutionStrategy();
@@ -797,6 +889,9 @@ public final class Main {
           logger.error("Fatal", ex);
           return 1;
         });
+    if (args.length == 0) {
+      args = new String[] {"shell"};
+    }
     int exitCode = cmd.execute(args);
     System.exit(exitCode);
   }
