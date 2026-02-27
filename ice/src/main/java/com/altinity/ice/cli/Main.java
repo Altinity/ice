@@ -21,6 +21,7 @@ import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.DescribeParquet;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
+import com.altinity.ice.cli.internal.cmd.ListPartitions;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
@@ -605,6 +606,23 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       Scan.run(catalog, TableIdentifier.parse(name), limit, json);
+    }
+  }
+
+  @CommandLine.Command(name = "list-partitions", description = "List partitions in a table.")
+  void listPartitions(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      ListPartitions.run(catalog, TableIdentifier.parse(name), json);
     }
   }
 
