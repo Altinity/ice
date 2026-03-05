@@ -323,12 +323,19 @@ public final class Partitioning {
               if (fieldSpec.type().typeId() != Type.TypeID.DATE) {
                 value = toEpochMicros(value);
               }
+              partitionRecord.setField(
+                sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
               break;
             default:
-              break;
+              if (transformName.startsWith("truncate[")
+                || transformName.startsWith("bucket[")) {
+                partitionRecord.setField(
+                sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
+              } else {
+              throw new UnsupportedOperationException(
+                "Unsupported transformation: " + transformName);
+             }
           }
-          partitionRecord.setField(
-              sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
         }
 
         partitionKeyMold.partition(partitionRecord);
