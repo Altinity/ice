@@ -324,17 +324,16 @@ public final class Partitioning {
                 value = toEpochMicros(value);
               }
               partitionRecord.setField(
-                sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
+                  sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
               break;
             default:
-              if (transformName.startsWith("truncate[")
-                || transformName.startsWith("bucket[")) {
+              if (transformName.startsWith("truncate[") || transformName.startsWith("bucket[")) {
                 partitionRecord.setField(
-                sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
+                    sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
               } else {
-              throw new UnsupportedOperationException(
-                "Unsupported transformation: " + transformName);
-             }
+                throw new UnsupportedOperationException(
+                    "Unsupported transformation: " + transformName);
+              }
           }
         }
 
