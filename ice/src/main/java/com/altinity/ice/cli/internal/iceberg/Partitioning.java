@@ -282,7 +282,10 @@ public final class Partitioning {
       case TIME, TIMESTAMP ->
           // Parquet timestamp might come as INT64 (micros) or Binary; assuming long micros for now
           ((Number) parquetStatValue).longValue();
-      case STRING -> ((org.apache.parquet.io.api.Binary) parquetStatValue).toStringUsingUTF8();
+      case STRING ->
+          parquetStatValue instanceof org.apache.parquet.io.api.Binary b
+              ? b.toStringUsingUTF8()
+              : parquetStatValue.toString();
       default ->
           throw new UnsupportedOperationException("unsupported type: " + icebergType.typeId());
     };
