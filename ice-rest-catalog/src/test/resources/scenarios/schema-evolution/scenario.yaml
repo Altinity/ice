@@ -1,0 +1,9 @@
+name: "Schema evolution (add, drop, rename)"
+description: "Tests alter-table: add column, drop column, rename column"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_schema_ev"
+  TABLE_NAME: "test_schema_ev.t1"
