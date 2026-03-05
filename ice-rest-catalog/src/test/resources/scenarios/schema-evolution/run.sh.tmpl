@@ -1,0 +1,53 @@
+#!/bin/bash
+set -e
+
+echo "Running schema evolution test..."
+
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/../insert-scan/input.parquet"
+
+# Create namespace
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "OK Created namespace: ${NAMESPACE_NAME}"
+
+# Insert table from iris parquet
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}"
+echo "OK Inserted data into ${TABLE_NAME}"
+
+# Alter table: add column only (so same parquet remains valid for second insert)
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} $'[{"op":"add_column","name":"extra","type":"string"}]'
+echo "OK Altered table schema"
+
+# Verify schema: expect extra
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/schema_ev_describe.txt
+if ! grep -q "extra" /tmp/schema_ev_describe.txt; then
+  echo "FAIL describe -s missing expected column 'extra'"
+  cat /tmp/schema_ev_describe.txt
+  exit 1
+fi
+echo "OK Schema verified"
+
+# First scan to get baseline row count (scan output: header + data lines)
+{{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_NAME} --limit 500 > /tmp/schema_ev_scan1.txt
+FIRST_LINES=$(wc -l < /tmp/schema_ev_scan1.txt)
+echo "OK First scan: ${FIRST_LINES} lines"
+
+# Second insert from same parquet (file schema is subset of table after add_column only)
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_NAME} "file://${INPUT_PATH}"
+echo "OK Second insert completed"
+
+# Second scan: expect more rows (more lines)
+{{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_NAME} --limit 500 > /tmp/schema_ev_scan2.txt
+SECOND_LINES=$(wc -l < /tmp/schema_ev_scan2.txt)
+if [ "${SECOND_LINES}" -le "${FIRST_LINES}" ]; then
+  echo "FAIL second scan should have more lines (got ${SECOND_LINES}, first had ${FIRST_LINES})"
+  exit 1
+fi
+echo "OK Second scan: ${SECOND_LINES} lines (rows inserted)"
+
+# Cleanup
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "OK Cleanup done"
+
+echo "Schema evolution test completed successfully"
