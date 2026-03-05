@@ -249,6 +249,11 @@ public final class Partitioning {
   // Copied from org.apache.iceberg.parquet.ParquetConversions.
   private static Object fromParquetPrimitive(Type type, PrimitiveType parquetType, Object value) {
     switch (type.typeId()) {
+      case STRING:
+        if (value instanceof org.apache.parquet.io.api.Binary b) {
+          return b.toStringUsingUTF8();
+        }
+        return value;
       case TIME:
       case TIMESTAMP:
         // time & timestamp/timestamptz are stored in microseconds
@@ -318,13 +323,12 @@ public final class Partitioning {
               if (fieldSpec.type().typeId() != Type.TypeID.DATE) {
                 value = toEpochMicros(value);
               }
-              partitionRecord.setField(
-                  sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
               break;
             default:
-              throw new UnsupportedOperationException(
-                  "Unsupported transformation: " + transformName);
+              break;
           }
+          partitionRecord.setField(
+              sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
         }
 
         partitionKeyMold.partition(partitionRecord);
