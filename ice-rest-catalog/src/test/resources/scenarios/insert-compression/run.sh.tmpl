@@ -6,16 +6,16 @@ echo "Running insert with compression test..."
 SCENARIO_DIR="{{SCENARIO_DIR}}"
 INPUT_PATH="${SCENARIO_DIR}/../insert-scan/input.parquet"
 
+# Create namespace and table
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "OK Created namespace"
+
 # Verify invalid compression codec is rejected
 if {{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}" --compression=invalid 2>/dev/null; then
   echo "FAIL insert should have rejected invalid compression codec"
   exit 1
 fi
 echo "OK Invalid compression codec rejected"
-
-# Create namespace
-{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
-echo "OK Created namespace"
 
 # Insert with zstd compression
 {{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}" --compression=zstd
