@@ -27,6 +27,8 @@ import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceScheduler;
 import com.altinity.ice.rest.catalog.internal.maintenance.ManifestCompaction;
 import com.altinity.ice.rest.catalog.internal.maintenance.OrphanCleanup;
 import com.altinity.ice.rest.catalog.internal.maintenance.SnapshotCleanup;
+import com.altinity.ice.rest.catalog.internal.metrics.CatalogMetrics;
+import com.altinity.ice.rest.catalog.internal.metrics.PrometheusMetricsReporter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAdapter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAuthorizationHandler;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogHandler;
@@ -51,6 +53,8 @@ import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.relocated.com.google.common.base.Function;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.eclipse.jetty.server.Server;
@@ -201,9 +205,38 @@ public final class Main implements Callable<Integer> {
     }
   }
 
+  private static void initializeCatalogMetrics(Catalog catalog) {
+    try {
+      CatalogMetrics metrics = CatalogMetrics.getInstance();
+      String catalogName = catalog.name();
+
+      // Count namespaces
+      if (catalog instanceof SupportsNamespaces nsCatalog) {
+        long namespaceCount = nsCatalog.listNamespaces().size();
+        metrics.setNamespacesTotal(catalogName, namespaceCount);
+        logger.info("Initialized namespace count: {}", namespaceCount);
+
+        // Count tables across all namespaces
+        long tableCount = 0;
+        for (Namespace ns : nsCatalog.listNamespaces()) {
+          tableCount += catalog.listTables(ns).size();
+        }
+        metrics.setTablesTotal(catalogName, tableCount);
+        logger.info("Initialized table count: {}", tableCount);
+      }
+    } catch (Exception e) {
+      logger.warn("Failed to initialize catalog metrics: {}", e.getMessage());
+    }
+  }
+
   static Server createServer(
-      String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
-    var s = createBaseServer(catalog, config, icebergConfig, true);
+      String host,
+      int port,
+      Catalog catalog,
+      Config config,
+      Map<String, String> icebergConfig,
+      PrometheusMetricsReporter metricsReporter) {
+    var s = createBaseServer(catalog, config, icebergConfig, true, metricsReporter);
     ServerConnector connector = new ServerConnector(s);
     connector.setHost(host);
     connector.setPort(port);
@@ -212,8 +245,13 @@ public final class Main implements Callable<Integer> {
   }
 
   private static Server createAdminServer(
-      String host, int port, Catalog catalog, Config config, Map<String, String> icebergConfig) {
-    var s = createBaseServer(catalog, config, icebergConfig, false);
+      String host,
+      int port,
+      Catalog catalog,
+      Config config,
+      Map<String, String> icebergConfig,
+      PrometheusMetricsReporter metricsReporter) {
+    var s = createBaseServer(catalog, config, icebergConfig, false, metricsReporter);
     ServerConnector connector = new ServerConnector(s);
     connector.setHost(host);
     connector.setPort(port);
@@ -222,7 +260,11 @@ public final class Main implements Callable<Integer> {
   }
 
   private static Server createBaseServer(
-      Catalog catalog, Config config, Map<String, String> icebergConfig, boolean requireAuth) {
+      Catalog catalog,
+      Config config,
+      Map<String, String> icebergConfig,
+      boolean requireAuth,
+      PrometheusMetricsReporter metricsReporter) {
     var mux = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
     mux.insertHandler(new GzipHandler());
     // TODO: RequestLogHandler
@@ -372,6 +414,9 @@ public final class Main implements Callable<Integer> {
 
     var catalog = loadCatalog(config, icebergConfig);
 
+    // Initialize catalog metrics with current counts
+    initializeCatalogMetrics(catalog);
+
     ObjectMapper om = new ObjectMapper();
 
     for (Config.Token t : config.bearerTokens()) {
@@ -401,6 +446,9 @@ public final class Main implements Callable<Integer> {
       logger.info("Catalog maintenance disabled (no maintenance schedule specified)");
     }
 
+    // Initialize Iceberg metrics reporter for Prometheus (singleton)
+    PrometheusMetricsReporter metricsReporter = PrometheusMetricsReporter.getInstance();
+
     // TODO: ensure all http handlers are hooked in
     JvmMetrics.builder().register();
 
@@ -414,14 +462,21 @@ public final class Main implements Callable<Integer> {
               adminHostAndPort.getPort(),
               catalog,
               config,
-              icebergConfig);
+              icebergConfig,
+              metricsReporter);
       adminServer.start();
       logger.warn("Serving admin endpoint at http://{}/v1/{config,*}", adminHostAndPort);
     }
 
     HostAndPort hostAndPort = HostAndPort.fromString(config.addr());
     Server httpServer =
-        createServer(hostAndPort.getHost(), hostAndPort.getPort(), catalog, config, icebergConfig);
+        createServer(
+            hostAndPort.getHost(),
+            hostAndPort.getPort(),
+            catalog,
+            config,
+            icebergConfig,
+            metricsReporter);
     httpServer.start();
     logger.info("Serving http://{}/v1/{config,*}", hostAndPort);
 

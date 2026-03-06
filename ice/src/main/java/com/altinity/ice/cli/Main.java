@@ -21,6 +21,7 @@ import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.DescribeParquet;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
+import com.altinity.ice.cli.internal.cmd.ListPartitions;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
@@ -211,7 +212,9 @@ public final class Main {
       @JsonProperty("nullFirst") boolean nullFirst) {}
 
   public record IcePartition(
-      @JsonProperty("column") String column, @JsonProperty("transform") String transform) {}
+      @JsonProperty("column") String column,
+      @JsonProperty("transform") String transform,
+      @JsonProperty("name") String name) {}
 
   @CommandLine.Command(name = "create-table", description = "Create table.")
   void createTable(
@@ -247,7 +250,7 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\", \"name\":\"custom_name\"}]. "
                       + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
@@ -397,7 +400,7 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\", \"name\":\"custom_name\"}]. "
                       + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
@@ -423,6 +426,10 @@ public final class Main {
               names = {"--watch"},
               description = "Event queue. Supported: AWS SQS")
           String watch,
+      @CommandLine.Option(
+              names = {"--watch-endpoint"},
+              description = "Custom SQS endpoint URL (e.g. http://localhost:9324 for LocalStack)")
+          String watchEndpoint,
       @CommandLine.Option(
               names = {"--watch-fire-once"},
               description = "")
@@ -525,6 +532,7 @@ public final class Main {
           System.exit(retryListExitCode);
         }
       } else {
+        boolean metricsEnabled = false;
         if (!Strings.isNullOrEmpty(watchDebugAddr)) {
           JvmMetrics.builder().register();
 
@@ -537,10 +545,19 @@ public final class Main {
             throw new RuntimeException(e); // TODO: find a better one
           }
           logger.info("Serving http://{}/{metrics,healtz,livez,readyz}", debugHostAndPort);
+          metricsEnabled = true;
         }
 
         InsertWatch.run(
-            catalog, tableId, files, watch, watchFireOnce, createTableIfNotExists, options);
+            catalog,
+            tableId,
+            files,
+            watch,
+            watchEndpoint,
+            watchFireOnce,
+            createTableIfNotExists,
+            options,
+            metricsEnabled);
       }
     }
   }
@@ -597,6 +614,23 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       Scan.run(catalog, TableIdentifier.parse(name), limit, json);
+    }
+  }
+
+  @CommandLine.Command(name = "list-partitions", description = "List partitions in a table.")
+  void listPartitions(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      ListPartitions.run(catalog, TableIdentifier.parse(name), json);
     }
   }
 

@@ -15,8 +15,21 @@ INPUT_PATH="${SCENARIO_DIR}/${INPUT_FILE}"
 {{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} ${INPUT_PATH} --partition="${PARTITION_SPEC}"
 echo "OK Inserted data with partitioning into table ${TABLE_NAME}"
 
-# Describe the table to verify partitioning (if describe command exists)
-# {{ICE_CLI}} --config {{CLI_CONFIG}} describe-table ${TABLE_NAME}
+# List partitions and validate output
+LIST_PARTITIONS_OUT=$(mktemp)
+trap "rm -f '${LIST_PARTITIONS_OUT}'" EXIT
+{{ICE_CLI}} --config {{CLI_CONFIG}} list-partitions ${TABLE_NAME} > "${LIST_PARTITIONS_OUT}"
+if ! grep -q "partitions:" "${LIST_PARTITIONS_OUT}"; then
+  echo "FAIL: list-partitions output missing 'partitions:' section"
+  cat "${LIST_PARTITIONS_OUT}"
+  exit 1
+fi
+if ! grep -qE -- "- *[^=]+=" "${LIST_PARTITIONS_OUT}"; then
+  echo "FAIL: list-partitions output has no partition entries (expected at least one key=value)"
+  cat "${LIST_PARTITIONS_OUT}"
+  exit 1
+fi
+echo "OK Listed and validated partitions for ${TABLE_NAME}"
 
 # Cleanup
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
