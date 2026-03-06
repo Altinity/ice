@@ -112,13 +112,14 @@ public final class Insert {
     }
 
     if (options.compression() != null) {
-      Set<String> valid =
+      // Validate against the list of parquet compression codecs supported by Iceberg.
+      Set<String> validCompressionCodecs =
           Arrays.stream(CompressionCodecName.values())
               .map(c -> c.name().toLowerCase(Locale.ENGLISH))
               .collect(Collectors.toCollection(HashSet::new));
-      valid.add("as-source");
-      if (!valid.contains(options.compression().toLowerCase(Locale.ENGLISH))) {
-        String accepted = String.join(", ", new TreeSet<>(valid));
+      validCompressionCodecs.add("as-source");
+      if (!validCompressionCodecs.contains(options.compression().toLowerCase(Locale.ENGLISH))) {
+        String accepted = String.join(", ", new TreeSet<>(validCompressionCodecs));
         throw new IllegalArgumentException(
             "Unknown --compression value: " + options.compression() + ". Accepted: " + accepted);
       }
