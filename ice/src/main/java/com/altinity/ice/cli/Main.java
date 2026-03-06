@@ -212,7 +212,9 @@ public final class Main {
       @JsonProperty("nullFirst") boolean nullFirst) {}
 
   public record IcePartition(
-      @JsonProperty("column") String column, @JsonProperty("transform") String transform) {}
+      @JsonProperty("column") String column,
+      @JsonProperty("transform") String transform,
+      @JsonProperty("name") String name) {}
 
   @CommandLine.Command(name = "create-table", description = "Create table.")
   void createTable(
@@ -248,7 +250,7 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\", \"name\":\"custom_name\"}]. "
                       + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
@@ -398,7 +400,7 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\", \"name\":\"custom_name\"}]. "
                       + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
