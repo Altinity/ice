@@ -6,6 +6,13 @@ echo "Running insert with compression test..."
 SCENARIO_DIR="{{SCENARIO_DIR}}"
 INPUT_PATH="${SCENARIO_DIR}/../insert-scan/input.parquet"
 
+# Verify invalid compression codec is rejected
+if {{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}" --compression=invalid 2>/dev/null; then
+  echo "FAIL insert should have rejected invalid compression codec"
+  exit 1
+fi
+echo "OK Invalid compression codec rejected"
+
 # Create namespace
 {{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
 echo "OK Created namespace"
@@ -14,27 +21,28 @@ echo "OK Created namespace"
 {{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}" --compression=zstd
 echo "OK Inserted data with zstd compression"
 
-# Scan to verify data is readable
-{{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_NAME} > /tmp/compression_scan.txt
-if ! grep -q "sepal.length" /tmp/compression_scan.txt; then
-  echo "FAIL Scan output missing expected column 'sepal.length'"
-  cat /tmp/compression_scan.txt
+# Scan to verify data written with zstd is readable
+{{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_NAME} > /tmp/compression_scan1.txt
+if ! grep -q "sepal.length" /tmp/compression_scan1.txt; then
+  echo "FAIL Scan output missing expected column after zstd insert"
+  cat /tmp/compression_scan1.txt
   exit 1
 fi
-echo "OK Scan verified data is readable after zstd insert"
+FIRST_LINES=$(wc -l < /tmp/compression_scan1.txt)
+echo "OK Scan after zstd insert: ${FIRST_LINES} lines"
 
-# Insert again with snappy to verify a second codec works
+# Insert again with snappy compression
 {{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_NAME} "file://${INPUT_PATH}" --compression=snappy
 echo "OK Inserted data with snappy compression"
 
-# Scan again to verify both inserts are readable
+# Scan to verify both zstd and snappy data files are readable together
 {{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_NAME} --limit 500 > /tmp/compression_scan2.txt
-LINES=$(wc -l < /tmp/compression_scan2.txt)
-if [ "${LINES}" -le 1 ]; then
-  echo "FAIL Scan after second insert returned no data"
+SECOND_LINES=$(wc -l < /tmp/compression_scan2.txt)
+if [ "${SECOND_LINES}" -le "${FIRST_LINES}" ]; then
+  echo "FAIL Second scan should have more rows (got ${SECOND_LINES}, first had ${FIRST_LINES})"
   exit 1
 fi
-echo "OK Scan after second insert: ${LINES} lines"
+echo "OK Scan after snappy insert: ${SECOND_LINES} lines"
 
 # Cleanup
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
