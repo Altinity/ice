@@ -8,3 +8,7 @@ target
 .devbox
 /.envrc
 *.credentials
+/.idea
+/examples/docker-compose/data
+devbox.lock
+/var/cache
