@@ -8,3 +8,4 @@ target
 .devbox
 /.envrc
 *.credentials
+.DS_Store

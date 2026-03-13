@@ -22,6 +22,7 @@ import com.altinity.ice.cli.internal.cmd.DescribeParquet;
 import com.altinity.ice.cli.internal.cmd.Files;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
+import com.altinity.ice.cli.internal.cmd.ListNamespace;
 import com.altinity.ice.cli.internal.cmd.ListPartitions;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
@@ -705,6 +706,28 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       DeleteNamespace.run(catalog, Namespace.of(name.split("[.]")), ignoreNotFound);
+    }
+  }
+
+  @CommandLine.Command(name = "list-namespace", description = "List namespaces.")
+  void listNamespace(
+      @CommandLine.Parameters(
+              arity = "0..1",
+              paramLabel = "<parent>",
+              description =
+                  "Parent namespace to list children of (e.g. parent_ns). Omit for top-level.")
+          String parent,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      Namespace namespace =
+          (parent == null || parent.isEmpty())
+              ? Namespace.empty()
+              : Namespace.of(parent.split("[.]"));
+      ListNamespace.run(catalog, namespace, json);
     }
   }
 
