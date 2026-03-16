@@ -875,9 +875,6 @@ public final class Main {
           logger.error("Fatal", ex);
           return 1;
         });
-    if (args.length == 0) {
-      args = new String[] {"shell"};
-    }
     int exitCode = cmd.execute(args);
     System.exit(exitCode);
   }
