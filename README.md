@@ -10,7 +10,7 @@ Create/delete tables, insert data with `ice insert -p ns1.table1 file://example.
 
 ## Installation
 
-Pre-built binaries\* (+ links to Docker images for [ice](https://hub.docker.com/r/altinity/ice) and [ice-rest-catalog](https://hub.docker.com/r/altinity/ice-rest-catalog)) are available form [GitHub Releases](https://github.com/Altinity/ice/releases) page.
+Pre-built binaries\* (+ links to Docker images for [ice](https://hub.docker.com/r/altinity/ice) and [ice-rest-catalog](https://hub.docker.com/r/altinity/ice-rest-catalog)) are available from [GitHub Releases](https://github.com/Altinity/ice/releases) page.
 > \* currently require `java` 21+ to run (available [here](https://adoptium.net/installation/)).  
 
 ## Usage
