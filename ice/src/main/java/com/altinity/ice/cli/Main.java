@@ -709,7 +709,7 @@ public final class Main {
     }
   }
 
-  @CommandLine.Command(name = "list-namespace", description = "List namespaces.")
+  @CommandLine.Command(name = "list-namespaces", description = "List namespaces.")
   void listNamespace(
       @CommandLine.Parameters(
               arity = "0..1",

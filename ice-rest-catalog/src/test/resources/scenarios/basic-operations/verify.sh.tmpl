@@ -66,7 +66,7 @@ if ! grep -qE "s3a://test-bucket/warehouse/test_ns/.*/data/.*\.parquet" "$F"; th
   echo "FAIL $F does not contain expected datafile path pattern"
   exit 1
 fi
-# Verify list-namespace output contains the test namespace
+# Verify list-namespaces output contains the test namespace
 if ! grep -q "test_ns" /tmp/basic_ops_list_namespace.txt; then
   echo "FAIL basic_ops_list_namespace.txt does not contain expected namespace 'test_ns'"
   exit 1
