@@ -710,7 +710,7 @@ public final class Main {
   }
 
   @CommandLine.Command(name = "list-namespaces", description = "List namespaces.")
-  void listNamespace(
+  void listNamespaces(
       @CommandLine.Parameters(
               arity = "0..1",
               paramLabel = "<parent>",
