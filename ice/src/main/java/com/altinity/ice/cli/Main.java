@@ -22,7 +22,7 @@ import com.altinity.ice.cli.internal.cmd.DescribeParquet;
 import com.altinity.ice.cli.internal.cmd.Files;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
-import com.altinity.ice.cli.internal.cmd.ListNamespace;
+import com.altinity.ice.cli.internal.cmd.ListNamespaces;
 import com.altinity.ice.cli.internal.cmd.ListPartitions;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
@@ -727,7 +727,7 @@ public final class Main {
           (parent == null || parent.isEmpty())
               ? Namespace.empty()
               : Namespace.of(parent.split("[.]"));
-      ListNamespace.run(catalog, namespace, json);
+      ListNamespaces.run(catalog, namespace, json);
     }
   }
 

@@ -19,9 +19,9 @@ import java.util.stream.Collectors;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTCatalog;
 
-public final class ListNamespace {
+public final class ListNamespaces {
 
-  private ListNamespace() {}
+  private ListNamespaces() {}
 
   public static void run(RESTCatalog catalog, Namespace parent, boolean json) throws IOException {
     List<Namespace> namespaces = catalog.listNamespaces(parent);
