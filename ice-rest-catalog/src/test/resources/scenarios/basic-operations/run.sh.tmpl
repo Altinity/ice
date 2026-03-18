@@ -17,6 +17,15 @@ INPUT_PATH="${SCENARIO_DIR}/${INPUT_FILE}"
 {{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
 echo "OK Created namespace: ${NAMESPACE_NAME}"
 
+# List namespaces via list-namespaces command (top-level)
+{{ICE_CLI}} --config {{CLI_CONFIG}} list-namespaces > /tmp/basic_ops_list_namespace.txt
+if ! grep -q "${NAMESPACE_NAME}" /tmp/basic_ops_list_namespace.txt; then
+  echo "FAIL: list-namespaces output missing namespace ${NAMESPACE_NAME}"
+  cat /tmp/basic_ops_list_namespace.txt
+  exit 1
+fi
+echo "OK list-namespaces listed ${NAMESPACE_NAME}"
+
 # List namespaces (ice describe) - no output when no tables yet
 {{ICE_CLI}} --config {{CLI_CONFIG}} describe
 echo "OK Listed namespaces"
