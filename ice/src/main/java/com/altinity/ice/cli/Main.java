@@ -917,7 +917,7 @@ public final class Main {
           String line = reader.readLine(prompt);
           systemRegistry.execute(line);
         } catch (UserInterruptException e) {
-          // Ctrl+C - ignore
+          System.exit(0);
         } catch (EndOfFileException e) {
           return;
         } catch (Exception e) {
