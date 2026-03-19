@@ -1,3 +1,4 @@
+.idea/
 target
 /demo/data
 /demo/clickhouse-udfs.xml
@@ -7,3 +8,4 @@ target
 .devbox
 /.envrc
 *.credentials
+.DS_Store

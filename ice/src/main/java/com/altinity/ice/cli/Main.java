@@ -19,8 +19,11 @@ import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.DescribeParquet;
+import com.altinity.ice.cli.internal.cmd.Files;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
+import com.altinity.ice.cli.internal.cmd.ListNamespaces;
+import com.altinity.ice.cli.internal.cmd.ListPartitions;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
@@ -158,6 +161,19 @@ public final class Main {
     }
   }
 
+  @CommandLine.Command(name = "files", description = "List files in current snapshot.")
+  void files(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      Files.run(catalog, TableIdentifier.parse(name));
+    }
+  }
+
   @CommandLine.Command(name = "describe-parquet", description = "Describe parquet file metadata.")
   void describeParquet(
       @CommandLine.Parameters(
@@ -226,7 +242,9 @@ public final class Main {
       @JsonProperty("nullFirst") boolean nullFirst) {}
 
   public record IcePartition(
-      @JsonProperty("column") String column, @JsonProperty("transform") String transform) {}
+      @JsonProperty("column") String column,
+      @JsonProperty("transform") String transform,
+      @JsonProperty("name") String name) {}
 
   @CommandLine.Command(name = "create-table", description = "Create table.")
   void createTable(
@@ -262,7 +280,7 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\", \"name\":\"custom_name\"}]. "
                       + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
@@ -412,7 +430,7 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\", \"name\":\"custom_name\"}]. "
                       + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
@@ -433,6 +451,10 @@ public final class Main {
               names = {"--watch"},
               description = "Event queue. Supported: AWS SQS")
           String watch,
+      @CommandLine.Option(
+              names = {"--watch-endpoint"},
+              description = "Custom SQS endpoint URL (e.g. http://localhost:9324 for LocalStack)")
+          String watchEndpoint,
       @CommandLine.Option(
               names = {"--watch-fire-once"},
               description = "")
@@ -534,6 +556,7 @@ public final class Main {
           System.exit(retryListExitCode);
         }
       } else {
+        boolean metricsEnabled = false;
         if (!Strings.isNullOrEmpty(watchDebugAddr)) {
           JvmMetrics.builder().register();
 
@@ -546,10 +569,19 @@ public final class Main {
             throw new RuntimeException(e); // TODO: find a better one
           }
           logger.info("Serving http://{}/{metrics,healtz,livez,readyz}", debugHostAndPort);
+          metricsEnabled = true;
         }
 
         InsertWatch.run(
-            catalog, tableId, files, watch, watchFireOnce, createTableIfNotExists, options);
+            catalog,
+            tableId,
+            files,
+            watch,
+            watchEndpoint,
+            watchFireOnce,
+            createTableIfNotExists,
+            options,
+            metricsEnabled);
       }
     }
   }
@@ -606,6 +638,23 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       Scan.run(catalog, TableIdentifier.parse(name), limit, json);
+    }
+  }
+
+  @CommandLine.Command(name = "list-partitions", description = "List partitions in a table.")
+  void listPartitions(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      ListPartitions.run(catalog, TableIdentifier.parse(name), json);
     }
   }
 
@@ -672,6 +721,28 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       DeleteNamespace.run(catalog, Namespace.of(name.split("[.]")), ignoreNotFound);
+    }
+  }
+
+  @CommandLine.Command(name = "list-namespaces", description = "List namespaces.")
+  void listNamespaces(
+      @CommandLine.Parameters(
+              arity = "0..1",
+              paramLabel = "<parent>",
+              description =
+                  "Parent namespace to list children of (e.g. parent_ns). Omit for top-level.")
+          String parent,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      Namespace namespace =
+          (parent == null || parent.isEmpty())
+              ? Namespace.empty()
+              : Namespace.of(parent.split("[.]"));
+      ListNamespaces.run(catalog, namespace, json);
     }
   }
 

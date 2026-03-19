@@ -10,6 +10,7 @@
 package com.altinity.ice.cli.internal.iceberg;
 
 import com.altinity.ice.cli.Main;
+import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -61,25 +62,50 @@ public final class Partitioning {
     if (!columns.isEmpty()) {
       for (Main.IcePartition partition : columns) {
         String transform = Objects.requireNonNullElse(partition.transform(), "").toLowerCase();
+        String name = Strings.isNullOrEmpty(partition.name()) ? null : partition.name();
         if (transform.startsWith("bucket[")) {
           int numBuckets = Integer.parseInt(transform.substring(7, transform.length() - 1));
-          builder.bucket(partition.column(), numBuckets);
+          if (name != null) {
+            builder.bucket(partition.column(), numBuckets, name);
+          } else {
+            builder.bucket(partition.column(), numBuckets);
+          }
         } else if (transform.startsWith("truncate[")) {
           int width = Integer.parseInt(transform.substring(9, transform.length() - 1));
-          builder.truncate(partition.column(), width);
+          if (name != null) {
+            builder.truncate(partition.column(), width, name);
+          } else {
+            builder.truncate(partition.column(), width);
+          }
         } else {
           switch (transform) {
             case "year":
-              builder.year(partition.column());
+              if (name != null) {
+                builder.year(partition.column(), name);
+              } else {
+                builder.year(partition.column());
+              }
               break;
             case "month":
-              builder.month(partition.column());
+              if (name != null) {
+                builder.month(partition.column(), name);
+              } else {
+                builder.month(partition.column());
+              }
               break;
             case "day":
-              builder.day(partition.column());
+              if (name != null) {
+                builder.day(partition.column(), name);
+              } else {
+                builder.day(partition.column());
+              }
               break;
             case "hour":
-              builder.hour(partition.column());
+              if (name != null) {
+                builder.hour(partition.column(), name);
+              } else {
+                builder.hour(partition.column());
+              }
               break;
             case "identity":
             case "":
@@ -97,26 +123,32 @@ public final class Partitioning {
   public static void apply(UpdatePartitionSpec op, List<Main.IcePartition> columns) {
     for (Main.IcePartition partition : columns) {
       String transform = Objects.requireNonNullElse(partition.transform(), "").toLowerCase();
+      String name = Strings.isNullOrEmpty(partition.name()) ? null : partition.name();
       if (transform.startsWith("bucket[")) {
         int numBuckets = Integer.parseInt(transform.substring(7, transform.length() - 1));
-        op.addField(
-            partition.column() + "_bucket", Expressions.bucket(partition.column(), numBuckets));
+        String fieldName = name != null ? name : partition.column() + "_bucket";
+        op.addField(fieldName, Expressions.bucket(partition.column(), numBuckets));
       } else if (transform.startsWith("truncate[")) {
         int width = Integer.parseInt(transform.substring(9, transform.length() - 1));
-        op.addField(partition.column() + "_trunc", Expressions.truncate(partition.column(), width));
+        String fieldName = name != null ? name : partition.column() + "_trunc";
+        op.addField(fieldName, Expressions.truncate(partition.column(), width));
       } else {
         switch (transform) {
           case "year":
-            op.addField(partition.column() + "_year", Expressions.year(partition.column()));
+            String yearField = name != null ? name : partition.column() + "_year";
+            op.addField(yearField, Expressions.year(partition.column()));
             break;
           case "month":
-            op.addField(partition.column() + "_month", Expressions.month(partition.column()));
+            String monthField = name != null ? name : partition.column() + "_month";
+            op.addField(monthField, Expressions.month(partition.column()));
             break;
           case "day":
-            op.addField(partition.column() + "_day", Expressions.day(partition.column()));
+            String dayField = name != null ? name : partition.column() + "_day";
+            op.addField(dayField, Expressions.day(partition.column()));
             break;
           case "hour":
-            op.addField(partition.column() + "_hour", Expressions.hour(partition.column()));
+            String hourField = name != null ? name : partition.column() + "_hour";
+            op.addField(hourField, Expressions.hour(partition.column()));
             break;
           case "identity":
           case "":
@@ -217,6 +249,11 @@ public final class Partitioning {
   // Copied from org.apache.iceberg.parquet.ParquetConversions.
   private static Object fromParquetPrimitive(Type type, PrimitiveType parquetType, Object value) {
     switch (type.typeId()) {
+      case STRING:
+        if (value instanceof org.apache.parquet.io.api.Binary b) {
+          return b.toStringUsingUTF8();
+        }
+        return value;
       case TIME:
       case TIMESTAMP:
         // time & timestamp/timestamptz are stored in microseconds
@@ -245,7 +282,10 @@ public final class Partitioning {
       case TIME, TIMESTAMP ->
           // Parquet timestamp might come as INT64 (micros) or Binary; assuming long micros for now
           ((Number) parquetStatValue).longValue();
-      case STRING -> ((org.apache.parquet.io.api.Binary) parquetStatValue).toStringUsingUTF8();
+      case STRING ->
+          parquetStatValue instanceof org.apache.parquet.io.api.Binary b
+              ? b.toStringUsingUTF8()
+              : parquetStatValue.toString();
       default ->
           throw new UnsupportedOperationException("unsupported type: " + icebergType.typeId());
     };
@@ -290,8 +330,13 @@ public final class Partitioning {
                   sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
               break;
             default:
-              throw new UnsupportedOperationException(
-                  "Unsupported transformation: " + transformName);
+              if (transformName.startsWith("truncate[") || transformName.startsWith("bucket[")) {
+                partitionRecord.setField(
+                    sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
+              } else {
+                throw new UnsupportedOperationException(
+                    "Unsupported transformation: " + transformName);
+              }
           }
         }
 
