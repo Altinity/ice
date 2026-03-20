@@ -115,6 +115,9 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
           String pageSize = PropertyUtil.propertyAsString(vars, "pageSize", null);
 
           if (pageSize != null) {
+            if (pageToken == null) {
+              pageToken = "";
+            }
             return castResponse(
                 responseType,
                 CatalogHandlers.listNamespaces(asNamespaceCatalog, ns, pageToken, pageSize));

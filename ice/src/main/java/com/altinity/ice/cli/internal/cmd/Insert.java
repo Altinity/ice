@@ -531,6 +531,16 @@ public final class Insert {
         } else {
           compressionCodecOverride = options.compression().toLowerCase();
         }
+      // Table isn't partitioned or sorted. Copy as is.
+      String dstDataFile;
+      if (partitionSpec.isPartitioned() && partitionKey != null) {
+        // File has inferred partition, use partition path
+        dstDataFile = dstDataFileSource.get(partitionSpec, partitionKey, file);
+      } else {
+        dstDataFile = dstDataFileSource.get(file);
+      }
+      if (checkNotExists.apply(dstDataFile)) {
+        return Collections.emptyList();
       }
 
       if (partitionSpec.isPartitioned() && partitionKey == null) {
