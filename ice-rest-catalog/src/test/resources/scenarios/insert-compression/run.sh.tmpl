@@ -1,0 +1,52 @@
+#!/bin/bash
+set -e
+
+echo "Running insert with compression test..."
+
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/../insert-scan/input.parquet"
+
+# Create namespace and table
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "OK Created namespace"
+
+# Verify invalid compression codec is rejected
+if {{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}" --compression=invalid 2>/dev/null; then
+  echo "FAIL insert should have rejected invalid compression codec"
+  exit 1
+fi
+echo "OK Invalid compression codec rejected"
+
+# Insert with zstd compression
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}" --compression=zstd
+echo "OK Inserted data with zstd compression"
+
+# Scan to verify data written with zstd is readable
+{{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_NAME} > /tmp/compression_scan1.txt
+if ! grep -q "sepal.length" /tmp/compression_scan1.txt; then
+  echo "FAIL Scan output missing expected column after zstd insert"
+  cat /tmp/compression_scan1.txt
+  exit 1
+fi
+FIRST_LINES=$(wc -l < /tmp/compression_scan1.txt)
+echo "OK Scan after zstd insert: ${FIRST_LINES} lines"
+
+# Insert again with snappy compression
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_NAME} "file://${INPUT_PATH}" --compression=snappy
+echo "OK Inserted data with snappy compression"
+
+# Scan to verify both zstd and snappy data files are readable together
+{{ICE_CLI}} --config {{CLI_CONFIG}} scan ${TABLE_NAME} --limit 500 > /tmp/compression_scan2.txt
+SECOND_LINES=$(wc -l < /tmp/compression_scan2.txt)
+if [ "${SECOND_LINES}" -le "${FIRST_LINES}" ]; then
+  echo "FAIL Second scan should have more rows (got ${SECOND_LINES}, first had ${FIRST_LINES})"
+  exit 1
+fi
+echo "OK Scan after snappy insert: ${SECOND_LINES} lines"
+
+# Cleanup
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "OK Cleanup done"
+
+echo "Insert with compression test completed successfully"
