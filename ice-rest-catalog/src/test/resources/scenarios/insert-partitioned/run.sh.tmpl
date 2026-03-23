@@ -69,8 +69,8 @@ if ! grep -q "partitions:" <<<"${LIST_PARTITIONS_OUT_BUCKET}"; then
   printf '%s\n' "${LIST_PARTITIONS_OUT_BUCKET}"
   exit 1
 fi
-if ! grep -qE -- "- *[^=]+=" <<<"${LIST_PARTITIONS_OUT_BUCKET}"; then
-  echo "FAIL: list-partitions output has no partition entries"
+if ! grep -q "variety_bucket=" <<<"${LIST_PARTITIONS_OUT_BUCKET}"; then
+  echo "FAIL: list-partitions output missing bucket partition entries (expected 'variety_bucket=')"
   printf '%s\n' "${LIST_PARTITIONS_OUT_BUCKET}"
   exit 1
 fi
