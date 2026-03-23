@@ -8,4 +8,4 @@ env:
   NAMESPACE_NAME: "test_custom_part"
   TABLE_NAME: "test_custom_part.iris_custom"
   INPUT_FILE: "input.parquet"
-  PARTITION_SPEC: '[{"column":"variety","transform":"truncate[3]","name":"var_trunc"}]'
+  PARTITION_SPEC: '[{"column":"variety","transform":"bucket[3]","name":"var_bucket"}]'
