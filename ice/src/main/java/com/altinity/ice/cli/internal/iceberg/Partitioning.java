@@ -282,7 +282,7 @@ public final class Partitioning {
           }
           String transformName = transform.toString();
 
-          if (transformName.startsWith("bucket[") || transformName.startsWith("truncate[")) {
+          if (transformName.startsWith("bucket[")) {
             partitionRecord.setField(
                 sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
             continue;
