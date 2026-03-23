@@ -13,14 +13,14 @@ echo "OK Created namespace"
   --partition="${PARTITION_SPEC}"
 echo "OK Inserted data with custom partition name"
 
-{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/custom_part_describe.txt
+DESCRIBE_OUT=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe -s "${TABLE_NAME}")
 
-if ! grep -q "var_trunc" /tmp/custom_part_describe.txt; then
-  echo "FAIL describe -s output missing custom partition name 'var_trunc'"
-  cat /tmp/custom_part_describe.txt
+if ! grep -q "var_bucket" <<<"${DESCRIBE_OUT}"; then
+  echo "FAIL describe -s output missing custom partition name 'var_bucket'"
+  printf '%s\n' "${DESCRIBE_OUT}"
   exit 1
 fi
-echo "OK Custom partition name 'var_trunc' found in describe output"
+echo "OK Custom partition name 'var_bucket' found in describe output"
 
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}

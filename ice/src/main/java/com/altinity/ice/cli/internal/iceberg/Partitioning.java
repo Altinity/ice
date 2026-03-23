@@ -344,12 +344,6 @@ public final class Partitioning {
           }
           String transformName = transform.toString();
 
-          if (transformName.startsWith("bucket[")) {
-            partitionRecord.setField(
-                sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
-            continue;
-          }
-
           switch (transformName) {
             case "hour", "day", "month", "year":
               if (fieldSpec.type().typeId() != Type.TypeID.DATE) {
@@ -359,7 +353,7 @@ public final class Partitioning {
                   sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
               break;
             default:
-              if (transformName.startsWith("truncate[") || transformName.startsWith("bucket[")) {
+              if (transformName.startsWith("bucket[")) {
                 partitionRecord.setField(
                     sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
               } else {
