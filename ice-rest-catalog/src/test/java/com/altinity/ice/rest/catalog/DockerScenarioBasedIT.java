@@ -169,7 +169,8 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
     templateVars.put("CLI_CONFIG", "/tmp/ice-cli.yaml");
     templateVars.put("SCENARIO_DIR", "/scenarios/" + scenarioName);
     templateVars.put("MINIO_ENDPOINT", "");
-    templateVars.put("CATALOG_URI", "http://localhost:5000");
+    templateVars.put(
+        "CATALOG_URI", "http://" + catalog.getHost() + ":" + catalog.getMappedPort(5000));
 
     return new ScenarioTestRunner(scenariosDir, templateVars);
   }

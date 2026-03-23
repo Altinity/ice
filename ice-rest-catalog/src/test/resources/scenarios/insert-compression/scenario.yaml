@@ -1,0 +1,10 @@
+name: "Insert with compression codec"
+description: "Tests inserting data with --compression flag (zstd) and verifying data is readable"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_compression"
+  TABLE_NAME: "test_compression.iris_zstd"
+  INPUT_FILE: "input.parquet"

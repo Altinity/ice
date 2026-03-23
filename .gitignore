@@ -8,3 +8,7 @@ target
 .devbox
 /.envrc
 *.credentials
+.DS_Store
+/examples/docker-compose/data
+devbox.lock
+/var/cache

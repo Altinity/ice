@@ -66,7 +66,7 @@ jobs:
 
       - name: Run Docker integration tests
         run: >
-          ./mvnw -pl ice-rest-catalog install -Dmaven.test.skip=true -Pno-check &&
+          ./mvnw -pl ice-rest-catalog -am install -Dmaven.test.skip=true -Pno-check &&
           ./mvnw -pl ice-rest-catalog failsafe:integration-test failsafe:verify
           -Dit.test=DockerScenarioBasedIT
           -Ddocker.image=altinity/ice-rest-catalog:debug-with-ice-latest-master-amd64

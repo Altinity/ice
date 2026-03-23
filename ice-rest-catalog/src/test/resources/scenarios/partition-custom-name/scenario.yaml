@@ -1,0 +1,11 @@
+name: "Insert with custom partition name"
+description: "Tests that custom partition field names are applied via the name JSON field"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_custom_part"
+  TABLE_NAME: "test_custom_part.iris_custom"
+  INPUT_FILE: "input.parquet"
+  PARTITION_SPEC: '[{"column":"variety","transform":"truncate[3]","name":"var_trunc"}]'

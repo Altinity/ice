@@ -19,8 +19,11 @@ import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
 import com.altinity.ice.cli.internal.cmd.DescribeParquet;
+import com.altinity.ice.cli.internal.cmd.Files;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
+import com.altinity.ice.cli.internal.cmd.ListNamespaces;
+import com.altinity.ice.cli.internal.cmd.ListPartitions;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
@@ -34,12 +37,14 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.curator.shaded.com.google.common.net.HostAndPort;
 import org.apache.iceberg.CatalogProperties;
@@ -47,10 +52,21 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.eclipse.jetty.server.Server;
+import org.jline.console.SystemRegistry;
+import org.jline.console.impl.SystemRegistryImpl;
+import org.jline.reader.EndOfFileException;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.Parser;
+import org.jline.reader.UserInterruptException;
+import org.jline.reader.impl.DefaultParser;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.AutoComplete;
 import picocli.CommandLine;
+import picocli.shell.jline3.PicocliCommands;
 
 @CommandLine.Command(
     name = "ice",
@@ -62,6 +78,8 @@ import picocli.CommandLine;
 public final class Main {
 
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
+
+  private boolean inShellMode = false;
 
   @CommandLine.Option(
       names = {"-c", "--config"},
@@ -143,6 +161,19 @@ public final class Main {
     }
   }
 
+  @CommandLine.Command(name = "files", description = "List files in current snapshot.")
+  void files(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      Files.run(catalog, TableIdentifier.parse(name));
+    }
+  }
+
   @CommandLine.Command(name = "describe-parquet", description = "Describe parquet file metadata.")
   void describeParquet(
       @CommandLine.Parameters(
@@ -211,7 +242,9 @@ public final class Main {
       @JsonProperty("nullFirst") boolean nullFirst) {}
 
   public record IcePartition(
-      @JsonProperty("column") String column, @JsonProperty("transform") String transform) {}
+      @JsonProperty("column") String column,
+      @JsonProperty("transform") String transform,
+      @JsonProperty("name") String name) {}
 
   @CommandLine.Command(name = "create-table", description = "Create table.")
   void createTable(
@@ -247,7 +280,7 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\", \"name\":\"custom_name\"}]. "
                       + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
@@ -397,7 +430,7 @@ public final class Main {
       @CommandLine.Option(
               names = {"--partition"},
               description =
-                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\"}],"
+                  "Partition spec, e.g. [{\"column\":\"name\", \"transform\":\"identity\", \"name\":\"custom_name\"}]. "
                       + "Supported transformations: \"hour\", \"day\", \"month\", \"year\", \"identity\" (default)")
           String partitionJson,
       @CommandLine.Option(
@@ -415,9 +448,18 @@ public final class Main {
               defaultValue = "-1")
           int threadCount,
       @CommandLine.Option(
+              names = {"--compression"},
+              description =
+                  "Parquet compression codec: gzip (default), zstd, snappy, lz4, brotli, uncompressed, or as-source")
+          String compression,
+      @CommandLine.Option(
               names = {"--watch"},
               description = "Event queue. Supported: AWS SQS")
           String watch,
+      @CommandLine.Option(
+              names = {"--watch-endpoint"},
+              description = "Custom SQS endpoint URL (e.g. http://localhost:9324 for LocalStack)")
+          String watchEndpoint,
       @CommandLine.Option(
               names = {"--watch-fire-once"},
               description = "")
@@ -506,6 +548,7 @@ public final class Main {
               .sortOrderList(sortOrders)
               .threadCount(
                   threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount)
+              .compression(compression)
               .build();
 
       if (!watchMode) {
@@ -519,6 +562,7 @@ public final class Main {
           System.exit(retryListExitCode);
         }
       } else {
+        boolean metricsEnabled = false;
         if (!Strings.isNullOrEmpty(watchDebugAddr)) {
           JvmMetrics.builder().register();
 
@@ -531,10 +575,19 @@ public final class Main {
             throw new RuntimeException(e); // TODO: find a better one
           }
           logger.info("Serving http://{}/{metrics,healtz,livez,readyz}", debugHostAndPort);
+          metricsEnabled = true;
         }
 
         InsertWatch.run(
-            catalog, tableId, files, watch, watchFireOnce, createTableIfNotExists, options);
+            catalog,
+            tableId,
+            files,
+            watch,
+            watchEndpoint,
+            watchFireOnce,
+            createTableIfNotExists,
+            options,
+            metricsEnabled);
       }
     }
   }
@@ -594,6 +647,23 @@ public final class Main {
     }
   }
 
+  @CommandLine.Command(name = "list-partitions", description = "List partitions in a table.")
+  void listPartitions(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      ListPartitions.run(catalog, TableIdentifier.parse(name), json);
+    }
+  }
+
   @CommandLine.Command(name = "delete-table", description = "Delete table.")
   void deleteTable(
       @CommandLine.Parameters(
@@ -628,7 +698,18 @@ public final class Main {
           boolean createNamespaceIfNotExists)
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
-      CreateNamespace.run(catalog, Namespace.of(name.split("[.]")), createNamespaceIfNotExists);
+      String[] split = name.split("[.]");
+      for (String level : split) {
+        if (level.isEmpty()) {
+          throw new IllegalArgumentException(
+              "Invalid namespace name: '.' cannot separate empty names");
+        }
+      }
+      if (split.length == 0) {
+        throw new IllegalArgumentException("Invalid namespace name: name cannot be empty");
+      }
+
+      CreateNamespace.run(catalog, Namespace.of(split), createNamespaceIfNotExists);
     }
   }
 
@@ -646,6 +727,28 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       DeleteNamespace.run(catalog, Namespace.of(name.split("[.]")), ignoreNotFound);
+    }
+  }
+
+  @CommandLine.Command(name = "list-namespaces", description = "List namespaces.")
+  void listNamespaces(
+      @CommandLine.Parameters(
+              arity = "0..1",
+              paramLabel = "<parent>",
+              description =
+                  "Parent namespace to list children of (e.g. parent_ns). Omit for top-level.")
+          String parent,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      Namespace namespace =
+          (parent == null || parent.isEmpty())
+              ? Namespace.empty()
+              : Namespace.of(parent.split("[.]"));
+      ListNamespaces.run(catalog, namespace, json);
     }
   }
 
@@ -751,6 +854,83 @@ public final class Main {
           e);
     }
     return catalog;
+  }
+
+  @CommandLine.Command(
+      name = "shell",
+      description = "Start interactive shell with tab completion.",
+      mixinStandardHelpOptions = true)
+  void shell() throws IOException {
+    if (inShellMode) {
+      logger.warn("Already in shell mode");
+      return;
+    }
+    inShellMode = true;
+
+    final String savedConfigFile = this.configFile;
+    final String savedLogLevel = this.logLevel;
+    final boolean savedInsecure = this.insecure;
+
+    Supplier<Path> workDir = () -> Path.of(System.getProperty("user.dir"));
+
+    CommandLine cmd = new CommandLine(this);
+    cmd.getSubcommands().remove("shell");
+
+    cmd.setExecutionStrategy(
+        parseResult -> {
+          Main main = (Main) parseResult.commandSpec().root().userObject();
+          if (!parseResult.hasMatchedOption("--config")) {
+            main.configFile = savedConfigFile;
+          }
+          if (!parseResult.hasMatchedOption("--log-level")) {
+            main.logLevel = savedLogLevel;
+          }
+          if (!parseResult.hasMatchedOption("--insecure")) {
+            main.insecure = savedInsecure;
+          }
+          ch.qos.logback.classic.Logger rootLogger =
+              (ch.qos.logback.classic.Logger)
+                  LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+          rootLogger.setLevel(Level.toLevel(main.logLevel.toUpperCase(), Level.INFO));
+          return new CommandLine.RunLast().execute(parseResult);
+        });
+    cmd.setExecutionExceptionHandler(
+        (Exception ex, CommandLine self, CommandLine.ParseResult res) -> {
+          logger.error("Error", ex);
+          return 1;
+        });
+
+    PicocliCommands picocliCommands = new PicocliCommands(cmd);
+
+    try (Terminal terminal = TerminalBuilder.builder().build()) {
+      Parser parser = new DefaultParser();
+      SystemRegistry systemRegistry = new SystemRegistryImpl(parser, terminal, workDir, null);
+      systemRegistry.setCommandRegistries(picocliCommands);
+
+      LineReader reader =
+          LineReaderBuilder.builder()
+              .terminal(terminal)
+              .completer(systemRegistry.completer())
+              .parser(parser)
+              .variable(LineReader.LIST_MAX, 50)
+              .build();
+
+      String prompt = "ice> ";
+
+      while (true) {
+        try {
+          systemRegistry.cleanUp();
+          String line = reader.readLine(prompt);
+          systemRegistry.execute(line);
+        } catch (UserInterruptException e) {
+          System.exit(0);
+        } catch (EndOfFileException e) {
+          return;
+        } catch (Exception e) {
+          systemRegistry.trace(e);
+        }
+      }
+    }
   }
 
   public static void main(String[] args) {
