@@ -62,9 +62,7 @@ public class LocalFileIOIT {
     Path absTemp = tempDir.toAbsolutePath().normalize();
     String[] warehouses =
         new String[] {
-          absTemp.toUri().toString(),
-          "file://",
-          absTemp.resolve("x/y/z").toUri().toString()
+          absTemp.toUri().toString(), "file://", absTemp.resolve("x/y/z").toUri().toString()
         };
 
     for (String warehouse : warehouses) {
@@ -164,8 +162,7 @@ public class LocalFileIOIT {
     try (LocalFileIO io = new LocalFileIO()) {
       assertThatThrownBy(
               () ->
-                  io.initialize(
-                      Map.of(LocalFileIO.LOCALFILEIO_PROP_WAREHOUSE, "file://warehouse")))
+                  io.initialize(Map.of(LocalFileIO.LOCALFILEIO_PROP_WAREHOUSE, "file://warehouse")))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("absolute path");
     }
