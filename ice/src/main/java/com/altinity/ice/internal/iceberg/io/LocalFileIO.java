@@ -57,6 +57,11 @@ public class LocalFileIO implements DelegateFileIO {
         warehouse.startsWith("file://"),
         "\"%s\" must start with file://",
         LOCALFILEIO_PROP_WAREHOUSE);
+    Preconditions.checkArgument(
+        warehouse.startsWith("file:///") || warehouse.equals("file://"),
+        "\"%s\" must use an absolute path (file:///abs/path), got: %s",
+        LOCALFILEIO_PROP_WAREHOUSE,
+        warehouse);
     this.workDir = resolveWorkdir(warehouse, properties.get(LOCALFILEIO_PROP_BASEDIR));
     Path warehousePath = resolveWarehousePath(warehouse, workDir);
     if (!Files.isDirectory(warehousePath)) {
