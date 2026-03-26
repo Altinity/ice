@@ -1,8 +1,8 @@
 # examples/localfileio
 
-It's an example setup where Iceberg table data is stored on your local disk (under /tmp/ice-example/warehouse) instead of
+This is an example setup where Iceberg table data is stored on your local disk (under /tmp/ice-example/warehouse) instead of
 in cloud object storage (S3, GCS, etc.).
-This example is primarily intended for learning and experimentation , and development without cloud credentials.
+This example is primarily intended for learning and experimentation, and development without cloud credentials.
 Table data is stored under `/tmp/ice-example/warehouse` as regular files (see `warehouse` in `.ice-rest-catalog.yaml`). The catalog metadata stays under `data/ice-rest-catalog/`.
 
 ```shell
@@ -32,8 +32,13 @@ sqlite> .quit
 
 # open ClickHouse* shell, then try SQL below 
 # IMPORTANT: make sure mount path is set to /tmp
+# For Linux:
+docker run -it --rm  --add-host=host.docker.internal:host-gateway --network host -v /tmp/ice-example/warehouse:/tmp/ice-example/warehouse \
+  altinity/clickhouse-server:25.8.16.20002.altinityantalya clickhouse local
+# For Mac:
 docker run -it --rm --network host -v /tmp/ice-example/warehouse:/tmp/ice-example/warehouse \
   altinity/clickhouse-server:25.8.16.20002.altinityantalya clickhouse local
+
 ```
 
 >  currently this only works with altinity/clickhouse-server:25.3+ builds.
@@ -50,8 +55,6 @@ CREATE DATABASE ice
   SETTINGS catalog_type = 'rest',
     vended_credentials = false,
     warehouse = 'warehouse';
-
-SHOW TABLES FROM ice;
 
 -- inspect
 SHOW DATABASES;
