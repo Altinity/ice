@@ -1,2 +1,4 @@
+warehouse: file:///tmp/ice-example/warehouse
+
 uri: http://localhost:5000
 httpCacheDir: data/ice/http/cache
