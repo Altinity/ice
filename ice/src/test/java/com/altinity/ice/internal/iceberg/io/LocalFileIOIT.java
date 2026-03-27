@@ -13,11 +13,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.altinity.ice.internal.strings.Strings;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -58,14 +59,23 @@ public class LocalFileIOIT {
 
   @Test
   public void testBasicFlow() throws IOException {
-    for (var warehouse : new String[] {"file://.", "file://", "file://x/y/z"}) {
-      tempDir.toFile().mkdirs();
-      new File(tempDir.toString(), Strings.removePrefix(warehouse, "file://")).mkdirs();
-      Path fooFile = tempDir.resolve(Strings.removePrefix(warehouse, "file://")).resolve("foo");
-      Files.writeString(fooFile, "foo_content");
-      Files.writeString(
-          tempDir.resolve(Strings.removePrefix(warehouse, "file://")).resolve("bar"),
-          "bar_content");
+    Path absTemp = tempDir.toAbsolutePath().normalize();
+    String[] warehouses =
+        new String[] {
+          absTemp.toUri().toString(), "file://", absTemp.resolve("x/y/z").toUri().toString()
+        };
+
+    for (String warehouse : warehouses) {
+      Path warehousePhysical =
+          "file://".equals(warehouse)
+              ? absTemp
+              : Paths.get(Strings.removePrefix(warehouse, "file://"));
+      Files.createDirectories(warehousePhysical);
+      Files.writeString(warehousePhysical.resolve("foo"), "foo_content");
+      Files.writeString(warehousePhysical.resolve("bar"), "bar_content");
+
+      Path fooFile = warehousePhysical.resolve("foo");
+
       try (LocalFileIO io = new LocalFileIO()) {
         assertThatThrownBy(
                 () ->
@@ -81,12 +91,12 @@ public class LocalFileIOIT {
         Function<String, String> warehouseLocation =
             (String s) -> (warehouse.endsWith("/") ? warehouse : warehouse + "/") + s;
 
-        io.initialize(
-            Map.of(
-                LocalFileIO.LOCALFILEIO_PROP_BASEDIR,
-                tempDir.toString(),
-                LocalFileIO.LOCALFILEIO_PROP_WAREHOUSE,
-                warehouse));
+        Map<String, String> props = new HashMap<>();
+        props.put(LocalFileIO.LOCALFILEIO_PROP_WAREHOUSE, warehouse);
+        if ("file://".equals(warehouse)) {
+          props.put(LocalFileIO.LOCALFILEIO_PROP_BASEDIR, absTemp.toString());
+        }
+        io.initialize(props);
 
         InputFile inputFile = io.newInputFile("foo");
         OutputFile outputFile = io.newOutputFile("foo.out");
@@ -144,6 +154,17 @@ public class LocalFileIOIT {
                     .toList())
             .isEqualTo(List.of());
       }
+    }
+  }
+
+  @Test
+  public void testRelativeFileUriRejected() {
+    try (LocalFileIO io = new LocalFileIO()) {
+      assertThatThrownBy(
+              () ->
+                  io.initialize(Map.of(LocalFileIO.LOCALFILEIO_PROP_WAREHOUSE, "file://warehouse")))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("absolute path");
     }
   }
 }

@@ -1,6 +1,5 @@
 uri: jdbc:sqlite:file:data/ice-rest-catalog/catalog.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500
-warehouse: file://warehouse
-localFileIOBaseDir: data/ice-rest-catalog
+warehouse: file:///tmp/ice-example/warehouse
 anonymousAccess:
   enabled: true
   accessConfig:

@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+
+echo "Running custom partition name test..."
+
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/../insert-scan/input.parquet"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "OK Created namespace"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}" \
+  --partition="${PARTITION_SPEC}"
+echo "OK Inserted data with custom partition name"
+
+DESCRIBE_OUT=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe -s "${TABLE_NAME}")
+
+if ! grep -q "var_bucket" <<<"${DESCRIBE_OUT}"; then
+  echo "FAIL describe -s output missing custom partition name 'var_bucket'"
+  printf '%s\n' "${DESCRIBE_OUT}"
+  exit 1
+fi
+echo "OK Custom partition name 'var_bucket' found in describe output"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "OK Cleanup done"
+
+echo "Custom partition name test completed successfully"

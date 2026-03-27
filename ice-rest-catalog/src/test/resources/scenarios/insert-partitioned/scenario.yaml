@@ -6,7 +6,15 @@ catalogConfig:
 
 env:
   NAMESPACE_NAME: "test_insert_partitioned"
-  TABLE_NAME: "test_insert_partitioned.iris_partitioned"
-  INPUT_FILE: "input.parquet"
-  PARTITION_SPEC: '[{"column":"variety","transform":"identity"}]'
+  TABLE_NAME_IRIS: "test_insert_partitioned.iris_partitioned"
+  TABLE_NAME_ONTIME: "test_insert_partitioned.ontime_partitioned"
+  INPUT_FILE_IRIS: "input.parquet"
+  INPUT_FILE_ONTIME: "ontime-2010-01-01.parquet"
+  PARTITION_SPEC_IRIS: '[{"column":"variety","transform":"identity"}]'
+  PARTITION_SPEC_ONTIME: '[{"column":"Year"}]'
+  EXPECTED_DATA_PATH_ONTIME: "s3://test-bucket/warehouse/test_insert_partitioned/ontime_partitioned/data/Year=2010/*.parquet"
+  TABLE_NAME_BUCKET: "test_insert_partitioned.iris_bucket_partitioned"
+  PARTITION_SPEC_BUCKET: '[{"column":"variety","transform":"bucket[3]"}]'
+  # Scheme-agnostic: files output may use s3:// or s3a:// depending on Hadoop FS
+  EXPECTED_DATA_PATH_BUCKET: "iris_bucket_partitioned/data/variety_bucket="
 

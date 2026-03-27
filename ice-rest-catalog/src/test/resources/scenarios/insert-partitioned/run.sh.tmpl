@@ -9,18 +9,89 @@ echo "OK Created namespace: ${NAMESPACE_NAME}"
 
 # Get the full path to the input file
 SCENARIO_DIR="{{SCENARIO_DIR}}"
-INPUT_PATH="${SCENARIO_DIR}/${INPUT_FILE}"
+INPUT_PATH_IRIS="${SCENARIO_DIR}/${INPUT_FILE_IRIS}"
+INPUT_PATH_ONTIME="${SCENARIO_DIR}/${INPUT_FILE_ONTIME}"
 
 # Create table with partitioning and insert data
-{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} ${INPUT_PATH} --partition="${PARTITION_SPEC}"
-echo "OK Inserted data with partitioning into table ${TABLE_NAME}"
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME_IRIS} ${INPUT_PATH_IRIS} --partition="${PARTITION_SPEC_IRIS}"
+echo "OK Inserted data with partitioning into table ${TABLE_NAME_IRIS}"
 
-# Describe the table to verify partitioning (if describe command exists)
-# {{ICE_CLI}} --config {{CLI_CONFIG}} describe-table ${TABLE_NAME}
+# List partitions and validate output
+LIST_PARTITIONS_OUT_IRIS=$({{ICE_CLI}} --config {{CLI_CONFIG}} list-partitions "${TABLE_NAME_IRIS}")
+if ! grep -q "partitions:" <<<"${LIST_PARTITIONS_OUT_IRIS}"; then
+  echo "FAIL: list-partitions output missing 'partitions:' section"
+  printf '%s\n' "${LIST_PARTITIONS_OUT_IRIS}"
+  exit 1
+fi
+if ! grep -qE -- "- *[^=]+=" <<<"${LIST_PARTITIONS_OUT_IRIS}"; then
+  echo "FAIL: list-partitions output has no partition entries (expected at least one key=value)"
+  printf '%s\n' "${LIST_PARTITIONS_OUT_IRIS}"
+  exit 1
+fi
+echo "OK Listed and validated partitions for ${TABLE_NAME_IRIS}"
+
+# Create table using file with single partition
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME_ONTIME} ${INPUT_PATH_ONTIME} --partition="${PARTITION_SPEC_ONTIME}"
+echo "OK Inserted data with partitioning into table ${TABLE_NAME_ONTIME}"
+
+# List partitions and validate output
+LIST_PARTITIONS_OUT_ONTIME=$({{ICE_CLI}} --config {{CLI_CONFIG}} list-partitions "${TABLE_NAME_ONTIME}")
+if ! grep -q "partitions:" <<<"${LIST_PARTITIONS_OUT_ONTIME}"; then
+  echo "FAIL: list-partitions output missing 'partitions:' section"
+  printf '%s\n' "${LIST_PARTITIONS_OUT_ONTIME}"
+  exit 1
+fi
+if ! grep -qE -- "- *[^=]+=" <<<"${LIST_PARTITIONS_OUT_ONTIME}"; then
+  echo "FAIL: list-partitions output has no partition entries (expected at least one key=value)"
+  printf '%s\n' "${LIST_PARTITIONS_OUT_ONTIME}"
+  exit 1
+fi
+echo "OK Listed and validated partitions for ${TABLE_NAME_ONTIME}"
+
+# Validate data file was inserted to correct partitioned path
+
+FILES_OUT_ONTIME=$({{ICE_CLI}} --config {{CLI_CONFIG}} files ${TABLE_NAME_ONTIME})
+
+if [[ "${FILES_OUT_ONTIME}" != *${EXPECTED_DATA_PATH_ONTIME}* ]]; then
+  echo "FAIL: expected substring '${EXPECTED_DATA_PATH_ONTIME}' not found in files command output: ${FILES_OUT_ONTIME}"
+  exit 1
+fi
+echo "OK Validated correct partitioned data file path for ${TABLE_NAME_ONTIME}"
+
+# Create table with bucket partition and insert data
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME_BUCKET} ${INPUT_PATH_IRIS} --partition="${PARTITION_SPEC_BUCKET}"
+echo "OK Inserted data with bucket partitioning into table ${TABLE_NAME_BUCKET}"
+
+# List partitions and validate output
+LIST_PARTITIONS_OUT_BUCKET=$({{ICE_CLI}} --config {{CLI_CONFIG}} list-partitions "${TABLE_NAME_BUCKET}")
+if ! grep -q "partitions:" <<<"${LIST_PARTITIONS_OUT_BUCKET}"; then
+  echo "FAIL: list-partitions output missing 'partitions:' section"
+  printf '%s\n' "${LIST_PARTITIONS_OUT_BUCKET}"
+  exit 1
+fi
+if ! grep -q "variety_bucket=" <<<"${LIST_PARTITIONS_OUT_BUCKET}"; then
+  echo "FAIL: list-partitions output missing bucket partition entries (expected 'variety_bucket=')"
+  printf '%s\n' "${LIST_PARTITIONS_OUT_BUCKET}"
+  exit 1
+fi
+echo "OK Listed and validated bucket partitions for ${TABLE_NAME_BUCKET}"
+
+# Validate data file was inserted to correct bucket-partitioned path
+FILES_OUT_BUCKET=$({{ICE_CLI}} --config {{CLI_CONFIG}} files ${TABLE_NAME_BUCKET})
+
+if [[ "${FILES_OUT_BUCKET}" != *${EXPECTED_DATA_PATH_BUCKET}* ]]; then
+  echo "FAIL: expected substring '${EXPECTED_DATA_PATH_BUCKET}' not found in files command output: ${FILES_OUT_BUCKET}"
+  exit 1
+fi
+echo "OK Validated correct bucket-partitioned data file path for ${TABLE_NAME_BUCKET}"
 
 # Cleanup
-{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
-echo "OK Deleted table: ${TABLE_NAME}"
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME_IRIS}
+echo "OK Deleted table: ${TABLE_NAME_IRIS}"
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME_ONTIME}
+echo "OK Deleted table: ${TABLE_NAME_ONTIME}"
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME_BUCKET}
+echo "OK Deleted table: ${TABLE_NAME_BUCKET}"
 
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
 echo "OK Deleted namespace: ${NAMESPACE_NAME}"
