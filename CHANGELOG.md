@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ice` - Added iceberg-gcp mvn dependencies for GCS support ([#99](https://github.com/Altinity/ice/pull/99))
 - `ice` - Added describe-parquet command to print info of parquet files ([#65](https://github.com/Altinity/ice/pull/65))
 - `ice` - Prevent empty namespace creation ([#105](https://github.com/Altinity/ice/pull/105))
-- `ice-rest-catalog` - Iceberg metrics ([#82](https://github.com/Altinity/ice/pull/82))
+- `ice-rest-catalog` - Iceberg metrics and Grafana dashboard ([#82](https://github.com/Altinity/ice/pull/82))
 - `ice` - Ice cli partitions ([#114](https://github.com/Altinity/ice/pull/114))
 - `ice` - Add option to pass partition name when creating partitions. ([#123](https://github.com/Altinity/ice/pull/123))
 - `ice` - Ice cli files command ([#112](https://github.com/Altinity/ice/pull/112))
