@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/altinity/ice/compare/v0.10.1...master)
 
+## [0.13.0](https://github.com/altinity/ice/compare/v0.12.0...v0.13.0)
+### Added
+- `ice` - Added iceberg-gcp mvn dependencies for GCS support ([#99](https://github.com/Altinity/ice/pull/99))
+- `ice` - Added describe-parquet command to print info of parquet files ([#65](https://github.com/Altinity/ice/pull/65))
+- `ice` - Prevent empty namespace creation ([#105](https://github.com/Altinity/ice/pull/105))
+- `ice-rest-catalog` - Iceberg metrics ([#82](https://github.com/Altinity/ice/pull/82))
+- `ice` - Ice cli partitions ([#114](https://github.com/Altinity/ice/pull/114))
+- `ice` - Add option to pass partition name when creating partitions. ([#123](https://github.com/Altinity/ice/pull/123))
+- `ice` - Ice cli files command ([#112](https://github.com/Altinity/ice/pull/112))
+- `ice` - Fix insert inferred partition not writing to partition folder ([#120](https://github.com/Altinity/ice/pull/120))
+- `ice` - Add support for list-namespaces ([#131](https://github.com/Altinity/ice/pull/131))
+- `ice` - Add shell mode for autocompletion of commands. ([#118](https://github.com/Altinity/ice/pull/118))
+- `ice` - Fix delete partition for transformed partition types ([#94](https://github.com/Altinity/ice/pull/94))
+- `ice` - Configurable compression ([#115](https://github.com/Altinity/ice/pull/115))
+- `ice` - Added logic to support bucket partitioning ([#97](https://github.com/Altinity/ice/pull/97))
+
+### Fixed
+- `ice` - Null pageToken ([#128](https://github.com/Altinity/ice/pull/128))
+
+### Other
+- Add integration tests using templates ([#75](https://github.com/Altinity/ice/pull/75))
+- Add Docker integration tests ([#108](https://github.com/Altinity/ice/pull/108))
+- Disable docker test in mvn verify ([#109](https://github.com/Altinity/ice/pull/109))
+- Fix pre release ([#113](https://github.com/Altinity/ice/pull/113))
+- Added test for schema evolution. ([#125](https://github.com/Altinity/ice/pull/125))
+- Added fix for malformed warehouse file path ([#133](https://github.com/Altinity/ice/pull/133))
+
 ## [0.12.0](https://github.com/altinity/ice/compare/v0.11.1...v0.12.0)
 
 ### Added
