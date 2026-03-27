@@ -16,15 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ice` - Ice cli partitions ([#114](https://github.com/Altinity/ice/pull/114))
 - `ice` - Add option to pass partition name when creating partitions. ([#123](https://github.com/Altinity/ice/pull/123))
 - `ice` - Ice cli files command ([#112](https://github.com/Altinity/ice/pull/112))
-- `ice` - Fix insert inferred partition not writing to partition folder ([#120](https://github.com/Altinity/ice/pull/120))
 - `ice` - Add support for list-namespaces ([#131](https://github.com/Altinity/ice/pull/131))
 - `ice` - Add shell mode for autocompletion of commands. ([#118](https://github.com/Altinity/ice/pull/118))
-- `ice` - Fix delete partition for transformed partition types ([#94](https://github.com/Altinity/ice/pull/94))
 - `ice` - Configurable compression ([#115](https://github.com/Altinity/ice/pull/115))
 - `ice` - Added logic to support bucket partitioning ([#97](https://github.com/Altinity/ice/pull/97))
 
 ### Fixed
 - `ice` - Null pageToken ([#128](https://github.com/Altinity/ice/pull/128))
+- `ice` - Fix insert inferred partition not writing to partition folder ([#120](https://github.com/Altinity/ice/pull/120))
+- `ice` - Fix delete partition for transformed partition types ([#94](https://github.com/Altinity/ice/pull/94))
 
 ### Other
 - Add integration tests using templates ([#75](https://github.com/Altinity/ice/pull/75))
