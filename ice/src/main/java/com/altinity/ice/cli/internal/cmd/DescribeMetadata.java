@@ -21,12 +21,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.iceberg.DataFile;
-import org.apache.iceberg.ManifestFile;
-import org.apache.iceberg.ManifestFiles;
-import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.TableMetadataParser;
+
+import org.apache.iceberg.*;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.types.Conversions;
@@ -120,7 +116,7 @@ public final class DescribeMetadata {
   }
 
   private static SchemaInfo extractSchema(TableMetadata metadata) {
-    org.apache.iceberg.Schema schema = metadata.schema();
+    Schema schema = metadata.schema();
     List<FieldInfo> fields = new ArrayList<>();
     for (Types.NestedField field : schema.columns()) {
       fields.add(
