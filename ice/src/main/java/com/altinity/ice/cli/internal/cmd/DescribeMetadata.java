@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.iceberg.*;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
@@ -217,7 +216,7 @@ public final class DescribeMetadata {
   }
 
   private static Map<Integer, String> convertBounds(
-      org.apache.iceberg.Schema schema, Map<Integer, ByteBuffer> bounds) {
+      Schema schema, Map<Integer, ByteBuffer> bounds) {
     if (bounds == null) {
       return null;
     }
