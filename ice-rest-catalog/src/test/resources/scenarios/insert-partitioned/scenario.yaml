@@ -17,4 +17,6 @@ env:
   PARTITION_SPEC_BUCKET: '[{"column":"variety","transform":"bucket[3]"}]'
   # Scheme-agnostic: files output may use s3:// or s3a:// depending on Hadoop FS
   EXPECTED_DATA_PATH_BUCKET: "iris_bucket_partitioned/data/variety_bucket="
-
+  TABLE_NAME_TRUNCATE: "test_insert_partitioned.iris_truncate_partitioned"
+  PARTITION_SPEC_TRUNCATE: '[{"column":"variety","transform":"truncate[2]"}]'
+  EXPECTED_DATA_PATH_TRUNCATE: "iris_truncate_partitioned/data/variety_trunc="
