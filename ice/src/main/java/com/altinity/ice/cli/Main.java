@@ -335,7 +335,7 @@ public final class Main {
                   e.g. [{"op":"drop_column","name":"foo"}]
 
                   Supported operations:
-                    - add_column           (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional))
+                    - add_column           (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional), "nullable" (optional, default true), "default" (optional))
                     - alter_column         (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types))
                     - rename_column        (params: "name", "new_name")
                     - drop_column          (params: "name")
