@@ -67,8 +67,26 @@ public class ScenarioTestRunner {
           .filter(Files::isDirectory)
           .map(path -> path.getFileName().toString())
           .filter(name -> !name.startsWith(".")) // Ignore hidden directories
+          .filter(name -> !isExcludedFromStandardDiscovery(name))
           .sorted()
           .collect(Collectors.toList());
+    }
+  }
+
+  private boolean isExcludedFromStandardDiscovery(String scenarioName) {
+    Path configPath = scenariosDir.resolve(scenarioName).resolve("scenario.yaml");
+    if (!Files.exists(configPath)) {
+      return false;
+    }
+    try {
+      ScenarioConfig config = yamlMapper.readValue(configPath.toFile(), ScenarioConfig.class);
+      return config.excludeFromStandardDiscovery();
+    } catch (IOException e) {
+      logger.warn(
+          "Failed to parse {} while checking excludeFromStandardDiscovery; including scenario: {}",
+          configPath,
+          e.getMessage());
+      return false;
     }
   }
 
