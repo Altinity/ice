@@ -1,0 +1,85 @@
+#!/bin/bash
+set -e
+
+echo "Running schema evolution (position) test..."
+
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/../insert-scan/input.parquet"
+
+# Extract ordered column names from "describe -s" output into a comma-joined string.
+# Each column line looks like: "    1: sepal.length: optional double"
+extract_order() {
+  grep -E '^[[:space:]]+[0-9]+: [A-Za-z0-9._]+:' "$1" \
+    | sed -E 's/^[[:space:]]+[0-9]+: ([A-Za-z0-9._]+):.*/\1/' \
+    | paste -s -d, -
+}
+
+assert_order() {
+  local label="$1"
+  local expected="$2"
+  local actual="$3"
+  if [ "$expected" != "$actual" ]; then
+    echo "FAIL ${label}: expected '${expected}' got '${actual}'"
+    exit 1
+  fi
+  echo "OK ${label}: ${actual}"
+}
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}"
+echo "OK Inserted data into ${TABLE_NAME}"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/sepos_initial.txt
+assert_order "initial order" \
+  "sepal.length,sepal.width,petal.length,petal.width,variety" \
+  "$(extract_order /tmp/sepos_initial.txt)"
+
+# --- after ---
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} \
+  $'[{"op":"add_column","name":"a_after","type":"string","after":"petal.length"}]'
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/sepos_after.txt
+assert_order "after=petal.length" \
+  "sepal.length,sepal.width,petal.length,a_after,petal.width,variety" \
+  "$(extract_order /tmp/sepos_after.txt)"
+
+# --- before ---
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} \
+  $'[{"op":"add_column","name":"a_before","type":"string","before":"variety"}]'
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/sepos_before.txt
+assert_order "before=variety" \
+  "sepal.length,sepal.width,petal.length,a_after,petal.width,a_before,variety" \
+  "$(extract_order /tmp/sepos_before.txt)"
+
+# --- first ---
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} \
+  $'[{"op":"add_column","name":"a_first","type":"string","first":true}]'
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/sepos_first.txt
+assert_order "first=true" \
+  "a_first,sepal.length,sepal.width,petal.length,a_after,petal.width,a_before,variety" \
+  "$(extract_order /tmp/sepos_first.txt)"
+
+# --- conflicting position should fail ---
+set +e
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} \
+  $'[{"op":"add_column","name":"bad","type":"string","after":"variety","before":"petal.width"}]' \
+  > /tmp/sepos_conflict.txt 2>&1
+RC=$?
+set -e
+if [ $RC -eq 0 ]; then
+  echo "FAIL conflicting position should have failed but CLI returned 0"
+  cat /tmp/sepos_conflict.txt
+  exit 1
+fi
+if ! grep -q "at most one" /tmp/sepos_conflict.txt; then
+  echo "FAIL conflicting position error message missing 'at most one'"
+  cat /tmp/sepos_conflict.txt
+  exit 1
+fi
+echo "OK Conflicting position rejected"
+
+# Cleanup
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "OK Cleanup done"
+
+echo "Schema evolution (position) test completed successfully"

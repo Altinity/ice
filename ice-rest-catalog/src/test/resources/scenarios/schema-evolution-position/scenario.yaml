@@ -1,0 +1,9 @@
+name: "Schema evolution - add_column position (after/before/first)"
+description: "Tests alter-table add_column with after/before/first placement; verifies order via describe -s"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_schema_ev_pos"
+  TABLE_NAME: "test_schema_ev_pos.iris_pos"

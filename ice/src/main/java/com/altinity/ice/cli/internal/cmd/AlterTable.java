@@ -50,14 +50,23 @@ public class AlterTable {
     private final String name;
     private final Type type;
     @Nullable private final String doc;
+    @Nullable private final String after;
+    @Nullable private final String before;
+    private final boolean first;
 
     public AddColumn(
         @JsonProperty(value = "name", required = true) String name,
         @JsonProperty(value = "type", required = true) String type,
-        @JsonProperty("doc") @Nullable String doc) {
+        @JsonProperty("doc") @Nullable String doc,
+        @JsonProperty("after") @Nullable String after,
+        @JsonProperty("before") @Nullable String before,
+        @JsonProperty("first") @Nullable Boolean first) {
       this.name = name;
       this.type = Types.fromPrimitiveString(type);
       this.doc = doc;
+      this.after = after;
+      this.before = before;
+      this.first = first != null && first;
     }
   }
 
@@ -138,7 +147,15 @@ public class AlterTable {
       switch (update) {
         case AddColumn up -> {
           // TODO: support nested columns
-          schemaUpdates.getValue().addColumn(up.name, up.type, up.doc);
+          UpdateSchema us = schemaUpdates.getValue();
+          us.addColumn(up.name, up.type, up.doc);
+          if (up.after != null) {
+            us.moveAfter(up.name, up.after);
+          } else if (up.before != null) {
+            us.moveBefore(up.name, up.before);
+          } else if (up.first) {
+            us.moveFirst(up.name);
+          }
         }
         case AlterColumn up -> {
           // TODO: support nested columns
