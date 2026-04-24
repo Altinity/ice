@@ -116,4 +116,109 @@ public class AlterTableTest {
     table = catalog.loadTable(tableId);
     assertThat(table.spec().fields()).isEmpty();
   }
+
+  // Default values require Iceberg table spec v3.
+  private Table createV3Table() {
+    return catalog.buildTable(tableId, schema).withProperty("format-version", "3").create();
+  }
+
+  @Test
+  public void testAddColumnNullable() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(new AlterTable.AddColumn("email", "string", null, null, null));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    Types.NestedField added = table.schema().findField("email");
+    assertThat(added).isNotNull();
+    assertThat(added.isOptional()).isTrue();
+    assertThat(added.type()).isEqualTo(Types.StringType.get());
+    assertThat(added.initialDefault()).isNull();
+    assertThat(added.writeDefault()).isNull();
+  }
+
+  @Test
+  public void testAddRequiredColumnWithoutDefaultIsRejected() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    // Iceberg 1.9+ rejects adding a required column without an explicit default
+    // because there is no safe value to backfill into existing rows.
+    assertThatThrownBy(
+            () ->
+                AlterTable.run(
+                    catalog,
+                    tableId,
+                    Arrays.asList(new AlterTable.AddColumn("status", "string", null, false, null))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("required column");
+  }
+
+  @Test
+  public void testAddColumnWithDefault() throws Exception {
+    createV3Table();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(new AlterTable.AddColumn("age", "int", null, true, 0));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    Types.NestedField added = table.schema().findField("age");
+    assertThat(added).isNotNull();
+    assertThat(added.isOptional()).isTrue();
+    assertThat(added.type()).isEqualTo(Types.IntegerType.get());
+    assertThat(added.initialDefault()).isEqualTo(0);
+    assertThat(added.writeDefault()).isEqualTo(0);
+  }
+
+  @Test
+  public void testAddRequiredColumnWithDefault() throws Exception {
+    createV3Table();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(new AlterTable.AddColumn("score", "long", null, false, 42));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    Types.NestedField added = table.schema().findField("score");
+    assertThat(added).isNotNull();
+    assertThat(added.isRequired()).isTrue();
+    assertThat(added.type()).isEqualTo(Types.LongType.get());
+    assertThat(added.initialDefault()).isEqualTo(42L);
+    assertThat(added.writeDefault()).isEqualTo(42L);
+  }
+
+  @Test
+  public void testAddColumnWithStringDefault() throws Exception {
+    createV3Table();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(new AlterTable.AddColumn("country", "string", null, true, "US"));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    Types.NestedField added = table.schema().findField("country");
+    assertThat(added).isNotNull();
+    assertThat(added.type()).isEqualTo(Types.StringType.get());
+    assertThat(added.initialDefault().toString()).isEqualTo("US");
+  }
+
+  @Test
+  public void testAddColumnInvalidDefaultThrows() throws Exception {
+    createV3Table();
+
+    assertThatThrownBy(
+            () ->
+                AlterTable.run(
+                    catalog,
+                    tableId,
+                    Arrays.asList(
+                        new AlterTable.AddColumn("age", "int", null, true, "not-an-int"))))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 }

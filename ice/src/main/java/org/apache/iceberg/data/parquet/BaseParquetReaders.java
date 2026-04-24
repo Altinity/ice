@@ -37,17 +37,13 @@ import org.apache.iceberg.types.Types;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.schema.GroupType;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
-import org.apache.parquet.schema.LogicalTypeAnnotation.DateLogicalTypeAnnotation;
 import org.apache.parquet.schema.LogicalTypeAnnotation.DecimalLogicalTypeAnnotation;
 import org.apache.parquet.schema.LogicalTypeAnnotation.EnumLogicalTypeAnnotation;
 import org.apache.parquet.schema.LogicalTypeAnnotation.IntLogicalTypeAnnotation;
 import org.apache.parquet.schema.LogicalTypeAnnotation.JsonLogicalTypeAnnotation;
 import org.apache.parquet.schema.LogicalTypeAnnotation.LogicalTypeAnnotationVisitor;
 import org.apache.parquet.schema.LogicalTypeAnnotation.StringLogicalTypeAnnotation;
-import org.apache.parquet.schema.LogicalTypeAnnotation.TimeLogicalTypeAnnotation;
-import org.apache.parquet.schema.LogicalTypeAnnotation.TimestampLogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
-import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
 
 /**
@@ -79,55 +75,6 @@ public abstract class BaseParquetReaders<T> {
 
   protected abstract ParquetValueReader<T> createStructReader(
       List<Type> types, List<ParquetValueReader<?>> fieldReaders, Types.StructType structType);
-
-  protected ParquetValueReader<?> fixedReader(ColumnDescriptor desc) {
-    return new GenericParquetReaders.FixedReader(desc);
-  }
-
-  protected ParquetValueReader<?> dateReader(ColumnDescriptor desc) {
-    return new GenericParquetReaders.DateReader(desc);
-  }
-
-  protected ParquetValueReader<?> timeReader(ColumnDescriptor desc) {
-    LogicalTypeAnnotation time = desc.getPrimitiveType().getLogicalTypeAnnotation();
-    Preconditions.checkArgument(
-        time instanceof TimeLogicalTypeAnnotation, "Invalid time logical type: " + time);
-
-    LogicalTypeAnnotation.TimeUnit unit = ((TimeLogicalTypeAnnotation) time).getUnit();
-    switch (unit) {
-      case MICROS:
-        return new GenericParquetReaders.TimeReader(desc);
-      case MILLIS:
-        return new GenericParquetReaders.TimeMillisReader(desc);
-      default:
-        throw new UnsupportedOperationException("Unsupported unit for time: " + unit);
-    }
-  }
-
-  protected ParquetValueReader<?> timestampReader(ColumnDescriptor desc, boolean isAdjustedToUTC) {
-    if (desc.getPrimitiveType().getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT96) {
-      return new GenericParquetReaders.TimestampInt96Reader(desc);
-    }
-
-    LogicalTypeAnnotation timestamp = desc.getPrimitiveType().getLogicalTypeAnnotation();
-    Preconditions.checkArgument(
-        timestamp instanceof TimestampLogicalTypeAnnotation,
-        "Invalid timestamp logical type: " + timestamp);
-
-    LogicalTypeAnnotation.TimeUnit unit = ((TimestampLogicalTypeAnnotation) timestamp).getUnit();
-    switch (unit) {
-      case MICROS:
-        return isAdjustedToUTC
-            ? new GenericParquetReaders.TimestamptzReader(desc)
-            : new GenericParquetReaders.TimestampReader(desc);
-      case MILLIS:
-        return isAdjustedToUTC
-            ? new GenericParquetReaders.TimestamptzMillisReader(desc)
-            : new GenericParquetReaders.TimestampMillisReader(desc);
-      default:
-        throw new UnsupportedOperationException("Unsupported unit for timestamp: " + unit);
-    }
-  }
 
   protected Object convertConstant(org.apache.iceberg.types.Type type, Object value) {
     return value;
@@ -192,23 +139,6 @@ public abstract class BaseParquetReaders<T> {
     @Override
     public Optional<ParquetValueReader<?>> visit(DecimalLogicalTypeAnnotation decimalLogicalType) {
       return Optional.of(ParquetValueReaders.bigDecimals(desc));
-    }
-
-    @Override
-    public Optional<ParquetValueReader<?>> visit(DateLogicalTypeAnnotation dateLogicalType) {
-      return Optional.of(dateReader(desc));
-    }
-
-    @Override
-    public Optional<ParquetValueReader<?>> visit(TimeLogicalTypeAnnotation timeLogicalType) {
-      return Optional.of(timeReader(desc));
-    }
-
-    @Override
-    public Optional<ParquetValueReader<?>> visit(
-        TimestampLogicalTypeAnnotation timestampLogicalType) {
-      return Optional.of(
-          timestampReader(desc, ((Types.TimestampType) expected).shouldAdjustToUTC()));
     }
 
     @Override
@@ -378,59 +308,60 @@ public abstract class BaseParquetReaders<T> {
           ParquetValueReaders.option(valueType, valueD, valueReader));
     }
 
-    @Override
-    @SuppressWarnings("checkstyle:CyclomaticComplexity")
-    public ParquetValueReader<?> primitive(
-        org.apache.iceberg.types.Type.PrimitiveType expected, PrimitiveType primitive) {
-      if (expected == null) {
-        return null;
-      }
-
-      ColumnDescriptor desc = type.getColumnDescription(currentPath());
-
-      if (primitive.getLogicalTypeAnnotation() != null) {
-        return primitive
-            .getLogicalTypeAnnotation()
-            .accept(new LogicalTypeReadBuilder(desc, expected))
-            .orElseThrow(
-                () ->
-                    new UnsupportedOperationException(
-                        "Unsupported logical type: " + primitive.getLogicalTypeAnnotation()));
-      }
-
-      switch (primitive.getPrimitiveTypeName()) {
-        case FIXED_LEN_BYTE_ARRAY:
-          return fixedReader(desc);
-        case BINARY:
-          if (expected.typeId() == TypeID.STRING) {
-            return ParquetValueReaders.strings(desc);
-          } else {
-            return ParquetValueReaders.byteBuffers(desc);
-          }
-        case INT32:
-          if (expected.typeId() == TypeID.LONG) {
-            return ParquetValueReaders.intsAsLongs(desc);
-          } else {
-            return ParquetValueReaders.unboxed(desc);
-          }
-        case FLOAT:
-          if (expected.typeId() == TypeID.DOUBLE) {
-            return ParquetValueReaders.floatsAsDoubles(desc);
-          } else {
-            return ParquetValueReaders.unboxed(desc);
-          }
-        case BOOLEAN:
-        case INT64:
-        case DOUBLE:
-          return ParquetValueReaders.unboxed(desc);
-        case INT96:
-          // Impala & Spark used to write timestamps as INT96 without a logical type. For backwards
-          // compatibility we try to read INT96 as timestamps.
-          return timestampReader(desc, true);
-        default:
-          throw new UnsupportedOperationException("Unsupported type: " + primitive);
-      }
-    }
+    //    @Override
+    //    @SuppressWarnings("checkstyle:CyclomaticComplexity")
+    //    public ParquetValueReader<?> primitive(
+    //      org.apache.iceberg.types.Type.PrimitiveType expected, PrimitiveType primitive) {
+    //      if (expected == null) {
+    //        return null;
+    //      }
+    //
+    //      ColumnDescriptor desc = type.getColumnDescription(currentPath());
+    //
+    //      if (primitive.getLogicalTypeAnnotation() != null) {
+    //        return primitive
+    //          .getLogicalTypeAnnotation()
+    //          .accept(new LogicalTypeReadBuilder(desc, expected))
+    //          .orElseThrow(
+    //            () ->
+    //              new UnsupportedOperationException(
+    //                "Unsupported logical type: " + primitive.getLogicalTypeAnnotation()));
+    //      }
+    //
+    //      switch (primitive.getPrimitiveTypeName()) {
+    //        case FIXED_LEN_BYTE_ARRAY:
+    //          return fixedReader(desc);
+    //        case BINARY:
+    //          if (expected.typeId() == TypeID.STRING) {
+    //            return ParquetValueReaders.strings(desc);
+    //          } else {
+    //            return ParquetValueReaders.byteBuffers(desc);
+    //          }
+    //        case INT32:
+    //          if (expected.typeId() == TypeID.LONG) {
+    //            return ParquetValueReaders.intsAsLongs(desc);
+    //          } else {
+    //            return ParquetValueReaders.unboxed(desc);
+    //          }
+    //        case FLOAT:
+    //          if (expected.typeId() == TypeID.DOUBLE) {
+    //            return ParquetValueReaders.floatsAsDoubles(desc);
+    //          } else {
+    //            return ParquetValueReaders.unboxed(desc);
+    //          }
+    //        case BOOLEAN:
+    //        case INT64:
+    //        case DOUBLE:
+    //          return ParquetValueReaders.unboxed(desc);
+    //        case INT96:
+    //          // Impala & Spark used to write timestamps as INT96 without a logical type. For
+    // backwards
+    //          // compatibility we try to read INT96 as timestamps.
+    //          return timestampReader(desc, true);
+    //        default:
+    //          throw new UnsupportedOperationException("Unsupported type: " + primitive);
+    //      }
+    //    }
 
     MessageType type() {
       return type;
