@@ -67,7 +67,6 @@ public class AlterTable {
       this.after = after;
       this.before = before;
       this.first = first != null && first;
-
     }
   }
 
