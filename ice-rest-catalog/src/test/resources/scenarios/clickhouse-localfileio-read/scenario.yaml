@@ -1,0 +1,14 @@
+name: "ClickHouse reads local file Iceberg warehouse"
+description: "Inserts via ice CLI into file:///warehouse and validates ClickHouse can read rows via REST catalog (requires DockerLocalFileIOClickHouseIT)."
+
+# Not run by ScenarioBasedIT / DockerScenarioBasedIT; see DockerLocalFileIOClickHouseIT.
+excludeFromStandardDiscovery: true
+
+catalogConfig:
+  warehouse: "file:///warehouse"
+
+env:
+  NAMESPACE_NAME: "ch_test"
+  TABLE_NAME: "ch_test.iris"
+  CH_DB: "ice_localfileio"
+  INPUT_PATH: "/scenarios/insert-scan/input.parquet"

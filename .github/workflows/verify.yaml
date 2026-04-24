@@ -55,5 +55,6 @@ jobs:
         run: >
           ./mvnw -pl ice-rest-catalog -am install -DskipTests=true -Pno-check &&
           ./mvnw -pl ice-rest-catalog failsafe:integration-test failsafe:verify
-          -Dit.test=DockerScenarioBasedIT
+          -Dit.test=DockerScenarioBasedIT,DockerLocalFileIOClickHouseIT
           -Ddocker.image=altinity/ice-rest-catalog:debug-with-ice-latest-master-amd64
+          -Dclickhouse.image=altinity/clickhouse-server:25.8.16.20002.altinityantalya
