@@ -311,26 +311,6 @@ public abstract class BaseMetastoreTableOperations extends BaseMetastoreOperatio
   }
 
   /**
-   * Attempt to load the table and see if any current or past metadata location matches the one we
-   * were attempting to set. This is used as a last resort when we are dealing with exceptions that
-   * may indicate the commit has failed but are not proof that this is the case. Past locations must
-   * also be searched on the chance that a second committer was able to successfully commit on top
-   * of our commit. When the {@code newMetadataLocation} is not found, the method returns {@link
-   * CommitStatus#FAILURE}.
-   *
-   * @param newMetadataLocation the path of the new commit file
-   * @param config metadata to use for configuration
-   * @return Commit Status of Success, Failure or Unknown
-   */
-  protected CommitStatus checkCommitStatusStrict(String newMetadataLocation, TableMetadata config) {
-    return checkCommitStatusStrict(
-        tableName(),
-        newMetadataLocation,
-        config.properties(),
-        () -> checkCurrentMetadataLocation(newMetadataLocation));
-  }
-
-  /**
    * Validate if the new metadata location is the current metadata location or present within
    * previous metadata files.
    *

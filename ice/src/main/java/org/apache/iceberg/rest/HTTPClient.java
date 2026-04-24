@@ -41,6 +41,7 @@ import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpRequestInterceptor;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.impl.EnglishReasonPhraseCatalog;
@@ -48,6 +49,8 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.iceberg.IcebergBuild;
+import org.apache.iceberg.common.DynConstructors;
+import org.apache.iceberg.common.DynMethods;
 import org.apache.iceberg.exceptions.RESTException;
 import org.apache.iceberg.relocated.com.google.common.annotations.VisibleForTesting;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
@@ -63,6 +66,9 @@ import org.slf4j.LoggerFactory;
 public class HTTPClient extends BaseHTTPClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(HTTPClient.class);
+  private static final String SIGV4_ENABLED = "rest.sigv4-enabled";
+  private static final String SIGV4_REQUEST_INTERCEPTOR_IMPL =
+      "org.apache.iceberg.aws.RESTSigV4Signer";
   @VisibleForTesting static final String CLIENT_VERSION_HEADER = "X-Client-Version";
 
   @VisibleForTesting
@@ -84,7 +90,6 @@ public class HTTPClient extends BaseHTTPClient {
   private final Map<String, String> baseHeaders;
   private final ObjectMapper mapper;
   private final AuthSession authSession;
-  private final boolean isRootClient;
 
   private HTTPClient(
       URI baseUri,
@@ -92,6 +97,7 @@ public class HTTPClient extends BaseHTTPClient {
       CredentialsProvider proxyCredsProvider,
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
+      HttpRequestInterceptor requestInterceptor,
       Map<String, String> properties,
       HttpClientConnectionManager connectionManager,
       AuthSession session) {
@@ -103,6 +109,10 @@ public class HTTPClient extends BaseHTTPClient {
     HttpClientBuilder clientBuilder = HttpClients.custom();
 
     clientBuilder.setConnectionManager(connectionManager);
+
+    if (requestInterceptor != null) {
+      clientBuilder.addRequestInterceptorLast(requestInterceptor);
+    }
 
     int maxRetries = PropertyUtil.propertyAsInt(properties, REST_MAX_RETRIES, 5);
     clientBuilder.setRetryStrategy(new ExponentialHttpRequestRetryStrategy(maxRetries));
@@ -116,7 +126,6 @@ public class HTTPClient extends BaseHTTPClient {
     }
 
     this.httpClient = clientBuilder.build();
-    this.isRootClient = true;
   }
 
   /**
@@ -130,7 +139,6 @@ public class HTTPClient extends BaseHTTPClient {
     this.mapper = parent.mapper;
     this.baseHeaders = parent.baseHeaders;
     this.authSession = authSession;
-    this.isRootClient = false;
   }
 
   @Override
@@ -152,6 +160,7 @@ public class HTTPClient extends BaseHTTPClient {
     }
   }
 
+  // Per the spec, the only currently defined / used "success" responses are 200 and 202.
   private static boolean isSuccessful(CloseableHttpResponse response) {
     int code = response.getCode();
     return code == HttpStatus.SC_OK
@@ -322,11 +331,48 @@ public class HTTPClient extends BaseHTTPClient {
 
   @Override
   public void close() throws IOException {
-    // Do not close the AuthSession as it's managed by the owner of this HTTPClient.
-    // Only close the underlying Apache HTTP client if this is a root HTTPClient.
-    if (isRootClient) {
+    try {
+      if (authSession != null) {
+        authSession.close();
+      }
+    } finally {
       httpClient.close(CloseMode.GRACEFUL);
     }
+  }
+
+  @VisibleForTesting
+  static HttpRequestInterceptor loadInterceptorDynamically(
+      String impl, Map<String, String> properties) {
+    HttpRequestInterceptor instance;
+
+    DynConstructors.Ctor<HttpRequestInterceptor> ctor;
+    try {
+      ctor =
+          DynConstructors.builder(HttpRequestInterceptor.class)
+              .loader(HTTPClient.class.getClassLoader())
+              .impl(impl)
+              .buildChecked();
+    } catch (NoSuchMethodException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot initialize RequestInterceptor, missing no-arg constructor: %s", impl),
+          e);
+    }
+
+    try {
+      instance = ctor.newInstance();
+    } catch (ClassCastException e) {
+      throw new IllegalArgumentException(
+          String.format("Cannot initialize, %s does not implement RequestInterceptor", impl), e);
+    }
+
+    DynMethods.builder("initialize")
+        .hiddenImpl(impl, Map.class)
+        .orNoop()
+        .build(instance)
+        .invoke(properties);
+
+    return instance;
   }
 
   static HttpClientConnectionManager configureConnectionManager(
@@ -455,6 +501,12 @@ public class HTTPClient extends BaseHTTPClient {
       withHeader(CLIENT_VERSION_HEADER, IcebergBuild.fullVersion());
       withHeader(CLIENT_GIT_COMMIT_SHORT_HEADER, IcebergBuild.gitCommitShortId());
 
+      HttpRequestInterceptor interceptor = null;
+
+      if (PropertyUtil.propertyAsBoolean(properties, SIGV4_ENABLED, false)) {
+        interceptor = loadInterceptorDynamically(SIGV4_REQUEST_INTERCEPTOR_IMPL, properties);
+      }
+
       if (this.proxyCredentialsProvider != null) {
         Preconditions.checkNotNull(
             proxy, "Invalid http client proxy for proxy credentials provider: null");
@@ -466,6 +518,7 @@ public class HTTPClient extends BaseHTTPClient {
           proxyCredentialsProvider,
           baseHeaders,
           mapper,
+          interceptor,
           properties,
           configureConnectionManager(properties, tlsSocketStrategy),
           authSession);
