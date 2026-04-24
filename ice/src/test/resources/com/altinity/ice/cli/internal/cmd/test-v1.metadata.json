@@ -1,0 +1,66 @@
+{
+  "format-version": 2,
+  "table-uuid": "fb3de834-aa02-4154-b3e2-a1f528e8e7c4",
+  "location": "warehouse/test_ns/test_table",
+  "last-sequence-number": 1,
+  "last-updated-ms": 1700000000000,
+  "last-column-id": 3,
+  "current-schema-id": 0,
+  "schemas": [
+    {
+      "type": "struct",
+      "schema-id": 0,
+      "fields": [
+        {"id": 1, "name": "id", "required": true, "type": "long"},
+        {"id": 2, "name": "name", "required": false, "type": "string"},
+        {"id": 3, "name": "ts", "required": false, "type": "timestamptz"}
+      ],
+      "identifier-field-ids": [1]
+    }
+  ],
+  "default-spec-id": 0,
+  "partition-specs": [
+    {"spec-id": 0, "fields": []}
+  ],
+  "last-partition-id": 999,
+  "default-sort-order-id": 0,
+  "sort-orders": [
+    {"order-id": 0, "fields": []}
+  ],
+  "properties": {
+    "owner": "test-user",
+    "created-at": "2023-11-14T22:13:20"
+  },
+  "current-snapshot-id": 1234567890123456789,
+  "refs": {
+    "main": {
+      "snapshot-id": 1234567890123456789,
+      "type": "branch"
+    }
+  },
+  "snapshots": [
+    {
+      "snapshot-id": 1234567890123456789,
+      "sequence-number": 1,
+      "timestamp-ms": 1700000000000,
+      "summary": {
+        "operation": "append",
+        "added-data-files": "1",
+        "added-records": "100",
+        "total-data-files": "1",
+        "total-records": "100"
+      },
+      "manifest-list": "warehouse/test_ns/test_table/metadata/snap-1234567890123456789-0-abc.avro",
+      "schema-id": 0
+    }
+  ],
+  "snapshot-log": [
+    {
+      "snapshot-id": 1234567890123456789,
+      "timestamp-ms": 1700000000000
+    }
+  ],
+  "metadata-log": [],
+  "statistics": [],
+  "partition-statistics": []
+}

@@ -18,6 +18,7 @@ import com.altinity.ice.cli.internal.cmd.Delete;
 import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
+import com.altinity.ice.cli.internal.cmd.DescribeMetadata;
 import com.altinity.ice.cli.internal.cmd.DescribeParquet;
 import com.altinity.ice.cli.internal.cmd.Files;
 import com.altinity.ice.cli.internal.cmd.Insert;
@@ -234,6 +235,70 @@ public final class Main {
       DescribeParquet.run(
           catalog, target, json, s3NoSignRequest, options.toArray(new DescribeParquet.Option[0]));
     }
+  }
+
+  @CommandLine.Command(name = "describe-metadata", description = "Describe Iceberg metadata file.")
+  void describeMetadata(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<target>",
+              description = "Path to metadata.json file")
+          String target,
+      @CommandLine.Option(
+              names = {"-a", "--all"},
+              description = "Show everything")
+          boolean showAll,
+      @CommandLine.Option(
+              names = {"-s", "--summary"},
+              description = "Show table UUID, format version, location, current snapshot, etc.")
+          boolean showSummary,
+      @CommandLine.Option(
+              names = {"-S", "--schema"},
+              description = "Show full schema with field IDs and types")
+          boolean showSchema,
+      @CommandLine.Option(
+              names = {"--snapshots"},
+              description = "List all snapshots")
+          boolean showSnapshots,
+      @CommandLine.Option(
+              names = {"--history"},
+              description = "Show snapshot log and metadata log")
+          boolean showHistory,
+      @CommandLine.Option(
+              names = {"--manifests"},
+              description = "Drill into manifest list for current snapshot")
+          boolean showManifests,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    Config config = Config.load(configFile());
+    var icebergConfig = config.toIcebergConfig();
+
+    var options = new ArrayList<DescribeMetadata.Option>();
+    if (showAll || showSummary) {
+      options.add(DescribeMetadata.Option.SUMMARY);
+    }
+    if (showAll || showSchema) {
+      options.add(DescribeMetadata.Option.SCHEMA);
+    }
+    if (showAll || showSnapshots) {
+      options.add(DescribeMetadata.Option.SNAPSHOTS);
+    }
+    if (showAll || showHistory) {
+      options.add(DescribeMetadata.Option.HISTORY);
+    }
+    if (showAll || showManifests) {
+      options.add(DescribeMetadata.Option.MANIFESTS);
+    }
+
+    if (options.isEmpty()) {
+      options.add(DescribeMetadata.Option.SUMMARY);
+    }
+
+    DescribeMetadata.run(
+        icebergConfig, target, json, options.toArray(new DescribeMetadata.Option[0]));
   }
 
   public record IceSortOrder(
