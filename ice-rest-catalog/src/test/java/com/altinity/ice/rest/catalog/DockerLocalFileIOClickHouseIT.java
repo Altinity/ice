@@ -14,6 +14,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -71,6 +72,12 @@ public class DockerLocalFileIOClickHouseIT {
     logger.info("Using ClickHouse Docker image: {}", clickhouseImage);
 
     hostWarehouseDir = Files.createTempDirectory("ice-warehouse-");
+    // Both containers bind-mount this dir as /warehouse. The catalog runs as root
+    // and writes here, but ClickHouse runs as uid 101 and needs o+x on the
+    // bind-mount root to stat any metadata file underneath. JDK creates temp dirs
+    // as 0700 by default, which causes EACCES from std::filesystem::last_write_time
+    // inside ClickHouse. Relax to 0755 so non-root containers can traverse.
+    Files.setPosixFilePermissions(hostWarehouseDir, PosixFilePermissions.fromString("rwxr-xr-x"));
 
     URL configResource =
         getClass().getClassLoader().getResource("docker-catalog-localfileio-config.yaml");
