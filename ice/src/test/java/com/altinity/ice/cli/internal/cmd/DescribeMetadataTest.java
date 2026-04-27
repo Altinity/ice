@@ -37,6 +37,24 @@ public class DescribeMetadataTest {
     return Map.of(CatalogProperties.WAREHOUSE_LOCATION, dir);
   }
 
+  /** Metadata + manifest-list + manifest Avro under {@code describe-metadata-manifest-fixture/}. */
+  private static String manifestFixtureMetadataPath() {
+    String path =
+        Objects.requireNonNull(
+                DescribeMetadataTest.class
+                    .getClassLoader()
+                    .getResource(
+                        "com/altinity/ice/cli/internal/cmd/describe-metadata-manifest-fixture/metadata.json"))
+            .getPath();
+    return "file://" + path;
+  }
+
+  private static Map<String, String> manifestFixtureConfig() {
+    String filePath = manifestFixtureMetadataPath();
+    String dir = filePath.substring(0, filePath.lastIndexOf('/'));
+    return Map.of(CatalogProperties.WAREHOUSE_LOCATION, dir);
+  }
+
   @Test
   public void testDescribeMetadataSummary() throws IOException {
     ByteArrayOutputStream outContent = new ByteArrayOutputStream();
@@ -124,6 +142,34 @@ public class DescribeMetadataTest {
       assertThat(output).contains("snapshotLog:");
       assertThat(output).contains("snapshotId:");
       assertThat(output).contains("timestamp:");
+    } finally {
+      System.setOut(originalOut);
+    }
+  }
+
+  @Test
+  public void testDescribeMetadataManifests() throws IOException {
+    ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+    PrintStream originalOut = System.out;
+    System.setOut(new PrintStream(outContent));
+
+    try {
+      DescribeMetadata.run(
+          manifestFixtureConfig(),
+          manifestFixtureMetadataPath(),
+          false,
+          DescribeMetadata.Option.MANIFESTS);
+
+      String output = outContent.toString();
+
+      assertThat(output).contains("manifests:");
+      assertThat(output).contains("-m0.avro");
+      assertThat(output).contains("dataFiles:");
+      assertThat(output).contains("format:");
+      assertThat(output).contains("PARQUET");
+      assertThat(output).contains("recordCount:");
+      assertThat(output).contains("3066766");
+      assertThat(output).contains("partitionSpecId:");
     } finally {
       System.setOut(originalOut);
     }
