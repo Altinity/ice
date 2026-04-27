@@ -140,6 +140,7 @@ where `filelist` contains one file path per line. If any file fails, the entire 
 ```shell
 ice create-namespace flowers
 ice list-namespaces
+ice list-tables flowers
 ice delete-namespace flowers
 ```
 
