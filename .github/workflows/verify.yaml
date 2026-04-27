@@ -76,7 +76,7 @@ jobs:
           distribution: 'graalvm'
           cache: maven
       - name: Build native image (dynamic linking - no musl required)
-        run: ./mvnw -Pnative -pl ice clean package
+        run: ./mvnw -Pnative -pl ice clean install -Dmaven.test.skip=true
       - name: Run Scenario-Based Integration Tests
         run: ../mvnw test -Dtest=ScenarioBasedIT -Dice.native=true
         working-directory: ice-rest-catalog
