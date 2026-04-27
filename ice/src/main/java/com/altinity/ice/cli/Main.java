@@ -24,6 +24,7 @@ import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
 import com.altinity.ice.cli.internal.cmd.ListNamespaces;
 import com.altinity.ice.cli.internal.cmd.ListPartitions;
+import com.altinity.ice.cli.internal.cmd.ListTables;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
@@ -749,6 +750,33 @@ public final class Main {
               ? Namespace.empty()
               : Namespace.of(parent.split("[.]"));
       ListNamespaces.run(catalog, namespace, json);
+    }
+  }
+
+  @CommandLine.Command(name = "list-tables", description = "List tables in a namespace.")
+  void listTables(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<namespace>",
+              description = "Namespace to list tables from (e.g. parent_ns.child_ns)")
+          String namespaceName,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    if (namespaceName == null || namespaceName.isEmpty()) {
+      throw new IllegalArgumentException("Namespace name is required");
+    }
+    String[] split = namespaceName.split("[.]");
+    for (String level : split) {
+      if (level.isEmpty()) {
+        throw new IllegalArgumentException(
+            "Invalid namespace name: '.' cannot separate empty names");
+      }
+    }
+    try (RESTCatalog catalog = loadCatalog()) {
+      ListTables.run(catalog, Namespace.of(split), json);
     }
   }
 
