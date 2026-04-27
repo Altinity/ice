@@ -17,7 +17,6 @@ jobs:
       - run: ./mvnw clean verify
       - name: Install
         run: ./mvnw install
-      # TODO: check native-image can build ice
       - name: Run Scenario-Based Integration Tests
         run: ../mvnw test -Dtest=ScenarioBasedIT
         working-directory: ice-rest-catalog
@@ -65,11 +64,9 @@ jobs:
         include:
           - arch: amd64
             runner: ubuntu-24.04
-            profile: native
             artifact: ice-native-amd64-dynamic
           - arch: arm64
             runner: ubuntu-24.04-arm
-            profile: native-arm64
             artifact: ice-native-arm64-dynamic
     steps:
       - uses: actions/checkout@v4
@@ -79,7 +76,10 @@ jobs:
           distribution: 'graalvm'
           cache: maven
       - name: Build native image (dynamic linking - no musl required)
-        run: ./mvnw -P${{ matrix.profile }} -pl ice clean package -Dmaven.test.skip=true
+        run: ./mvnw -Pnative -pl ice clean package
+      - name: Run Scenario-Based Integration Tests
+        run: ../mvnw test -Dtest=ScenarioBasedIT -Dice.native=true
+        working-directory: ice-rest-catalog
       - name: Upload native binary as artifact
         uses: actions/upload-artifact@v4
         with:

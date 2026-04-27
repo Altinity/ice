@@ -1,5 +1,6 @@
-# Dockerfile for building ICE native image (arm64, dynamic linking)
-# Usage: docker build -f ice/Dockerfile.native-arm64 -t ice-native:arm64 .
+# Dockerfile for building ICE native image (mostly-static with dynamic libc)
+# Usage (amd64): docker build -f ice/Dockerfile.native -t ice-native:amd64 .
+# Usage (arm64): docker build -f ice/Dockerfile.native -t ice-native:arm64 .
 
 FROM ghcr.io/graalvm/native-image-community:21 AS builder
 
@@ -21,8 +22,8 @@ RUN ./mvnw dependency:go-offline -pl ice || true
 # Copy source code
 COPY ice/src ice/src
 
-# Build dynamic native image
-RUN ./mvnw -Pnative-arm64 -pl ice clean package -Dmaven.test.skip=true
+# Build mostly-static native image (everything statically linked except libc)
+RUN ./mvnw -Pnative -pl ice clean package -Dmaven.test.skip=true
 
 # ============================================================================
 # Final stage: distroless base (includes minimal glibc runtime)
@@ -30,4 +31,3 @@ RUN ./mvnw -Pnative-arm64 -pl ice clean package -Dmaven.test.skip=true
 FROM gcr.io/distroless/base-debian12:nonroot
 COPY --from=builder /workspace/ice/target/ice /ice
 ENTRYPOINT ["/ice"]
-

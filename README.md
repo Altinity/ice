@@ -16,7 +16,7 @@ Pre-built binaries (+ links to Docker images for [ice](https://hub.docker.com/r/
 
 1. **Java-based binaries** - Require Java 21+ to run (available [here](https://adoptium.net/installation/))
 2. **Native binaries** - Standalone executables with no Java dependency
-   - `ice-native-amd64` - Static binary (musl) for x86_64 Linux (no dependencies)
+   - `ice-native-amd64` - Dynamic binary for x86_64 Linux (requires glibc)
    - `ice-native-arm64` - Dynamic binary for ARM64 Linux (requires glibc)
 
 ## Usage
@@ -51,15 +51,14 @@ Build standalone native binaries with no Java dependency:
 # Install prerequisites
 sdk env  # or ensure Java 21+ and GraalVM are available
 
-# For amd64 (static with musl - no dependencies)
-mvn -Pnative-amd64-static -pl ice clean package -Dmaven.test.skip=true
-For arm64
-mvn -Pnative-arm64 -pl ice clean package -Dmaven.test.skip=true
+# Build ice binary (both amd64 and arm64)
+mvn -Pnative -pl ice clean package -Dmaven.test.skip=true
 
 # Docker builds
-docker build -f ice/Dockerfile.native-amd64-static -t ice-native:amd64 .
+docker build -f ice/Dockerfile.native -t ice-native:amd64 .
 
-docker build -f ice/Dockerfile.native-arm64 -t ice-native:arm64 .
+docker build -f ice/Dockerfile.native -t ice-native:arm64 .
+```
 
 ## License
 

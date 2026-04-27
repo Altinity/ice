@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+PROJECT_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
+
+shopt -s nullglob
+jars=("$PROJECT_ROOT"/ice/target/ice-*-shaded.jar)
+shopt -u nullglob
+if (( ${#jars[@]} == 0 )); then
+  echo "agent-ice: no ice-*-shaded.jar in $PROJECT_ROOT/ice/target/." >&2
+  exit 1
+fi
+jar=$(ls -t "${jars[@]}" | head -n1)
+
+exec "${JAVA_HOME:?JAVA_HOME not set — run inside direnv shell}/bin/java" \
+-agentlib:native-image-agent=config-merge-dir=$PROJECT_ROOT/ice/src/main/resources/META-INF/native-image/com.altinity/ice,experimental-class-loader-support \
+-jar "$jar" "$@"
