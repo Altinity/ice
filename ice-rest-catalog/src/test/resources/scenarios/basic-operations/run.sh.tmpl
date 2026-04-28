@@ -104,6 +104,9 @@ if command -v aws &>/dev/null && [ -n "{{MINIO_ENDPOINT}}" ]; then
   S3_PATH="s3://${S3_BUCKET}/${NAMESPACE_NAME}/iris_no_copy/$(basename ${INPUT_PATH})"
   export AWS_ACCESS_KEY_ID=minioadmin
   export AWS_SECRET_ACCESS_KEY=minioadmin
+  # Iceberg S3FileIO / AWS SDK v2 need a region even for MinIO endpoints.
+  export AWS_REGION=us-east-1
+  export AWS_DEFAULT_REGION=us-east-1
   if aws s3 cp --endpoint-url "{{MINIO_ENDPOINT}}" "${INPUT_PATH}" "${S3_PATH}" 2>/dev/null; then
     if {{ICE_CLI}} --config {{CLI_CONFIG}} create-table ${TABLE_NO_COPY} --schema-from-parquet="file://${INPUT_PATH}" 2>/dev/null && \
        {{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_NO_COPY} --no-copy "${S3_PATH}" 2>/dev/null; then
@@ -122,6 +125,47 @@ fi
 {{ICE_CLI}} --config {{CLI_CONFIG}} files ${TABLE_PARTITIONED} >> /tmp/basic_ops_files.txt
 {{ICE_CLI}} --config {{CLI_CONFIG}} files ${TABLE_SORTED} >> /tmp/basic_ops_files.txt
 echo "OK Listed files in tables"
+
+# Describe-metadata --manifests on the iris table.
+# We need the current metadata.json key on S3; locate it via aws ls (best-effort).
+if command -v aws &>/dev/null && [ -n "{{MINIO_ENDPOINT}}" ]; then
+  export AWS_ACCESS_KEY_ID=minioadmin
+  export AWS_SECRET_ACCESS_KEY=minioadmin
+  export AWS_REGION=us-east-1
+  export AWS_DEFAULT_REGION=us-east-1
+  META_PREFIX="s3://${S3_BUCKET}/warehouse/${NAMESPACE_NAME}/iris/metadata/"
+  META_KEY=$(aws --endpoint-url "{{MINIO_ENDPOINT}}" s3 ls "${META_PREFIX}" 2>/dev/null \
+    | awk '/metadata\.json$/{print $NF}' | sort | tail -1)
+  if [ -n "${META_KEY}" ]; then
+    {{ICE_CLI}} --config {{CLI_CONFIG}} describe-metadata --manifests \
+      "${META_PREFIX}${META_KEY}" \
+      > /tmp/basic_ops_describe_metadata_manifests.txt
+    for needle in "manifests:" ".avro" "partitionSpecId:" "dataFiles:" "PARQUET"; do
+      if ! grep -q "${needle}" /tmp/basic_ops_describe_metadata_manifests.txt; then
+        echo "FAIL: describe-metadata --manifests output missing '${needle}'"
+        cat /tmp/basic_ops_describe_metadata_manifests.txt
+        exit 1
+      fi
+    done
+    echo "OK describe-metadata --manifests verified for ${TABLE_IRIS}"
+  else
+    echo "SKIP describe-metadata --manifests: no metadata.json found via aws ls"
+  fi
+else
+  echo "SKIP describe-metadata --manifests: aws CLI or MINIO_ENDPOINT not available"
+fi
+
+# List tables in the namespace via list-tables command
+{{ICE_CLI}} --config {{CLI_CONFIG}} list-tables ${NAMESPACE_NAME} > /tmp/basic_ops_list_tables.txt
+for t in ${TABLE_IRIS} ${TABLE_PARTITIONED} ${TABLE_SORTED}; do
+  if ! grep -q "${t}" /tmp/basic_ops_list_tables.txt; then
+    echo "FAIL: list-tables output missing table ${t}"
+    cat /tmp/basic_ops_list_tables.txt
+    exit 1
+  fi
+done
+echo "OK list-tables listed tables in ${NAMESPACE_NAME}"
+
 
 # Cleanup tables then namespace
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_IRIS}

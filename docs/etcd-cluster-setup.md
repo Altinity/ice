@@ -10,20 +10,24 @@ This guide walks through setting up ice-rest-catalog backed by a 3-node etcd clu
 
 ## 1. Start the etcd Cluster
 
-Use the provided docker-compose file to bring up etcd, MinIO, ice-rest-catalog, and ClickHouse:
+Use the provided 3-node docker-compose file to bring up etcd, MinIO, ice-rest-catalog, and ClickHouse:
 
 ```bash
 cd examples/docker-compose
-docker compose -f docker-compose-etcd.yaml up -d
+docker compose -f docker-compose-etcd-3-node.yaml up -d
 ```
 
-This starts a single-node etcd by default. For a 3-node cluster, replace the `etcd` service definition with three separate nodes (etcd1, etcd2, etcd3) each with their own ports mapped to the host:
+By default, etcd ports are only exposed on the compose network. To run `etcdctl` from the host
+(used in step 4), uncomment the `ports` block under each etcd service in
+`docker-compose-etcd-3-node.yaml`. The host ports are:
 
-| Node  | Client Port |
-|-------|-------------|
-| etcd1 | 12379       |
-| etcd2 | 12479       |
-| etcd3 | 12579       |
+| Node   | Host Port | Container Port |
+|--------|-----------|----------------|
+| etcd-1 | 12379     | 2379           |
+| etcd-2 | 12479     | 2379           |
+| etcd-3 | 12579     | 2379           |
+
+For a single-node setup, use `docker-compose-etcd.yaml` instead.
 
 ## 2. Configure ice-rest-catalog
 
@@ -48,10 +52,13 @@ Start (or restart) ice-rest-catalog so it picks up the new config.
 
 ## 3. Insert Data
 
-Use the ice CLI to create a table and insert a Parquet file:
+Use the ice CLI to create a table and insert a Parquet file. The example `iris.parquet` lives
+under `examples/scratch/` — see [examples/scratch/iris.parquet.txt](../examples/scratch/iris.parquet.txt)
+for the source link if you don't already have it locally:
 
 ```bash
-ice insert flowers.iris file://iris.parquet
+cd examples/scratch
+ice insert flowers.iris -p file://iris.parquet
 ```
 
 ## 4. Verify Replication with etcdctl
