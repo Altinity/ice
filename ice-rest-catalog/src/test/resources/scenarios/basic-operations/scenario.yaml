@@ -14,6 +14,7 @@ env:
   TABLE_SORTED: "test_ns.taxis_s_by_day"
   TABLE_NO_COPY: "test_ns.iris_no_copy"
   S3_BUCKET: "test-bucket"
+  CH_DB: "ice_basic_ops"
   # Optional: set MC_ALIAS (e.g. "minio") to run --no-copy test; requires mc configured for MinIO
   # MC_ALIAS: "minio"
 
