@@ -85,6 +85,33 @@ if [[ "${FILES_OUT_BUCKET}" != *${EXPECTED_DATA_PATH_BUCKET}* ]]; then
 fi
 echo "OK Validated correct bucket-partitioned data file path for ${TABLE_NAME_BUCKET}"
 
+# Create table with truncate partition and insert data
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME_TRUNCATE} ${INPUT_PATH_IRIS} --partition="${PARTITION_SPEC_TRUNCATE}"
+echo "OK Inserted data with truncate partitioning into table ${TABLE_NAME_TRUNCATE}"
+
+# List partitions and validate output
+LIST_PARTITIONS_OUT_TRUNCATE=$({{ICE_CLI}} --config {{CLI_CONFIG}} list-partitions "${TABLE_NAME_TRUNCATE}")
+if ! grep -q "partitions:" <<<"${LIST_PARTITIONS_OUT_TRUNCATE}"; then
+  echo "FAIL: list-partitions output missing 'partitions:' section"
+  printf '%s\n' "${LIST_PARTITIONS_OUT_TRUNCATE}"
+  exit 1
+fi
+if ! grep -q "variety_trunc=" <<<"${LIST_PARTITIONS_OUT_TRUNCATE}"; then
+  echo "FAIL: list-partitions output missing truncate partition entries (expected 'variety_trunc=')"
+  printf '%s\n' "${LIST_PARTITIONS_OUT_TRUNCATE}"
+  exit 1
+fi
+echo "OK Listed and validated truncate partitions for ${TABLE_NAME_TRUNCATE}"
+
+# Validate data file was inserted to correct truncate-partitioned path
+FILES_OUT_TRUNCATE=$({{ICE_CLI}} --config {{CLI_CONFIG}} files ${TABLE_NAME_TRUNCATE})
+
+if [[ "${FILES_OUT_TRUNCATE}" != *${EXPECTED_DATA_PATH_TRUNCATE}* ]]; then
+  echo "FAIL: expected substring '${EXPECTED_DATA_PATH_TRUNCATE}' not found in files command output: ${FILES_OUT_TRUNCATE}"
+  exit 1
+fi
+echo "OK Validated correct truncate-partitioned data file path for ${TABLE_NAME_TRUNCATE}"
+
 # Cleanup
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME_IRIS}
 echo "OK Deleted table: ${TABLE_NAME_IRIS}"
@@ -92,6 +119,8 @@ echo "OK Deleted table: ${TABLE_NAME_IRIS}"
 echo "OK Deleted table: ${TABLE_NAME_ONTIME}"
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME_BUCKET}
 echo "OK Deleted table: ${TABLE_NAME_BUCKET}"
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME_TRUNCATE}
+echo "OK Deleted table: ${TABLE_NAME_TRUNCATE}"
 
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
 echo "OK Deleted namespace: ${NAMESPACE_NAME}"

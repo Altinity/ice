@@ -1,0 +1,116 @@
+# Iceberg REST catalog with etcd as the metastore (instead of SQLite).
+# Usage: docker compose -f docker-compose-etcd.yaml up
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.12
+    restart: unless-stopped
+    command:
+      - etcd
+      - --name=etcd
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://etcd:2380
+      - --initial-cluster=etcd=http://etcd:2380
+      - --initial-cluster-token=ice-rest-catalog-etcd
+      - --initial-cluster-state=new
+    volumes:
+      - etcd-data:/etcd-data
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Uncomment to run etcdctl from the host against this cluster:
+    # ports:
+    #   - "2379:2379"
+
+  minio:
+    image: minio/minio:RELEASE.2025-03-12T18-04-18Z
+    restart: unless-stopped
+    command: [ 'server', '/data', '--address', ':8999', '--console-address', ':9001' ]
+    environment:
+      MINIO_ROOT_USER: miniouser
+      MINIO_ROOT_PASSWORD: miniopassword
+    ports:
+      - '8999:8999' # 9000 is taken by clickhouse
+      - '9001:9001' # web console
+    volumes:
+      - minio:/data
+  minio-init:
+    image: minio/mc:RELEASE.2025-03-12T17-29-24Z
+    restart: on-failure  # run once and exit
+    entrypoint: >
+      /bin/sh -c "
+      sleep 1; until /usr/bin/mc alias set local http://minio:8999 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do echo waiting for minio to start...; sleep 1; done;
+      /usr/bin/mc mb --ignore-existing local/bucket1;
+      exit 0;
+      "
+    environment:
+      MINIO_ROOT_USER: miniouser
+      MINIO_ROOT_PASSWORD: miniopassword
+    depends_on:
+      - minio
+  ice-rest-catalog:
+    image: altinity/ice-rest-catalog:${ICE_REST_CATALOG_TAG:-debug-with-ice-latest-master@sha256:9f5308309b98d2e0b76346cd29c22557076bfcb0070eb8f32b69b87932b9e37c}
+    pull_policy: ${ICE_REST_CATALOG_PULL_POLICY:-always}
+    restart: unless-stopped
+    ports:
+      - '5001:5000' # iceberg/http
+    configs:
+      - source: ice-rest-catalog-yaml
+        target: /etc/ice/ice-rest-catalog.yaml
+    depends_on:
+      etcd:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+  clickhouse:
+    image: altinity/clickhouse-server:25.8.9.20496.altinityantalya-alpine
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1" # insecure
+    ports:
+      - "8123:8123" # clickhouse/http
+      - "9000:9000" # clickhouse/native
+    configs:
+      - source: clickhouse-init
+        target: /docker-entrypoint-initdb.d/init-db.sh
+    volumes:
+      # for access to clickhouse-logs
+      - ./data/docker-compose/clickhouse/var/log/clickhouse-server:/var/log/clickhouse-server
+      # - ./config.xml:/etc/clickhouse-server/conf.d/config.xml
+    depends_on:
+      - ice-rest-catalog
+configs:
+  clickhouse-init:
+    content: |
+      #!/bin/bash
+      exec clickhouse client --query $"
+        SET allow_experimental_database_iceberg = 1;
+
+        DROP DATABASE IF EXISTS ice;
+
+        CREATE DATABASE ice
+          ENGINE = DataLakeCatalog('http://ice-rest-catalog:5000')
+          SETTINGS catalog_type = 'rest',
+            auth_header = 'Authorization: Bearer foo',
+            storage_endpoint = 'http://minio:8999',
+            warehouse = 's3://bucket1';
+      "
+  ice-rest-catalog-yaml:
+    content: |
+      uri: etcd:http://etcd:2379
+      warehouse: s3://bucket1
+      s3:
+        endpoint: http://minio:8999
+        pathStyleAccess: true
+        accessKeyID: miniouser
+        secretAccessKey: miniopassword
+        region: minio
+      bearerTokens:
+        - value: foo
+volumes:
+  minio:
+  etcd-data:

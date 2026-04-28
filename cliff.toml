@@ -1,0 +1,45 @@
+[changelog]
+body = """
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }})
+{% else %}\
+    ## [Unreleased]({{ self::remote_url() }}/compare/{{ previous.version }}...master)
+{% endif %}\
+
+{% for group, commits in commits | unique(attribute="message") | group_by(attribute="group") %}
+    ### {{ group | upper_first }}
+    {% for commit in commits %}
+        {%- set display_scope = commit.scope %}
+        {%- if commit.remote.pr_labels is containing("ice-rest-catalog") %}
+            {%- set display_scope = "ice-rest-catalog" %}
+        {%- elif commit.remote.pr_labels is containing("ice") %}
+            {%- set display_scope = "ice" %}
+        {%- endif %}
+        - {% if display_scope %}`{{ display_scope }}` - {% endif %}{{ commit.message | upper_first }}\
+    {% endfor %}
+{% endfor %}
+"""
+
+[git]
+filter_unconventional = false
+commit_parsers = [
+  { message = "^feat", group = "Added" },
+  { message = "^change", group = "Changed" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^Merge pull request #.*", skip = true},
+  { message = "^docs", skip = true },
+  { message = "^test", skip = true },
+  { message = "^chore", skip = true },
+  { message = ".*", group = "Other" },
+]
+commit_preprocessors = [
+  { pattern = "\\(#([0-9]+)\\)", replace = "([#${1}](https://github.com/Altinity/ice/pull/${1}))" },
+]
+
+[remote.github]
+owner = "Altinity"
+repo = "ice"

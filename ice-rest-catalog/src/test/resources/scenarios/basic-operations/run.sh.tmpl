@@ -150,6 +150,18 @@ else
   echo "SKIP describe-metadata --manifests: aws CLI or MINIO_ENDPOINT not available"
 fi
 
+# List tables in the namespace via list-tables command
+{{ICE_CLI}} --config {{CLI_CONFIG}} list-tables ${NAMESPACE_NAME} > /tmp/basic_ops_list_tables.txt
+for t in ${TABLE_IRIS} ${TABLE_PARTITIONED} ${TABLE_SORTED}; do
+  if ! grep -q "${t}" /tmp/basic_ops_list_tables.txt; then
+    echo "FAIL: list-tables output missing table ${t}"
+    cat /tmp/basic_ops_list_tables.txt
+    exit 1
+  fi
+done
+echo "OK list-tables listed tables in ${NAMESPACE_NAME}"
+
+
 # Cleanup tables then namespace
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_IRIS}
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_PARTITIONED}
