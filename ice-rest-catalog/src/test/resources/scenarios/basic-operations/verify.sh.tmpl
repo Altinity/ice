@@ -5,11 +5,11 @@ set -e
 # Exit code 0 = success, non-zero = failure
 # Expects run.sh to have written: basic_ops_list_namespace.txt, basic_ops_describe.txt,
 # basic_ops_scan_iris.txt, basic_ops_scan_partitioned.txt, basic_ops_scan_sorted.txt,
-# basic_ops_files.txt under /tmp
+# basic_ops_files.txt, basic_ops_list_tables.txt under /tmp
 
 echo "Verifying basic operations test..."
 
-for f in /tmp/basic_ops_list_namespace.txt /tmp/basic_ops_describe.txt /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt; do
+for f in /tmp/basic_ops_list_namespace.txt /tmp/basic_ops_describe.txt /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt /tmp/basic_ops_list_tables.txt; do
   if [ ! -f "$f" ]; then
     echo "FAIL Output file not found: $f"
     exit 1
@@ -87,8 +87,17 @@ if ! grep -q "test_ns" /tmp/basic_ops_list_namespace.txt; then
   exit 1
 fi
 
+# Verify list-tables output contains the expected tables in the test namespace
+for t in test_ns.iris test_ns.taxis_p_by_day test_ns.taxis_s_by_day; do
+  if ! grep -q "$t" /tmp/basic_ops_list_tables.txt; then
+    echo "FAIL basic_ops_list_tables.txt does not contain expected table '$t'"
+    exit 1
+  fi
+done
+
 # Cleanup temp files
 rm -f /tmp/basic_ops_list_namespace.txt /tmp/basic_ops_describe.txt /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt /tmp/basic_ops_files.txt /tmp/basic_ops_describe_metadata_manifests.txt
+rm -f /tmp/basic_ops_list_namespace.txt /tmp/basic_ops_describe.txt /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt /tmp/basic_ops_files.txt /tmp/basic_ops_list_tables.txt
 
 echo "OK Verification passed"
 exit 0

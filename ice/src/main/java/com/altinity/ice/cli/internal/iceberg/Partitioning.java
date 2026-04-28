@@ -353,7 +353,7 @@ public final class Partitioning {
                   sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
               break;
             default:
-              if (transformName.startsWith("bucket[")) {
+              if (transformName.startsWith("bucket[") || transformName.startsWith("truncate[")) {
                 partitionRecord.setField(
                     sourceFieldName, toGenericRecordFieldValue(value, fieldSpec.type()));
               } else {
