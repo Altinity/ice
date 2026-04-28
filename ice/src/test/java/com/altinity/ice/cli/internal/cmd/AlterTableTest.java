@@ -159,4 +159,18 @@ public class AlterTableTest {
     assertThat(table.schema().columns().stream().map(Types.NestedField::name).toList())
         .containsExactly("age", "id", "name", "timestamp_col", "date_col");
   }
+
+  @Test
+  public void testAddColumnAfterWinsWhenBothAfterAndBeforeSet() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(new AlterTable.AddColumn("bad", "string", null, "name", "id", null));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    assertThat(table.schema().columns().stream().map(Types.NestedField::name).toList())
+        .containsExactly("id", "name", "bad", "timestamp_col", "date_col");
+  }
 }

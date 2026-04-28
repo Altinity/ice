@@ -58,24 +58,14 @@ assert_order "first=true" \
   "a_first,sepal.length,sepal.width,petal.length,a_after,petal.width,a_before,variety" \
   "$(extract_order /tmp/sepos_first.txt)"
 
-# --- conflicting position should fail ---
-set +e
+# --- both after and before: CLI applies after only (before ignored) ---
 {{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} \
-  $'[{"op":"add_column","name":"bad","type":"string","after":"variety","before":"petal.width"}]' \
-  > /tmp/sepos_conflict.txt 2>&1
-RC=$?
-set -e
-if [ $RC -eq 0 ]; then
-  echo "FAIL conflicting position should have failed but CLI returned 0"
-  cat /tmp/sepos_conflict.txt
-  exit 1
-fi
-if ! grep -q "at most one" /tmp/sepos_conflict.txt; then
-  echo "FAIL conflicting position error message missing 'at most one'"
-  cat /tmp/sepos_conflict.txt
-  exit 1
-fi
-echo "OK Conflicting position rejected"
+  $'[{"op":"add_column","name":"bad","type":"string","after":"variety","before":"petal.width"}]'
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/sepos_conflict.txt
+assert_order "after wins when both after and before set" \
+  "a_first,sepal.length,sepal.width,petal.length,a_after,petal.width,a_before,variety,bad" \
+  "$(extract_order /tmp/sepos_conflict.txt)"
+echo "OK conflicting position: after wins (before ignored)"
 
 # Cleanup
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
