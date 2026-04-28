@@ -34,6 +34,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 15
+    # Uncomment to run etcdctl from the host against this node:
+    # ports:
+    #   - "12379:2379"
 
   etcd-2:
     image: quay.io/coreos/etcd:v3.5.12
@@ -56,6 +59,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 15
+    # Uncomment to run etcdctl from the host against this node:
+    # ports:
+    #   - "12479:2379"
 
   etcd-3:
     image: quay.io/coreos/etcd:v3.5.12
@@ -78,6 +84,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 15
+    # Uncomment to run etcdctl from the host against this node:
+    # ports:
+    #   - "12579:2379"
 
   minio:
     image: minio/minio:RELEASE.2025-03-12T18-04-18Z
