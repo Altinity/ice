@@ -104,6 +104,9 @@ if command -v aws &>/dev/null && [ -n "{{MINIO_ENDPOINT}}" ]; then
   S3_PATH="s3://${S3_BUCKET}/${NAMESPACE_NAME}/iris_no_copy/$(basename ${INPUT_PATH})"
   export AWS_ACCESS_KEY_ID=minioadmin
   export AWS_SECRET_ACCESS_KEY=minioadmin
+  # Iceberg S3FileIO / AWS SDK v2 need a region even for MinIO endpoints.
+  export AWS_REGION=us-east-1
+  export AWS_DEFAULT_REGION=us-east-1
   if aws s3 cp --endpoint-url "{{MINIO_ENDPOINT}}" "${INPUT_PATH}" "${S3_PATH}" 2>/dev/null; then
     if {{ICE_CLI}} --config {{CLI_CONFIG}} create-table ${TABLE_NO_COPY} --schema-from-parquet="file://${INPUT_PATH}" 2>/dev/null && \
        {{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_NO_COPY} --no-copy "${S3_PATH}" 2>/dev/null; then
@@ -128,6 +131,8 @@ echo "OK Listed files in tables"
 if command -v aws &>/dev/null && [ -n "{{MINIO_ENDPOINT}}" ]; then
   export AWS_ACCESS_KEY_ID=minioadmin
   export AWS_SECRET_ACCESS_KEY=minioadmin
+  export AWS_REGION=us-east-1
+  export AWS_DEFAULT_REGION=us-east-1
   META_PREFIX="s3://${S3_BUCKET}/warehouse/${NAMESPACE_NAME}/iris/metadata/"
   META_KEY=$(aws --endpoint-url "{{MINIO_ENDPOINT}}" s3 ls "${META_PREFIX}" 2>/dev/null \
     | awk '/metadata\.json$/{print $NF}' | sort | tail -1)
