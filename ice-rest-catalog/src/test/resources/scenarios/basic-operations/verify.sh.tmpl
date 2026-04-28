@@ -32,6 +32,21 @@ for f in /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/b
   fi
 done
 
+# Verify describe-metadata --manifests output if it was produced (aws available in run.sh)
+DM="/tmp/basic_ops_describe_metadata_manifests.txt"
+if [ -f "$DM" ]; then
+  if [ ! -s "$DM" ]; then
+    echo "FAIL $DM exists but is empty"
+    exit 1
+  fi
+  for needle in "manifests:" ".avro" "partitionSpecId:" "dataFiles:" "PARQUET"; do
+    if ! grep -q "${needle}" "$DM"; then
+      echo "FAIL $DM missing '${needle}'"
+      exit 1
+    fi
+  done
+fi
+
 # Verify files output contains expected structure (Snapshots/Snapshot/Manifest/Datafile and S3 paths)
 F="/tmp/basic_ops_files.txt"
 if [ ! -f "$F" ] || [ ! -s "$F" ]; then
@@ -73,7 +88,7 @@ if ! grep -q "test_ns" /tmp/basic_ops_list_namespace.txt; then
 fi
 
 # Cleanup temp files
-rm -f /tmp/basic_ops_list_namespace.txt /tmp/basic_ops_describe.txt /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt /tmp/basic_ops_files.txt
+rm -f /tmp/basic_ops_list_namespace.txt /tmp/basic_ops_describe.txt /tmp/basic_ops_scan_iris.txt /tmp/basic_ops_scan_partitioned.txt /tmp/basic_ops_scan_sorted.txt /tmp/basic_ops_files.txt /tmp/basic_ops_describe_metadata_manifests.txt
 
 echo "OK Verification passed"
 exit 0

@@ -123,6 +123,33 @@ fi
 {{ICE_CLI}} --config {{CLI_CONFIG}} files ${TABLE_SORTED} >> /tmp/basic_ops_files.txt
 echo "OK Listed files in tables"
 
+# Describe-metadata --manifests on the iris table.
+# We need the current metadata.json key on S3; locate it via aws ls (best-effort).
+if command -v aws &>/dev/null && [ -n "{{MINIO_ENDPOINT}}" ]; then
+  export AWS_ACCESS_KEY_ID=minioadmin
+  export AWS_SECRET_ACCESS_KEY=minioadmin
+  META_PREFIX="s3://${S3_BUCKET}/warehouse/${NAMESPACE_NAME}/iris/metadata/"
+  META_KEY=$(aws --endpoint-url "{{MINIO_ENDPOINT}}" s3 ls "${META_PREFIX}" 2>/dev/null \
+    | awk '/metadata\.json$/{print $NF}' | sort | tail -1)
+  if [ -n "${META_KEY}" ]; then
+    {{ICE_CLI}} --config {{CLI_CONFIG}} describe-metadata --manifests \
+      "${META_PREFIX}${META_KEY}" \
+      > /tmp/basic_ops_describe_metadata_manifests.txt
+    for needle in "manifests:" ".avro" "partitionSpecId:" "dataFiles:" "PARQUET"; do
+      if ! grep -q "${needle}" /tmp/basic_ops_describe_metadata_manifests.txt; then
+        echo "FAIL: describe-metadata --manifests output missing '${needle}'"
+        cat /tmp/basic_ops_describe_metadata_manifests.txt
+        exit 1
+      fi
+    done
+    echo "OK describe-metadata --manifests verified for ${TABLE_IRIS}"
+  else
+    echo "SKIP describe-metadata --manifests: no metadata.json found via aws ls"
+  fi
+else
+  echo "SKIP describe-metadata --manifests: aws CLI or MINIO_ENDPOINT not available"
+fi
+
 # Cleanup tables then namespace
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_IRIS}
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_PARTITIONED}
