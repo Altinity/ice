@@ -159,7 +159,20 @@ public abstract class RESTCatalogTestBase {
     File tempConfigFile = File.createTempFile("ice-rest-cli-", ".yaml");
     tempConfigFile.deleteOnExit();
 
-    String configContent = "uri: http://localhost:8080\n";
+    // Match server warehouse + MinIO S3 settings so CLI commands that read s3:// paths directly
+    // (e.g. describe-metadata on metadata.json) use S3FileIO against MinIO, not default AWS.
+    String minioEndpoint = getMinioEndpoint();
+    String configContent =
+        "uri: http://localhost:8080\n"
+            + "warehouse: s3://test-bucket/warehouse\n"
+            + "s3:\n"
+            + "  endpoint: "
+            + minioEndpoint
+            + "\n"
+            + "  pathStyleAccess: true\n"
+            + "  accessKeyID: minioadmin\n"
+            + "  secretAccessKey: minioadmin\n"
+            + "  region: us-east-1\n";
     Files.write(tempConfigFile.toPath(), configContent.getBytes());
 
     return tempConfigFile;

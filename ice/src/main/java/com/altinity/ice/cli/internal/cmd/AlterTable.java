@@ -55,20 +55,23 @@ public class AlterTable {
     private final String name;
     private final Type type;
     @Nullable private final String doc;
-    private final boolean nullable;
-    @Nullable private final Literal<?> defaultValue;
+    @Nullable private final String after;
+    @Nullable private final String before;
+    private final boolean first;
 
     public AddColumn(
         @JsonProperty(value = "name", required = true) String name,
         @JsonProperty(value = "type", required = true) String type,
         @JsonProperty("doc") @Nullable String doc,
-        @JsonProperty("nullable") @Nullable Boolean nullable,
-        @JsonProperty("default") @Nullable Object defaultValue) {
+        @JsonProperty("after") @Nullable String after,
+        @JsonProperty("before") @Nullable String before,
+        @JsonProperty("first") @Nullable Boolean first) {
       this.name = name;
       this.type = Types.fromPrimitiveString(type);
       this.doc = doc;
-      this.nullable = nullable == null || nullable;
-      this.defaultValue = coerceDefault(this.type, defaultValue);
+      this.after = after;
+      this.before = before;
+      this.first = first != null && first;
     }
   }
 
@@ -215,18 +218,13 @@ public class AlterTable {
         case AddColumn up -> {
           // TODO: support nested columns
           UpdateSchema us = schemaUpdates.getValue();
-          if (up.nullable) {
-            if (up.defaultValue == null) {
-              us.addColumn(up.name, up.type, up.doc);
-            } else {
-              us.addColumn(up.name, up.type, up.doc, up.defaultValue);
-            }
-          } else {
-            if (up.defaultValue == null) {
-              us.addRequiredColumn(up.name, up.type, up.doc);
-            } else {
-              us.addRequiredColumn(up.name, up.type, up.doc, up.defaultValue);
-            }
+          us.addColumn(up.name, up.type, up.doc);
+          if (up.after != null) {
+            us.moveAfter(up.name, up.after);
+          } else if (up.before != null) {
+            us.moveBefore(up.name, up.before);
+          } else if (up.first) {
+            us.moveFirst(up.name);
           }
         }
         case AlterColumn up -> {
