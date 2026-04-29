@@ -47,6 +47,30 @@ if ! grep -q "variety" /tmp/basic_ops_scan_iris.txt; then
 fi
 echo "OK Scan verified ${TABLE_IRIS}"
 
+# Verify ClickHouse can read the just-inserted iris table via DataLakeCatalog (Docker-only).
+# Skipped under host-based ScenarioBasedIT, where CH_EXEC is empty.
+if [ -n "{{CH_EXEC}}" ]; then
+  echo "Verifying ${TABLE_IRIS} from ClickHouse..."
+  {{CH_EXEC}} --multiquery --query "
+    SET allow_experimental_database_iceberg = 1;
+    DROP DATABASE IF EXISTS \`${CH_DB}\`;
+    CREATE DATABASE \`${CH_DB}\`
+      ENGINE = DataLakeCatalog('{{CATALOG_URI_INTERNAL}}')
+      SETTINGS catalog_type='rest',
+               vended_credentials=false,
+               warehouse='s3://test-bucket/warehouse',
+               storage_endpoint='{{S3_ENDPOINT_INTERNAL}}'"
+
+  COUNT_RAW=$({{CH_EXEC}} --query "SELECT count() FROM \`${CH_DB}\`.\`${TABLE_IRIS}\`")
+  COUNT=$(echo "${COUNT_RAW}" | tr -d '[:space:]')
+  if ! [[ "${COUNT}" =~ ^[0-9]+$ ]] || [ "${COUNT}" -lt 1 ]; then
+    echo "FAIL: ClickHouse expected count >= 1 from ${TABLE_IRIS}, got '${COUNT_RAW}'"
+    exit 1
+  fi
+  echo "OK ClickHouse read ${TABLE_IRIS}: ${COUNT} rows"
+  {{CH_EXEC}} --query "DROP DATABASE IF EXISTS \`${CH_DB}\`"
+fi
+
 # Describe catalog (output includes table ids like namespace.table) and verify namespace/table appears
 {{ICE_CLI}} --config {{CLI_CONFIG}} describe > /tmp/basic_ops_describe.txt
 if ! grep -q "${NAMESPACE_NAME}" /tmp/basic_ops_describe.txt; then

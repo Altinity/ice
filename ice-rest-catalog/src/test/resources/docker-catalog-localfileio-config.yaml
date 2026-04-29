@@ -1,0 +1,6 @@
+uri: "jdbc:sqlite::memory:"
+warehouse: "file:///warehouse"
+anonymousAccess:
+  enabled: true
+  accessConfig:
+    readOnly: false
