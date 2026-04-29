@@ -58,6 +58,7 @@ public class AlterTable {
     @Nullable private final String after;
     @Nullable private final String before;
     private final boolean first;
+    private final boolean required;
 
     public AddColumn(
         @JsonProperty(value = "name", required = true) String name,
@@ -65,13 +66,15 @@ public class AlterTable {
         @JsonProperty("doc") @Nullable String doc,
         @JsonProperty("after") @Nullable String after,
         @JsonProperty("before") @Nullable String before,
-        @JsonProperty("first") @Nullable Boolean first) {
+        @JsonProperty("first") @Nullable Boolean first,
+        @JsonProperty("required") @Nullable Boolean required) {
       this.name = name;
       this.type = Types.fromPrimitiveString(type);
       this.doc = doc;
       this.after = after;
       this.before = before;
       this.first = first != null && first;
+      this.required = required != null && required;
     }
   }
 
@@ -218,7 +221,18 @@ public class AlterTable {
         case AddColumn up -> {
           // TODO: support nested columns
           UpdateSchema us = schemaUpdates.getValue();
-          us.addColumn(up.name, up.type, up.doc);
+          if (up.required) {
+            // Iceberg rejects required adds without an initial default unless incompatible
+            // changes are explicitly allowed (even for empty tables with a snapshot).
+            us.allowIncompatibleChanges();
+            if (up.doc != null) {
+              us.addRequiredColumn(up.name, up.type, up.doc);
+            } else {
+              us.addRequiredColumn(up.name, up.type);
+            }
+          } else {
+            us.addColumn(up.name, up.type, up.doc);
+          }
           if (up.after != null) {
             us.moveAfter(up.name, up.after);
           } else if (up.before != null) {

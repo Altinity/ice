@@ -18,15 +18,17 @@
  */
 package org.apache.iceberg.data.parquet;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.iceberg.MetadataColumns;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.parquet.ParquetSchemaUtil;
 import org.apache.iceberg.parquet.ParquetValueReader;
 import org.apache.iceberg.parquet.ParquetValueReaders;
+import org.apache.iceberg.parquet.ParquetVariantVisitor;
 import org.apache.iceberg.parquet.TypeWithSchemaVisitor;
+import org.apache.iceberg.parquet.VariantReaderBuilder;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableList;
 import org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap;
@@ -50,11 +52,7 @@ import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
 
-/**
- * @deprecated since 1.8.0, will be made package-private in 1.9.0
- */
-@Deprecated
-public abstract class BaseParquetReaders<T> {
+abstract class BaseParquetReaders<T> {
   protected BaseParquetReaders() {}
 
   protected ParquetValueReader<T> createReader(Schema expectedSchema, MessageType fileSchema) {
@@ -78,7 +76,7 @@ public abstract class BaseParquetReaders<T> {
   }
 
   protected abstract ParquetValueReader<T> createStructReader(
-      List<Type> types, List<ParquetValueReader<?>> fieldReaders, Types.StructType structType);
+      List<ParquetValueReader<?>> fieldReaders, Types.StructType structType);
 
   protected abstract ParquetValueReader<?> fixedReader(ColumnDescriptor desc);
 
@@ -111,7 +109,6 @@ public abstract class BaseParquetReaders<T> {
       // the expected struct is ignored because nested fields are never found when the
       List<ParquetValueReader<?>> newFields =
           Lists.newArrayListWithExpectedSize(fieldReaders.size());
-      List<Type> types = Lists.newArrayListWithExpectedSize(fieldReaders.size());
       List<Type> fields = struct.getFields();
       for (int i = 0; i < fields.size(); i += 1) {
         ParquetValueReader<?> fieldReader = fieldReaders.get(i);
@@ -119,11 +116,10 @@ public abstract class BaseParquetReaders<T> {
           Type fieldType = fields.get(i);
           int fieldD = type().getMaxDefinitionLevel(path(fieldType.getName())) - 1;
           newFields.add(ParquetValueReaders.option(fieldType, fieldD, fieldReader));
-          types.add(fieldType);
         }
       }
 
-      return createStructReader(types, newFields, expected);
+      return createStructReader(newFields, expected);
     }
   }
 
@@ -177,6 +173,7 @@ public abstract class BaseParquetReaders<T> {
                 Preconditions.checkArgument(
                   intLogicalType.isSigned(), "Cannot read UINT64 as a long value");
         */
+
         return Optional.of(new ParquetValueReaders.UnboxedReader<>(desc));
       }
 
@@ -227,10 +224,12 @@ public abstract class BaseParquetReaders<T> {
     @Override
     public ParquetValueReader<?> struct(
         Types.StructType expected, GroupType struct, List<ParquetValueReader<?>> fieldReaders) {
+      if (null == expected) {
+        return createStructReader(ImmutableList.of(), null);
+      }
+
       // match the expected struct's order
       Map<Integer, ParquetValueReader<?>> readersById = Maps.newHashMap();
-      Map<Integer, Type> typesById = Maps.newHashMap();
-      Map<Integer, Integer> maxDefinitionLevelsById = Maps.newHashMap();
       List<Type> fields = struct.getFields();
       for (int i = 0; i < fields.size(); i += 1) {
         ParquetValueReader<?> fieldReader = fieldReaders.get(i);
@@ -239,55 +238,37 @@ public abstract class BaseParquetReaders<T> {
           int fieldD = type.getMaxDefinitionLevel(path(fieldType.getName())) - 1;
           int id = fieldType.getId().intValue();
           readersById.put(id, ParquetValueReaders.option(fieldType, fieldD, fieldReader));
-          typesById.put(id, fieldType);
-          if (idToConstant.containsKey(id)) {
-            maxDefinitionLevelsById.put(id, fieldD);
-          }
         }
       }
 
-      List<Types.NestedField> expectedFields =
-          expected != null ? expected.fields() : ImmutableList.of();
+      int constantDefinitionLevel = type.getMaxDefinitionLevel(currentPath());
+      List<Types.NestedField> expectedFields = expected.fields();
       List<ParquetValueReader<?>> reorderedFields =
           Lists.newArrayListWithExpectedSize(expectedFields.size());
-      List<Type> types = Lists.newArrayListWithExpectedSize(expectedFields.size());
-      // Defaulting to parent max definition level
-      int defaultMaxDefinitionLevel = type.getMaxDefinitionLevel(currentPath());
+
       for (Types.NestedField field : expectedFields) {
         int id = field.fieldId();
-        ParquetValueReader<?> reader = readersById.get(id);
-        if (idToConstant.containsKey(id)) {
-          // containsKey is used because the constant may be null
-          int fieldMaxDefinitionLevel =
-              maxDefinitionLevelsById.getOrDefault(id, defaultMaxDefinitionLevel);
-          reorderedFields.add(
-              ParquetValueReaders.constant(idToConstant.get(id), fieldMaxDefinitionLevel));
-          types.add(null);
-        } else if (id == MetadataColumns.ROW_POSITION.fieldId()) {
-          reorderedFields.add(ParquetValueReaders.position());
-          types.add(null);
-        } else if (id == MetadataColumns.IS_DELETED.fieldId()) {
-          reorderedFields.add(ParquetValueReaders.constant(false));
-          types.add(null);
-        } else if (reader != null) {
-          reorderedFields.add(reader);
-          types.add(typesById.get(id));
-        } else if (field.initialDefault() != null) {
-          reorderedFields.add(
-              ParquetValueReaders.constant(
-                  convertConstant(field.type(), field.initialDefault()),
-                  maxDefinitionLevelsById.getOrDefault(id, defaultMaxDefinitionLevel)));
-          types.add(typesById.get(id));
-        } else if (field.isOptional()) {
-          reorderedFields.add(ParquetValueReaders.nulls());
-          types.add(null);
-        } else {
-          throw new IllegalArgumentException(
-              String.format("Missing required field: %s", field.name()));
-        }
+        ParquetValueReader<?> reader =
+            ParquetValueReaders.replaceWithMetadataReader(
+                id, readersById.get(id), idToConstant, constantDefinitionLevel);
+        reorderedFields.add(defaultReader(field, reader, constantDefinitionLevel));
       }
 
-      return createStructReader(types, reorderedFields, expected);
+      return createStructReader(reorderedFields, expected);
+    }
+
+    private ParquetValueReader<?> defaultReader(
+        Types.NestedField field, ParquetValueReader<?> reader, int constantDL) {
+      if (reader != null) {
+        return reader;
+      } else if (field.initialDefault() != null) {
+        return ParquetValueReaders.constant(
+            convertConstant(field.type(), field.initialDefault()), constantDL);
+      } else if (field.isOptional()) {
+        return ParquetValueReaders.nulls();
+      }
+
+      throw new IllegalArgumentException(String.format("Missing required field: %s", field.name()));
     }
 
     @Override
@@ -383,12 +364,23 @@ public abstract class BaseParquetReaders<T> {
         case DOUBLE:
           return ParquetValueReaders.unboxed(desc);
         case INT96:
-          // Impala & Spark used to write timestamps as INT96 without a logical type. For
-          // backwards compatibility we try to read INT96 as timestamps.
+          // Impala & Spark used to write timestamps as INT96 without a logical type. For backwards
+          // compatibility we try to read INT96 as timestamps.
           return timestampReader(desc, true);
         default:
           throw new UnsupportedOperationException("Unsupported type: " + primitive);
       }
+    }
+
+    @Override
+    public ParquetValueReader<?> variant(
+        Types.VariantType iVariant, GroupType variant, ParquetValueReader<?> reader) {
+      return reader;
+    }
+
+    @Override
+    public ParquetVariantVisitor<ParquetValueReader<?>> variantVisitor() {
+      return new VariantReaderBuilder(type, Arrays.asList(currentPath()));
     }
 
     MessageType type() {

@@ -122,7 +122,7 @@ public class AlterTableTest {
     catalog.buildTable(tableId, schema).create();
 
     List<AlterTable.Update> updates =
-        Arrays.asList(new AlterTable.AddColumn("age", "long", null, "name", null, null));
+        Arrays.asList(new AlterTable.AddColumn("age", "long", null, "name", null, null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -136,7 +136,8 @@ public class AlterTableTest {
     catalog.buildTable(tableId, schema).create();
 
     List<AlterTable.Update> updates =
-        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, "timestamp_col", null));
+        Arrays.asList(
+            new AlterTable.AddColumn("age", "long", null, null, "timestamp_col", null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -150,7 +151,7 @@ public class AlterTableTest {
     catalog.buildTable(tableId, schema).create();
 
     List<AlterTable.Update> updates =
-        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, null, true));
+        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, null, true, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -165,12 +166,38 @@ public class AlterTableTest {
     catalog.buildTable(tableId, schema).create();
 
     List<AlterTable.Update> updates =
-        Arrays.asList(new AlterTable.AddColumn("bad", "string", null, "name", "id", null));
+        Arrays.asList(new AlterTable.AddColumn("bad", "string", null, "name", "id", null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
     Table table = catalog.loadTable(tableId);
     assertThat(table.schema().columns().stream().map(Types.NestedField::name).toList())
         .containsExactly("id", "name", "bad", "timestamp_col", "date_col");
+  }
+
+  @Test
+  public void testAddRequiredColumnOnEmptyTable() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, null, null, true));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    assertThat(table.schema().findField("age").isRequired()).isTrue();
+  }
+
+  @Test
+  public void testAddOptionalColumnByDefault() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, null, null, null));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    assertThat(table.schema().findField("age").isOptional()).isTrue();
   }
 }
