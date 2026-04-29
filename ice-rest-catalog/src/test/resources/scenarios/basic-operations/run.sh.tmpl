@@ -121,6 +121,24 @@ echo "OK Scan verified ${TABLE_SORTED}"
 {{ICE_CLI}} --config {{CLI_CONFIG}} describe
 echo "OK Described catalog"
 
+INVALID_NS="invalid_ns"
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe $INVALID_NS > /tmp/basic_ops_describe_invalid_ns.txt 2>&1
+if ! grep -q "Namespace $INVALID_NS not found" /tmp/basic_ops_describe_invalid_ns.txt; then
+  echo "FAIL: describe missing error message for invalid namespace"
+  cat /tmp/basic_ops_describe_invalid_ns.txt
+  exit 1
+fi
+echo "OK Describe reported invalid namespace"
+
+INVALID_TABLE="${NAMESPACE_NAME}.invalid_table"
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe $INVALID_TABLE > /tmp/basic_ops_describe_invalid_table.txt 2>&1
+if ! grep -q "Table $INVALID_TABLE not found" /tmp/basic_ops_describe_invalid_table.txt; then
+  echo "FAIL: describe missing error message for invalid table"
+  cat /tmp/basic_ops_describe_invalid_table.txt
+  exit 1
+fi
+echo "OK Describe reported invalid table"
+
 # Optional: --no-copy insert (like README: create-table + upload + insert --no-copy)
 # Upload to MinIO via AWS CLI if available so insert --no-copy can reference s3://
 # This section is best-effort: if it fails we skip rather than failing the whole test.

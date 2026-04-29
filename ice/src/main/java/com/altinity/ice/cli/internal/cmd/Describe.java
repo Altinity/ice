@@ -34,8 +34,12 @@ import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Types;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Describe {
+
+  private static final Logger logger = LoggerFactory.getLogger(Describe.class);
 
   private Describe() {}
 
@@ -66,10 +70,12 @@ public final class Describe {
 
     List<Table> tablesMetadata = new ArrayList<>();
     List<Namespace> namespaces = catalog.listNamespaces();
+    boolean foundNamespace = false;
     for (Namespace namespace : namespaces) {
       if (targetNamespace != null && !targetNamespace.equals(namespace.toString())) {
         continue;
       }
+      foundNamespace = true;
       List<TableIdentifier> tables = catalog.listTables(namespace);
       for (TableIdentifier tableId : tables) {
         if (targetTable != null && !targetTable.equals(tableId.name())) {
@@ -98,6 +104,12 @@ public final class Describe {
       mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
       String output = mapper.writeValueAsString(tablesMetadata);
       System.out.println(output);
+    } else if (targetNamespace != null) {
+      if (targetTable != null) {
+        logger.warn("Table {}.{} not found", targetNamespace, targetTable);
+      } else if (!foundNamespace) {
+        logger.warn("Namespace {} not found", targetNamespace);
+      }
     }
   }
 
