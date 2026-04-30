@@ -1,0 +1,31 @@
+#!/bin/bash
+set -e
+
+echo "Running ClickHouse + localfileio read test..."
+
+# {{ICE_CLI}} runs ice inside catalog container; {{CH_EXEC}} runs clickhouse-client inside CH container
+# {{CATALOG_URI_INTERNAL}} is http://catalog:5000 (Docker network alias)
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "OK Created namespace: ${NAMESPACE_NAME}"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}"
+echo "OK Inserted into ${TABLE_NAME}"
+
+{{CH_EXEC}} --multiquery --query "SET allow_experimental_database_iceberg = 1; DROP DATABASE IF EXISTS \`${CH_DB}\`; CREATE DATABASE \`${CH_DB}\` ENGINE = DataLakeCatalog('{{CATALOG_URI_INTERNAL}}') SETTINGS catalog_type='rest', vended_credentials=false, warehouse='warehouse'"
+echo "OK Created ClickHouse Iceberg database ${CH_DB}"
+
+COUNT_RAW=$({{CH_EXEC}} --query "SELECT count() FROM \`${CH_DB}\`.\`${TABLE_NAME}\`")
+COUNT=$(echo "${COUNT_RAW}" | tr -d '[:space:]')
+if ! [[ "${COUNT}" =~ ^[0-9]+$ ]] || [ "${COUNT}" -lt 1 ]; then
+  echo "FAIL: expected row count >= 1, got '${COUNT}' (raw: '${COUNT_RAW}')"
+  exit 1
+fi
+echo "OK ClickHouse row count: ${COUNT}"
+
+{{CH_EXEC}} --query "DROP DATABASE IF EXISTS \`${CH_DB}\`"
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME} -p
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME} -p
+echo "OK Cleanup done"
+
+echo "ClickHouse localfileio read test completed successfully"

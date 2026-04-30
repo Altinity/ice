@@ -18,12 +18,14 @@ import com.altinity.ice.cli.internal.cmd.Delete;
 import com.altinity.ice.cli.internal.cmd.DeleteNamespace;
 import com.altinity.ice.cli.internal.cmd.DeleteTable;
 import com.altinity.ice.cli.internal.cmd.Describe;
+import com.altinity.ice.cli.internal.cmd.DescribeMetadata;
 import com.altinity.ice.cli.internal.cmd.DescribeParquet;
 import com.altinity.ice.cli.internal.cmd.Files;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
 import com.altinity.ice.cli.internal.cmd.ListNamespaces;
 import com.altinity.ice.cli.internal.cmd.ListPartitions;
+import com.altinity.ice.cli.internal.cmd.ListTables;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
@@ -236,6 +238,70 @@ public final class Main {
     }
   }
 
+  @CommandLine.Command(name = "describe-metadata", description = "Describe Iceberg metadata file.")
+  void describeMetadata(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<target>",
+              description = "Path to metadata.json file")
+          String target,
+      @CommandLine.Option(
+              names = {"-a", "--all"},
+              description = "Show everything")
+          boolean showAll,
+      @CommandLine.Option(
+              names = {"-s", "--summary"},
+              description = "Show table UUID, format version, location, current snapshot, etc.")
+          boolean showSummary,
+      @CommandLine.Option(
+              names = {"-S", "--schema"},
+              description = "Show full schema with field IDs and types")
+          boolean showSchema,
+      @CommandLine.Option(
+              names = {"--snapshots"},
+              description = "List all snapshots")
+          boolean showSnapshots,
+      @CommandLine.Option(
+              names = {"--history"},
+              description = "Show snapshot log and metadata log")
+          boolean showHistory,
+      @CommandLine.Option(
+              names = {"--manifests"},
+              description = "Drill into manifest list for current snapshot")
+          boolean showManifests,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    Config config = Config.load(configFile());
+    var icebergConfig = config.toIcebergConfig();
+
+    var options = new ArrayList<DescribeMetadata.Option>();
+    if (showAll || showSummary) {
+      options.add(DescribeMetadata.Option.SUMMARY);
+    }
+    if (showAll || showSchema) {
+      options.add(DescribeMetadata.Option.SCHEMA);
+    }
+    if (showAll || showSnapshots) {
+      options.add(DescribeMetadata.Option.SNAPSHOTS);
+    }
+    if (showAll || showHistory) {
+      options.add(DescribeMetadata.Option.HISTORY);
+    }
+    if (showAll || showManifests) {
+      options.add(DescribeMetadata.Option.MANIFESTS);
+    }
+
+    if (options.isEmpty()) {
+      options.add(DescribeMetadata.Option.SUMMARY);
+    }
+
+    DescribeMetadata.run(
+        icebergConfig, target, json, options.toArray(new DescribeMetadata.Option[0]));
+  }
+
   public record IceSortOrder(
       @JsonProperty("column") String column,
       @JsonProperty("desc") boolean desc,
@@ -335,7 +401,10 @@ public final class Main {
                   e.g. [{"op":"drop_column","name":"foo"}]
 
                   Supported operations:
-                    - add_column           (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional))
+                    - add_column           (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional),
+                                                    "after"/"before"/"first" (optional, at most one;
+                                                    position the new column after/before a named column,
+                                                    or at the start of the schema))
                     - alter_column         (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types))
                     - rename_column        (params: "name", "new_name")
                     - drop_column          (params: "name")
@@ -749,6 +818,33 @@ public final class Main {
               ? Namespace.empty()
               : Namespace.of(parent.split("[.]"));
       ListNamespaces.run(catalog, namespace, json);
+    }
+  }
+
+  @CommandLine.Command(name = "list-tables", description = "List tables in a namespace.")
+  void listTables(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<namespace>",
+              description = "Namespace to list tables from (e.g. parent_ns.child_ns)")
+          String namespaceName,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    if (namespaceName == null || namespaceName.isEmpty()) {
+      throw new IllegalArgumentException("Namespace name is required");
+    }
+    String[] split = namespaceName.split("[.]");
+    for (String level : split) {
+      if (level.isEmpty()) {
+        throw new IllegalArgumentException(
+            "Invalid namespace name: '.' cannot separate empty names");
+      }
+    }
+    try (RESTCatalog catalog = loadCatalog()) {
+      ListTables.run(catalog, Namespace.of(split), json);
     }
   }
 

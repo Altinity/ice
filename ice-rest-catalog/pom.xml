@@ -568,6 +568,7 @@
           </systemPropertyVariables>
           <excludes>
             <exclude>**/DockerScenarioBasedIT.java</exclude>
+            <exclude>**/DockerLocalFileIOClickHouseIT.java</exclude>
           </excludes>
         </configuration>
       </plugin>
