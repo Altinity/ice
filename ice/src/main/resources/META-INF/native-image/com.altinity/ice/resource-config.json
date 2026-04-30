@@ -55,6 +55,8 @@
   }, {
     "pattern":"\\Qlinux/amd64/libzstd-jni-1.5.6-6.so\\E"
   }, {
+    "pattern":"\\Qlinux/aarch64/libzstd-jni-1.5.6-6.so\\E"
+  }, {
     "pattern":"\\Qlogback-test.scmo\\E"
   }, {
     "pattern":"\\Qlogback-test.xml\\E"
@@ -75,6 +77,8 @@
   }, {
     "pattern":"\\Qorg/jline/nativ/Linux/x86_64/libjlinenative.so\\E"
   }, {
+    "pattern":"\\Qorg/jline/nativ/Linux/aarch64/libjlinenative.so\\E"
+  }, {
     "pattern":"\\Qorg/jline/utils/capabilities.txt\\E"
   }, {
     "pattern":"\\Qorg/jline/utils/xterm-256color.caps\\E"
@@ -84,6 +88,8 @@
     "pattern":"\\Qorg/xerial/snappy/VERSION\\E"
   }, {
     "pattern":"\\Qorg/xerial/snappy/native/Linux/x86_64/libsnappyjava.so\\E"
+  }, {
+    "pattern":"\\Qorg/xerial/snappy/native/Linux/aarch64/libsnappyjava.so\\E"
   }, {
     "pattern":"\\Qsoftware/amazon/awssdk/core/util/mime.types\\E"
   }, {
