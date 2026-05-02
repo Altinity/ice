@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.rest.catalog;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.Map;
 
 /**
@@ -16,8 +17,14 @@ import java.util.Map;
  *
  * <p>This class uses Jackson/SnakeYAML annotations for YAML deserialization.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record ScenarioConfig(
-    String name, String description, CatalogConfig catalogConfig, Map<String, String> env) {
+    String name,
+    String description,
+    CatalogConfig catalogConfig,
+    Map<String, String> env,
+    boolean excludeFromStandardDiscovery) {
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public record CatalogConfig(String warehouse, String name, String uri) {}
 }
