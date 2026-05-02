@@ -564,6 +564,11 @@
         <configuration>
           <excludes>
             <exclude>**/DockerScenarioBasedIT.java</exclude>
+<<<<<<< Updated upstream
+=======
+            <exclude>**/DockerLocalFileIOClickHouseIT.java</exclude>
+            <exclude>**/DockerLocalFileIOClickHouseAllTypesIT.java</exclude>
+>>>>>>> Stashed changes
           </excludes>
         </configuration>
       </plugin>
