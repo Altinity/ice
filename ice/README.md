@@ -168,6 +168,12 @@ ice files flowers.iris
 # list partitions
 ice list-partitions nyc.taxis_p_by_day
 
+# list current and previous snapshots
+ice list-snapshots flowers.iris
+
+# only the latest 5
+ice list-snapshots flowers.iris --limit 5
+
 # describe a parquet file directly
 ice describe-parquet file://iris.parquet
 ```
