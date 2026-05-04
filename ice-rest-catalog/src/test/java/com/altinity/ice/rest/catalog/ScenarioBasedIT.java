@@ -35,6 +35,10 @@ public class ScenarioBasedIT extends RESTCatalogTestBase {
     templateVars.put("CLI_CONFIG", cliConfig.getAbsolutePath());
     templateVars.put("MINIO_ENDPOINT", getMinioEndpoint());
     templateVars.put("CATALOG_URI", getCatalogUri());
+    // DockerScenarioBasedIT sets these for ClickHouse; empty so basic-operations skips CH block.
+    templateVars.put("CH_EXEC", "");
+    templateVars.put("CATALOG_URI_INTERNAL", "");
+    templateVars.put("S3_ENDPOINT_INTERNAL", "");
 
     // Try to find ice-jar in the build
     String projectRoot = Paths.get("").toAbsolutePath().getParent().toString();

@@ -33,15 +33,21 @@ import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
  * Docker-based integration tests for ICE REST Catalog.
  *
  * <p>Runs the ice-rest-catalog Docker image (specified via system property {@code docker.image})
- * alongside a MinIO container, then executes scenario-based tests against it.
+ * alongside MinIO and ClickHouse (antalya) containers, then executes scenario-based tests against
+ * it.
  */
 public class DockerScenarioBasedIT extends RESTCatalogTestBase {
+
+  private static final String DEFAULT_CLICKHOUSE_IMAGE =
+      "altinity/clickhouse-server:25.8.16.20002.altinityantalya";
 
   private Network network;
 
   private GenericContainer<?> minio;
 
   private GenericContainer<?> catalog;
+
+  private GenericContainer<?> clickhouse;
 
   @Override
   @BeforeClass
@@ -106,6 +112,7 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
     catalog =
         new GenericContainer<>(dockerImage)
             .withNetwork(network)
+            .withNetworkAliases("catalog")
             .withExposedPorts(5000)
             .withEnv("ICE_REST_CATALOG_CONFIG", "")
             .withEnv("ICE_REST_CATALOG_CONFIG_YAML", catalogConfig)
@@ -121,6 +128,27 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
       throw e;
     }
 
+    String clickhouseImage = System.getProperty("clickhouse.image", DEFAULT_CLICKHOUSE_IMAGE);
+    logger.info("Using ClickHouse Docker image: {}", clickhouseImage);
+
+    clickhouse =
+        new GenericContainer<>(clickhouseImage)
+            .withNetwork(network)
+            .withNetworkAliases("clickhouse")
+            .withExposedPorts(8123, 9000)
+            .withEnv("AWS_ACCESS_KEY_ID", "minioadmin")
+            .withEnv("AWS_SECRET_ACCESS_KEY", "minioadmin")
+            .waitingFor(Wait.forHttp("/ping").forPort(8123).forStatusCode(200));
+
+    try {
+      clickhouse.start();
+    } catch (Exception e) {
+      if (clickhouse != null) {
+        logger.error("ClickHouse container logs: {}", clickhouse.getLogs());
+      }
+      throw e;
+    }
+
     // Copy CLI config into container so ice CLI can talk to co-located REST server
     File cliConfigHost = File.createTempFile("ice-docker-cli-", ".yaml");
     try {
@@ -132,12 +160,19 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
     }
 
     logger.info(
-        "Catalog container started at {}:{}", catalog.getHost(), catalog.getMappedPort(5000));
+        "Catalog container started at {}:{}, ClickHouse at {}:{}",
+        catalog.getHost(),
+        catalog.getMappedPort(5000),
+        clickhouse.getHost(),
+        clickhouse.getMappedPort(8123));
   }
 
   @Override
   @AfterClass
   public void tearDown() {
+    if (clickhouse != null) {
+      clickhouse.close();
+    }
     if (catalog != null) {
       catalog.close();
     }
@@ -154,6 +189,7 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
     Path scenariosDir = getScenariosDirectory();
 
     String containerId = catalog.getContainerId();
+    String clickhouseContainerId = clickhouse.getContainerId();
 
     // Wrapper script on host: docker exec <container> ice "$@" (CLI runs inside container)
     File wrapperScript = File.createTempFile("ice-docker-exec-", ".sh");
@@ -164,13 +200,26 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
       throw new IllegalStateException("Could not set wrapper script executable: " + wrapperScript);
     }
 
+    File chWrapperScript = File.createTempFile("ch-docker-exec-", ".sh");
+    chWrapperScript.deleteOnExit();
+    Files.writeString(
+        chWrapperScript.toPath(),
+        "#!/bin/sh\nexec docker exec " + clickhouseContainerId + " clickhouse-client \"$@\"\n");
+    if (!chWrapperScript.setExecutable(true)) {
+      throw new IllegalStateException(
+          "Could not set ClickHouse wrapper script executable: " + chWrapperScript);
+    }
+
     Map<String, String> templateVars = new HashMap<>();
     templateVars.put("ICE_CLI", wrapperScript.getAbsolutePath());
+    templateVars.put("CH_EXEC", chWrapperScript.getAbsolutePath());
     templateVars.put("CLI_CONFIG", "/tmp/ice-cli.yaml");
     templateVars.put("SCENARIO_DIR", "/scenarios/" + scenarioName);
     templateVars.put("MINIO_ENDPOINT", "");
     templateVars.put(
         "CATALOG_URI", "http://" + catalog.getHost() + ":" + catalog.getMappedPort(5000));
+    templateVars.put("CATALOG_URI_INTERNAL", "http://catalog:5000");
+    templateVars.put("S3_ENDPOINT_INTERNAL", "http://minio:9000");
 
     return new ScenarioTestRunner(scenariosDir, templateVars);
   }
