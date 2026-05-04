@@ -98,7 +98,7 @@ Supported codecs: `zstd`, `snappy`, `gzip`, `lz4`.
 # add a column to an existing table
 ice alter-table flowers.iris '[{"op":"add_column","name":"extra","type":"string"}]'
 
-# add a NOT NULL column (`required: true`; uses Iceberg allowIncompatibleChanges for that alter)
+# add a NOT NULL column (`required: true`;)
 ice alter-table flowers.iris '[{"op":"add_column","name":"extra","type":"string","required":true}]'
 
 # verify the schema change

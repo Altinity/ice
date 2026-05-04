@@ -46,7 +46,8 @@ import org.testng.annotations.Test;
  * Docker integration test: same topology as {@link DockerLocalFileIOClickHouseIT} (REST catalog +
  * {@code file:///warehouse} shared with ClickHouse). Writes a one-row Parquet with int, string,
  * date, and timestamp columns, inserts via {@code ice}, then asserts ClickHouse reads the same
- * values and {@code count() = 1}.
+ * values and {@code count() = 1}. A follow-up test alters the table (required vs optional columns)
+ * and checks ClickHouse {@code system.columns} types.
  *
  * <p>Requires Docker. Excluded from default Failsafe runs (see {@code pom.xml}); run explicitly,
  * e.g. {@code mvn -pl ice-rest-catalog verify -Dit.test=DockerLocalFileIOClickHouseAllTypesIT}.
@@ -217,16 +218,7 @@ public class DockerLocalFileIOClickHouseAllTypesIT {
     iceExecOrThrow("create-namespace", NAMESPACE);
     iceExecOrThrow("insert", "--create-table", TABLE, "file:///tmp/basic.parquet");
 
-    String createDb =
-        "SET allow_experimental_database_iceberg = 1; "
-            + "DROP DATABASE IF EXISTS `"
-            + CH_DB
-            + "`; "
-            + "CREATE DATABASE `"
-            + CH_DB
-            + "` ENGINE = DataLakeCatalog('http://catalog:5000') "
-            + "SETTINGS catalog_type='rest', vended_credentials=false, warehouse='warehouse'";
-    chExecOrThrow(createDb);
+    recreateClickHouseDatabase();
 
     String countSql = "SELECT count() FROM `" + CH_DB + "`.`" + TABLE + "` FORMAT TabSeparated";
     String count = chQueryOne(countSql);
@@ -257,6 +249,66 @@ public class DockerLocalFileIOClickHouseAllTypesIT {
     if (!"2024-06-15 12:06:45".equals(cells[3])) {
       throw new AssertionError("b_ts: expected 2024-06-15 12:06:45, got " + cells[3]);
     }
+  }
+
+  @Test(dependsOnMethods = "testClickHouseReadsBasicTypes")
+  public void testAlterTableAddRequiredAndOptionalColumns() throws Exception {
+    iceExecOrThrow(
+        "alter-table",
+        TABLE,
+        "[{\"op\":\"add_column\",\"name\":\"req_col\",\"type\":\"int\",\"required\":true},"
+            + "{\"op\":\"add_column\",\"name\":\"opt_col\",\"type\":\"int\",\"required\":false}]");
+
+    recreateClickHouseDatabase();
+
+    String typesSql =
+        "SELECT name, type FROM system.columns WHERE database = '"
+            + CH_DB
+            + "' AND table = '"
+            + TABLE
+            + "' AND name IN ('req_col','opt_col') ORDER BY name FORMAT TabSeparated";
+    String out = chQueryOne(typesSql);
+    String[] lines = out.split("\n");
+    if (lines.length != 2) {
+      throw new AssertionError(
+          "Expected 2 rows from system.columns (req_col, opt_col), got "
+              + lines.length
+              + ": "
+              + out);
+    }
+    String[] optParts = lines[0].split("\t", -1);
+    String[] reqParts = lines[1].split("\t", -1);
+    if (optParts.length != 2 || reqParts.length != 2) {
+      throw new AssertionError("Unexpected TSV shape: " + out);
+    }
+    if (!"opt_col".equals(optParts[0])) {
+      throw new AssertionError("Expected first row opt_col, got " + optParts[0]);
+    }
+    if (!"req_col".equals(reqParts[0])) {
+      throw new AssertionError("Expected second row req_col, got " + reqParts[0]);
+    }
+    String optType = optParts[1];
+    String reqType = reqParts[1];
+    if (!optType.startsWith("Nullable(")) {
+      throw new AssertionError(
+          "opt_col (required:false) expected Nullable(...) type, got: " + optType);
+    }
+    if (reqType.startsWith("Nullable(")) {
+      throw new AssertionError(
+          "req_col (required:true) expected non-Nullable type, got: " + reqType);
+    }
+  }
+
+  private void recreateClickHouseDatabase() throws Exception {
+    chExecOrThrow(
+        "SET allow_experimental_database_iceberg = 1; "
+            + "DROP DATABASE IF EXISTS `"
+            + CH_DB
+            + "`; "
+            + "CREATE DATABASE `"
+            + CH_DB
+            + "` ENGINE = DataLakeCatalog('http://catalog:5000') "
+            + "SETTINGS catalog_type='rest', vended_credentials=false, warehouse='warehouse'");
   }
 
   private static Schema basicTypesSchema() {
