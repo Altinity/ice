@@ -98,11 +98,9 @@ Scenarios are discovered and executed automatically by the `ScenarioBasedIT` tes
 mvn test -Dtest=ScenarioBasedIT
 ```
 
-To run a specific scenario:
+To run a specific scenario, pass `-Dscenario=<name>` (comma-separated for multiple):
 
 ```bash
-mvn test -Dtest=ScenarioBasedIT#testScenario[basic-operations]
+mvn test -Dtest=ScenarioBasedIT -Dscenario=basic-operations
+mvn test -Dtest=ScenarioBasedIT -Dscenario=basic-operations,describe-parquet
 ```
-
-
-
