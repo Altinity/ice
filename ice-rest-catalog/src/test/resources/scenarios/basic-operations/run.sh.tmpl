@@ -30,6 +30,10 @@ echo "OK list-namespaces listed ${NAMESPACE_NAME}"
 {{ICE_CLI}} --config {{CLI_CONFIG}} describe
 echo "OK Listed namespaces"
 
+# Check configuration
+{{ICE_CLI}} --config {{CLI_CONFIG}} check
+echo "OK checked configuration"
+
 # Insert from file (like README: ice insert flowers.iris -p file://...)
 {{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_IRIS} -p "file://${INPUT_PATH}"
 echo "Inserted from file into ${TABLE_IRIS}"
