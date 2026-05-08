@@ -10,6 +10,7 @@ env:
   NAMESPACE_NAME: "test_ns"
   INPUT_FILE: "input.parquet"
   TABLE_IRIS: "test_ns.iris"
+  TABLE_CREATE_VIA_CLI: "test_ns.iris_create_cli"
   TABLE_PARTITIONED: "test_ns.taxis_p_by_day"
   TABLE_SORTED: "test_ns.taxis_s_by_day"
   TABLE_NO_COPY: "test_ns.iris_no_copy"

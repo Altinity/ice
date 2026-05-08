@@ -19,6 +19,7 @@
 package com.altinity.ice.rest.catalog.internal.rest;
 
 import com.altinity.ice.rest.catalog.internal.auth.Session;
+import com.altinity.ice.rest.catalog.internal.etcd.CommitLockTimeoutException;
 import com.altinity.ice.rest.catalog.internal.metrics.HttpMetrics;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -70,6 +71,7 @@ public class RESTCatalogServlet extends HttpServlet {
           .put(CommitFailedException.class, 409)
           .put(UnprocessableEntityException.class, 422)
           .put(CommitStateUnknownException.class, 500)
+          .put(CommitLockTimeoutException.class, HttpServletResponse.SC_SERVICE_UNAVAILABLE)
           .buildOrThrow();
 
   private final RESTCatalogHandler restCatalogAdapter;

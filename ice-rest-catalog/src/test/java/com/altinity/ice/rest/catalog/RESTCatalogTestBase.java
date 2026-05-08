@@ -102,6 +102,8 @@ public abstract class RESTCatalogTestBase {
                     false, null)), // anonymousAccess - enable with read-write for testing
             null, // maintenanceSchedule
             null, // maintenance
+            null, // commitRetry
+            null, // commitLock
             null, // loadTableProperties
             null // icebergProperties
             );

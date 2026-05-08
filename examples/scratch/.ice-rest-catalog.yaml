@@ -1,16 +1,23 @@
-uri: jdbc:sqlite:file:data/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500
+#uri: jdbc:sqlite:file:data/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchronous=OFF&journal_size_limit=500
 
 # To use etcd instead of sqlite, start etcd with `etcd --data-dir=data/etcd`, then uncomment the line below
-#uri: etcd:http://localhost:2379
+uri: etcd:http://localhost:2379
 #uri: etcd:http://127.0.0.1:12379,http://127.0.0.1:12479,http://127.0.0.1:12579
-warehouse: s3://bucket1
+warehouse: s3://altiound-op3z9pa3-iceberg/
+#warehouse: warehouse: s3://bucket1
+commitRetry:
+  numRetries: 50
+  totalTimeoutMs: 5000
+
+commitLock:
+  enabled: true
+  leaseTtlSeconds: 30
+  acquireTimeoutMs: 30000
 
 s3:
-  endpoint: http://localhost:9000
+  endpoint: https://s3.us-west-2.amazonaws.com
   pathStyleAccess: true
-  accessKeyID: miniouser
-  secretAccessKey: miniopassword
-  region: minio
+  region: us-west-2
 
 bearerTokens:
 - value: foo

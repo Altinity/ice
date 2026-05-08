@@ -19,6 +19,7 @@ import com.altinity.ice.rest.catalog.internal.auth.Session;
 import com.altinity.ice.rest.catalog.internal.aws.CredentialsProvider;
 import com.altinity.ice.rest.catalog.internal.config.Config;
 import com.altinity.ice.rest.catalog.internal.config.MaintenanceConfig;
+import com.altinity.ice.rest.catalog.internal.etcd.CommitLock;
 import com.altinity.ice.rest.catalog.internal.etcd.EtcdCatalog;
 import com.altinity.ice.rest.catalog.internal.maintenance.DataCompaction;
 import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceJob;
@@ -279,7 +280,8 @@ public final class Main implements Callable<Integer> {
     if (requireAuth) {
       mux.insertHandler(createAuthorizationHandler(config.bearerTokens(), config));
 
-      restCatalogAdapter = new RESTCatalogAdapter(catalog);
+      restCatalogAdapter =
+          new RESTCatalogAdapter(catalog, config.commitRetry(), maybeCommitLock(catalog, config));
       var globalConfig = config.toIcebergConfigDefaults();
       if (!globalConfig.isEmpty()) {
         restCatalogAdapter = new RESTCatalogMiddlewareConfig(restCatalogAdapter, globalConfig);
@@ -299,7 +301,8 @@ public final class Main implements Callable<Integer> {
                 new RESTCatalogMiddlewareCredentials(restCatalogAdapter, auth), auth);
       }
     } else {
-      restCatalogAdapter = new RESTCatalogAdapter(catalog);
+      restCatalogAdapter =
+          new RESTCatalogAdapter(catalog, config.commitRetry(), maybeCommitLock(catalog, config));
       var globalConfig = config.toIcebergConfigDefaults();
       if (!globalConfig.isEmpty()) {
         restCatalogAdapter = new RESTCatalogMiddlewareConfig(restCatalogAdapter, globalConfig);
@@ -318,6 +321,18 @@ public final class Main implements Callable<Integer> {
                 new RESTCatalogMiddlewareCredentials(restCatalogAdapter, auth), auth);
       }
     }
+
+    logger.info(
+        "Commit retry config: numRetries={} minWaitMs={} maxWaitMs={} totalTimeoutMs={}",
+        config.commitRetry().numRetries(),
+        config.commitRetry().minWaitMs(),
+        config.commitRetry().maxWaitMs(),
+        config.commitRetry().totalTimeoutMs());
+    logger.info(
+        "Commit lock config: enabled={} leaseTtlSeconds={} acquireTimeoutMs={}",
+        config.commitLock().enabled(),
+        config.commitLock().leaseTtlSeconds(),
+        config.commitLock().acquireTimeoutMs());
 
     var h = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter));
     mux.addServlet(h, "/*");
@@ -393,6 +408,22 @@ public final class Main implements Callable<Integer> {
           "invalid config: either set anonymousAccess.enabled to true or provide tokens via bearerTokens");
     }
     return new RESTCatalogAuthorizationHandler(tokens, anonymousSession);
+  }
+
+  /**
+   * Per-table etcd commit lock for {@link EtcdCatalog}; ignored when disabled or when not using
+   * etcd.
+   */
+  static CommitLock maybeCommitLock(Catalog catalog, Config config) {
+    if (!config.commitLock().enabled()) {
+      return null;
+    }
+    if (!(catalog instanceof EtcdCatalog etcd)) {
+      logger.warn(
+          "commitLock.enabled is true but catalog is not EtcdCatalog; commit lock disabled");
+      return null;
+    }
+    return new CommitLock(etcd.etcdClient(), catalog.name(), config.commitLock());
   }
 
   private static void overrideJettyDefaults(Server s) {
