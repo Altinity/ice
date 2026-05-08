@@ -15,6 +15,9 @@
   "name":"[Lcom.altinity.ice.cli.internal.cmd.AlterTable$Update;"
 },
 {
+  "name":"[Lcom.altinity.ice.cli.internal.cmd.DescribeMetadata$ManifestInfo;"
+},
+{
   "name":"[Lcom.fasterxml.jackson.databind.deser.BeanDeserializerModifier;"
 },
 {
@@ -31,6 +34,9 @@
 },
 {
   "name":"[Lcom.fasterxml.jackson.databind.ser.Serializers;"
+},
+{
+  "name":"[Ljava.lang.Object;"
 },
 {
   "name":"[Ljava.lang.String;"
@@ -138,6 +144,48 @@
   "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String"] }, {"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.Boolean"] }]
 },
 {
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$AlterColumn",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$DropColumn",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$DropPartitionField",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$RenameColumn",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$RenameTo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$SetTblProperty",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String"] }]
+},
+{
   "name":"com.altinity.ice.cli.internal.cmd.AlterTable$Update",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
@@ -185,10 +233,18 @@
   "methods":[{"name":"columnSizes","parameterTypes":[] }, {"name":"fileSizeInBytes","parameterTypes":[] }, {"name":"format","parameterTypes":[] }, {"name":"lowerBounds","parameterTypes":[] }, {"name":"nullValueCounts","parameterTypes":[] }, {"name":"partition","parameterTypes":[] }, {"name":"path","parameterTypes":[] }, {"name":"recordCount","parameterTypes":[] }, {"name":"upperBounds","parameterTypes":[] }, {"name":"valueCounts","parameterTypes":[] }]
 },
 {
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$FieldInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"fieldId","parameterTypes":[] }, {"name":"name","parameterTypes":[] }, {"name":"required","parameterTypes":[] }, {"name":"type","parameterTypes":[] }]
+},
+{
   "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$HistoryInfo",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"metadataLog","parameterTypes":[] }, {"name":"snapshotLog","parameterTypes":[] }]
 },
 {
   "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$ManifestInfo",
@@ -205,16 +261,39 @@
   "methods":[{"name":"history","parameterTypes":[] }, {"name":"manifests","parameterTypes":[] }, {"name":"schema","parameterTypes":[] }, {"name":"snapshots","parameterTypes":[] }, {"name":"summary","parameterTypes":[] }]
 },
 {
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$MetadataLogEntry",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"file","parameterTypes":[] }, {"name":"timestamp","parameterTypes":[] }, {"name":"timestampMillis","parameterTypes":[] }]
+},
+{
   "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$SchemaInfo",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"fields","parameterTypes":[] }, {"name":"schemaId","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$SnapshotInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"manifestListLocation","parameterTypes":[] }, {"name":"operation","parameterTypes":[] }, {"name":"parentId","parameterTypes":[] }, {"name":"sequenceNumber","parameterTypes":[] }, {"name":"snapshotId","parameterTypes":[] }, {"name":"summary","parameterTypes":[] }, {"name":"timestamp","parameterTypes":[] }, {"name":"timestampMillis","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$SnapshotLogEntry",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"snapshotId","parameterTypes":[] }, {"name":"timestamp","parameterTypes":[] }, {"name":"timestampMillis","parameterTypes":[] }]
 },
 {
   "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$Summary",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"currentSnapshotId","parameterTypes":[] }, {"name":"formatVersion","parameterTypes":[] }, {"name":"lastUpdated","parameterTypes":[] }, {"name":"lastUpdatedMillis","parameterTypes":[] }, {"name":"location","parameterTypes":[] }, {"name":"numSnapshots","parameterTypes":[] }, {"name":"partitionSpec","parameterTypes":[] }, {"name":"properties","parameterTypes":[] }, {"name":"sortOrder","parameterTypes":[] }, {"name":"uuid","parameterTypes":[] }]
 },
 {
   "name":"com.altinity.ice.cli.internal.cmd.DescribeParquet$Column",
@@ -481,6 +560,10 @@
   "queryAllDeclaredConstructors":true
 },
 {
+  "name":"java.lang.Iterable",
+  "queryAllDeclaredMethods":true
+},
+{
   "name":"java.lang.Number",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true
@@ -635,6 +718,15 @@
   "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
 },
 {
+  "name":"java.util.AbstractCollection",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.Collection",
+  "queryAllDeclaredMethods":true
+},
+{
   "name":"java.util.Collections$UnmodifiableMap",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
@@ -644,7 +736,31 @@
   "name":"java.util.Date"
 },
 {
+  "name":"java.util.ImmutableCollections$AbstractImmutableCollection",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.ImmutableCollections$AbstractImmutableList",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.ImmutableCollections$ListN",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"java.util.List",
+  "queryAllDeclaredMethods":true
+},
+{
   "name":"java.util.Map",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.RandomAccess",
   "queryAllDeclaredMethods":true
 },
 {
@@ -808,6 +924,12 @@
   "queryAllDeclaredConstructors":true
 },
 {
+  "name":"org.apache.iceberg.rest.requests.RenameTableRequest",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
   "name":"org.apache.iceberg.rest.responses.CreateNamespaceResponse",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
@@ -948,6 +1070,10 @@
 },
 {
   "name":"sun.security.provider.JavaKeyStore$JKS",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.MD5",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
