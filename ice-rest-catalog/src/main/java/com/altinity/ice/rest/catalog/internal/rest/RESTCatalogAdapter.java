@@ -18,15 +18,13 @@
  */
 package com.altinity.ice.rest.catalog.internal.rest;
 
-import static org.apache.iceberg.TableProperties.COMMIT_MAX_RETRY_WAIT_MS_DEFAULT;
-import static org.apache.iceberg.TableProperties.COMMIT_MIN_RETRY_WAIT_MS_DEFAULT;
-import static org.apache.iceberg.TableProperties.COMMIT_NUM_RETRIES_DEFAULT;
-import static org.apache.iceberg.TableProperties.COMMIT_TOTAL_RETRY_TIME_MS_DEFAULT;
-
 import com.altinity.ice.rest.catalog.internal.auth.Session;
+import com.altinity.ice.rest.catalog.internal.config.CommitRetryConfig;
+import com.altinity.ice.rest.catalog.internal.etcd.CommitLock;
 import com.altinity.ice.rest.catalog.internal.metrics.CatalogMetrics;
 import com.altinity.ice.rest.catalog.internal.metrics.PrometheusMetricsReporter;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,12 +37,14 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.Transactions;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.exceptions.CommitFailedException;
+import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
 import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.Endpoint;
@@ -60,21 +60,43 @@ import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ConfigResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.OAuthTokenResponse;
 import org.apache.iceberg.util.PropertyUtil;
 import org.apache.iceberg.util.Tasks;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RESTCatalogAdapter implements RESTCatalogHandler {
+
+  private static final Logger logger = LoggerFactory.getLogger(RESTCatalogAdapter.class);
 
   private final Catalog catalog;
   private final SupportsNamespaces asNamespaceCatalog;
   private final ViewCatalog asViewCatalog;
+  private final CommitRetryConfig commitRetry;
+  private final CommitLock commitLock;
 
   public RESTCatalogAdapter(Catalog catalog) {
+    this(catalog, CommitRetryConfig.defaults(), null);
+  }
+
+  public RESTCatalogAdapter(Catalog catalog, CommitRetryConfig commitRetry) {
+    this(catalog, commitRetry, null);
+  }
+
+  public RESTCatalogAdapter(Catalog catalog, CommitRetryConfig commitRetry, CommitLock commitLock) {
     this.catalog = catalog;
     this.asNamespaceCatalog =
         catalog instanceof SupportsNamespaces ? (SupportsNamespaces) catalog : null;
     this.asViewCatalog = catalog instanceof ViewCatalog ? (ViewCatalog) catalog : null;
+    this.commitRetry = commitRetry != null ? commitRetry : CommitRetryConfig.defaults();
+    this.commitLock = commitLock;
+  }
+
+  private static String namespaceLabel(TableIdentifier ident) {
+    String[] levels = ident.namespace().levels();
+    return levels.length == 0 ? "" : String.join(".", levels);
   }
 
   @Override
@@ -235,7 +257,7 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
         {
           TableIdentifier ident = tableIdentFromPathVars(vars);
           UpdateTableRequest request = castRequest(UpdateTableRequest.class, requestBody);
-          var response = CatalogHandlers.updateTable(catalog, ident, request);
+          var response = updateTable(catalog, ident, request);
 
           // Check if this update contains schema changes
           boolean hasSchemaUpdate =
@@ -274,7 +296,7 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
         {
           CommitTransactionRequest request =
               castRequest(CommitTransactionRequest.class, requestBody);
-          commitTransaction(catalog, request);
+          commitTransaction(request);
           return null;
         }
 
@@ -384,15 +406,86 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
     }
   }
 
+  private LoadTableResponse updateTable(
+      Catalog catalog, TableIdentifier ident, UpdateTableRequest request) {
+    if (commitLock != null) {
+      try (CommitLock.Handle ignored = commitLock.acquire(ident)) {
+        return loadAndCommitTable(catalog, ident, request);
+      }
+    }
+    return loadAndCommitTable(catalog, ident, request);
+  }
+
+  /**
+   * Matches {@link CatalogHandlers#updateTable(Catalog, TableIdentifier, UpdateTableRequest)} so
+   * staged-create commits ({@link UpdateRequirement.AssertTableDoesNotExist}) work instead of
+   * failing with {@link org.apache.iceberg.exceptions.NoSuchTableException} from {@link
+   * Catalog#loadTable(TableIdentifier)}.
+   */
+  private static boolean isCreate(UpdateTableRequest request) {
+    boolean isCreate =
+        request.requirements().stream()
+            .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
+
+    if (isCreate) {
+      List<?> invalidRequirements =
+          request.requirements().stream()
+              .filter(req -> !(req instanceof UpdateRequirement.AssertTableDoesNotExist))
+              .collect(Collectors.toList());
+      Preconditions.checkArgument(
+          invalidRequirements.isEmpty(), "Invalid create requirements: %s", invalidRequirements);
+    }
+
+    return isCreate;
+  }
+
+  private LoadTableResponse loadAndCommitTable(
+      Catalog catalog, TableIdentifier ident, UpdateTableRequest request) {
+    if (isCreate(request)) {
+      logger.info("Committing staged table create for {}", ident);
+      return CatalogHandlers.updateTable(catalog, ident, request);
+    }
+    Table table = catalog.loadTable(ident);
+    if (!(table instanceof BaseTable)) {
+      throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
+    }
+    TableOperations ops = ((BaseTable) table).operations();
+    TableMetadata updated = commit(ops, request, ident);
+    return LoadTableResponse.builder().withTableMetadata(updated).build();
+  }
+
   /**
    * This is a very simplistic approach that only validates the requirements for each table and does
    * not do any other conflict detection. Therefore, it does not guarantee true transactional
    * atomicity, which is left to the implementation details of a REST server.
    */
-  private static void commitTransaction(Catalog catalog, CommitTransactionRequest request) {
+  private void commitTransaction(CommitTransactionRequest request) {
+    List<TableIdentifier> sorted =
+        request.tableChanges().stream()
+            .map(UpdateTableRequest::identifier)
+            .distinct()
+            .sorted(Comparator.comparing(TableIdentifier::toString))
+            .toList();
+
+    Runnable body = () -> commitTransactionBody(request);
+    if (commitLock != null) {
+      commitLock.withLocks(sorted, body);
+    } else {
+      body.run();
+    }
+  }
+
+  private void commitTransactionBody(CommitTransactionRequest request) {
     List<Transaction> transactions = Lists.newArrayList();
 
     for (UpdateTableRequest tableChange : request.tableChanges()) {
+      if (isCreate(tableChange)) {
+        logger.info(
+            "Committing staged table create (multi-table txn) for {}", tableChange.identifier());
+        CatalogHandlers.updateTable(catalog, tableChange.identifier(), tableChange);
+        continue;
+      }
+
       Table table = catalog.loadTable(tableChange.identifier());
       if (table instanceof BaseTable) {
         Transaction transaction =
@@ -404,7 +497,7 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
             (BaseTransaction.TransactionTable) transaction.table();
 
         // this performs validations and makes temporary commits that are in-memory
-        commit(txTable.operations(), tableChange);
+        commit(txTable.operations(), tableChange, tableChange.identifier());
       } else {
         throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
       }
@@ -414,18 +507,26 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
     transactions.forEach(Transaction::commitTransaction);
   }
 
-  // Copied from CatalogHandlers.commit.
-  static TableMetadata commit(TableOperations ops, UpdateTableRequest request) {
+  // Copied from CatalogHandlers.commit; retry budget is configurable (see CommitRetryConfig).
+  private TableMetadata commit(
+      TableOperations ops, UpdateTableRequest request, TableIdentifier ident) {
     AtomicBoolean isRetry = new AtomicBoolean(false);
     try {
       Tasks.foreach(ops)
-          .retry(COMMIT_NUM_RETRIES_DEFAULT)
+          .retry(commitRetry.numRetries())
           .exponentialBackoff(
-              COMMIT_MIN_RETRY_WAIT_MS_DEFAULT,
-              COMMIT_MAX_RETRY_WAIT_MS_DEFAULT,
-              COMMIT_TOTAL_RETRY_TIME_MS_DEFAULT,
+              commitRetry.minWaitMs(),
+              commitRetry.maxWaitMs(),
+              commitRetry.totalTimeoutMs(),
               2.0 /* exponential */)
           .onlyRetryOn(CommitFailedException.class)
+          .onFailure(
+              (task, ex) -> {
+                if (ex instanceof CommitFailedException) {
+                  CatalogMetrics.getInstance()
+                      .recordCommitRetry(catalog.name(), namespaceLabel(ident), ident.name());
+                }
+              })
           .run(
               taskOps -> {
                 TableMetadata base = isRetry.get() ? taskOps.refresh() : taskOps.current();
@@ -446,6 +547,11 @@ public class RESTCatalogAdapter implements RESTCatalogHandler {
                 TableMetadata updated = metadataBuilder.build();
                 if (updated.changes().isEmpty()) {
                   // do not commit if the metadata has not changed
+                  logger.warn(
+                      "commit no-op for table {}: empty metadata changes after refresh "
+                          + "(isRetry={}); client requirements validated but updates produced no changes",
+                      ident,
+                      isRetry.get());
                   return;
                 }
 

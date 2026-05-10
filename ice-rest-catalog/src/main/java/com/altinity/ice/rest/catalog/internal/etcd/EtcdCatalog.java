@@ -82,6 +82,11 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
     this.io = io;
   }
 
+  /** Shared jetcd client for auxiliary features (e.g. commit locks) without a second connection. */
+  public Client etcdClient() {
+    return client;
+  }
+
   // Used by EtcdCatalogTest to test concurrent modifications.
   protected Txn kvtx() {
     return kv.txn();

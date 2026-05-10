@@ -11,6 +11,19 @@ That's it.
 
 Examples of `.ice-rest-catalog.yaml` (as well as Kubernetes deployment manifests) can be found [here](../examples/).
 
+## Parallel writers (`commitLock`)
+
+Many concurrent commits to the **same table** can cause repeated `CommitFailedException` (optimistic concurrency). For the **etcd** metastore you can serialize commits per table using etcd’s lock API:
+
+```yaml
+commitLock:
+  enabled: true
+  leaseTtlSeconds: 30
+  acquireTimeoutMs: 30000
+```
+
+If `enabled` is true but the catalog backend is not etcd, the lock is ignored (warning in logs). When lock acquisition exceeds `acquireTimeoutMs`, the server responds with HTTP **503** so clients can retry.
+
 ## Documentation
 
 - [Architecture](../docs/architecture.md) -- components, design principles, HA, backup/recovery
