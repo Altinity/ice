@@ -14,12 +14,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -34,23 +31,10 @@ public final class ListSnapshots {
     Long currentSnapshotId =
         table.currentSnapshot() != null ? table.currentSnapshot().snapshotId() : null;
 
-    List<SnapshotInfo> rows = new ArrayList<>();
-    for (Snapshot snapshot : table.snapshots()) {
-      Long parentId = snapshot.parentId();
-      rows.add(
-          new SnapshotInfo(
-              snapshot.snapshotId(),
-              parentId,
-              snapshot.sequenceNumber(),
-              snapshot.timestampMillis(),
-              Instant.ofEpochMilli(snapshot.timestampMillis()).toString(),
-              snapshot.operation(),
-              currentSnapshotId != null && snapshot.snapshotId() == currentSnapshotId,
-              snapshot.summary(),
-              snapshot.manifestListLocation()));
-    }
+    List<DescribeMetadata.SnapshotInfo> rows =
+        DescribeMetadata.extractSnapshots(table.snapshots(), currentSnapshotId);
 
-    rows.sort(Comparator.comparingLong(SnapshotInfo::timestampMillis));
+    rows.sort(Comparator.comparingLong(DescribeMetadata.SnapshotInfo::timestampMillis));
 
     if (limit > 0 && rows.size() > limit) {
       rows = new ArrayList<>(rows.subList(rows.size() - limit, rows.size()));
@@ -70,17 +54,6 @@ public final class ListSnapshots {
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  record Result(String table, Long currentSnapshotId, List<SnapshotInfo> snapshots) {}
-
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  record SnapshotInfo(
-      long snapshotId,
-      Long parentId,
-      long sequenceNumber,
-      long timestampMillis,
-      String timestamp,
-      String operation,
-      boolean current,
-      Map<String, String> summary,
-      String manifestListLocation) {}
+  record Result(
+      String table, Long currentSnapshotId, List<DescribeMetadata.SnapshotInfo> snapshots) {}
 }
