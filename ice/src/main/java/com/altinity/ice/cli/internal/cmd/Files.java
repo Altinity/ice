@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
+import com.altinity.ice.cli.internal.util.TreePrinter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,53 +31,49 @@ public final class Files {
     Table table = catalog.loadTable(tableId);
     Snapshot snapshot = table.currentSnapshot();
 
+    String tableName = tableId.toString();
+    String rootLabel = "Snapshots: " + tableName;
+
     if (snapshot == null) {
-      System.out.println("Snapshots: " + tableId);
+      System.out.println(rootLabel);
       System.out.println("(no snapshots)");
       return;
     }
 
-    String tableName = tableId.toString();
     int schemaId = snapshot.schemaId() != null ? snapshot.schemaId() : 0;
     String manifestListLocation = snapshot.manifestListLocation();
     String locationStr = manifestListLocation != null ? manifestListLocation : "(embedded)";
-
-    System.out.println("Snapshots: " + tableName);
-    System.out.println(
-        "└── Snapshot " + snapshot.snapshotId() + ", schema " + schemaId + ": " + locationStr);
+    String snapshotLabel =
+        "Snapshot " + snapshot.snapshotId() + ", schema " + schemaId + ": " + locationStr;
 
     FileIO tableIO = table.io();
     List<ManifestFile> manifests;
     try {
       manifests = snapshot.allManifests(tableIO);
     } catch (Exception e) {
+      TreePrinter.print(
+          new TreePrinter.Node(rootLabel, List.of(new TreePrinter.Node(snapshotLabel))));
       System.out.println("    (failed to read manifests: " + e.getMessage() + ")");
       return;
     }
 
-    for (int m = 0; m < manifests.size(); m++) {
-      ManifestFile manifest = manifests.get(m);
-      boolean isLastManifest = (m == manifests.size() - 1);
-      String manifestPrefix = isLastManifest ? "└── " : "├── ";
-      String childConnector = isLastManifest ? "    " : "│   ";
-
-      List<String> dataFileLocations = new ArrayList<>();
+    List<TreePrinter.Node> manifestNodes = new ArrayList<>(manifests.size());
+    for (ManifestFile manifest : manifests) {
+      List<TreePrinter.Node> dataFileNodes = new ArrayList<>();
       try (CloseableIterable<DataFile> files = ManifestFiles.read(manifest, tableIO)) {
         for (DataFile file : files) {
-          dataFileLocations.add(file.location());
+          dataFileNodes.add(new TreePrinter.Node("Datafile: " + file.location()));
         }
       } catch (Exception e) {
-        dataFileLocations.add("(failed to read: " + e.getMessage() + ")");
+        dataFileNodes.add(
+            new TreePrinter.Node("Datafile: (failed to read: " + e.getMessage() + ")"));
       }
-
-      System.out.println("    " + manifestPrefix + "Manifest: " + manifest.path());
-
-      String dataFileIndent = "    " + childConnector;
-      for (int f = 0; f < dataFileLocations.size(); f++) {
-        boolean isLastFile = (f == dataFileLocations.size() - 1);
-        String filePrefix = isLastFile ? "└── " : "├── ";
-        System.out.println(dataFileIndent + filePrefix + "Datafile: " + dataFileLocations.get(f));
-      }
+      manifestNodes.add(new TreePrinter.Node("Manifest: " + manifest.path(), dataFileNodes));
     }
+
+    TreePrinter.Node root =
+        new TreePrinter.Node(
+            rootLabel, List.of(new TreePrinter.Node(snapshotLabel, manifestNodes)));
+    TreePrinter.print(root);
   }
 }
