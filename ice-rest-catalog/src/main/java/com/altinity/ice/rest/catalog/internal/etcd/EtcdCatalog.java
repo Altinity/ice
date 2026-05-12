@@ -98,8 +98,7 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
               e));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new RuntimeIOException(
-          new IOException("Interrupted connecting to etcd at " + uri, e));
+      throw new RuntimeIOException(new IOException("Interrupted connecting to etcd at " + uri, e));
     } catch (ExecutionException e) {
       Throwable cause = e.getCause() != null ? e.getCause() : e;
       throw new RuntimeIOException(

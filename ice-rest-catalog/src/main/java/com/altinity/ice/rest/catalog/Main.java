@@ -539,8 +539,7 @@ public final class Main implements Callable<Integer> {
       catalog = CatalogUtil.buildIcebergCatalog(catalogName, icebergConfig, null);
       String uri = icebergConfig.getOrDefault(CatalogProperties.URI, "");
       if (uri.toLowerCase().startsWith("jdbc:sqlite:")) {
-        logger.warn(
-            "Catalog backend: SQLite ({}); not recommended for production use", uri);
+        logger.warn("Catalog backend: SQLite ({}); not recommended for production use", uri);
       } else {
         logger.info("Catalog backend: {} ({})", catalogImpl, uri);
       }
