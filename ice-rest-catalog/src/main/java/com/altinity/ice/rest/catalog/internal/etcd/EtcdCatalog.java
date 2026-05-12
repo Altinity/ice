@@ -34,6 +34,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.iceberg.BaseMetastoreCatalog;
 import org.apache.iceberg.BaseMetastoreTableOperations;
 import org.apache.iceberg.CatalogUtil;
@@ -61,6 +63,8 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
 
   private static final Logger logger = LoggerFactory.getLogger(EtcdCatalog.class);
 
+  private static final long DEFAULT_TIMEOUT_SECONDS = 30;
+
   private static final String NAMESPACE_PREFIX = "n/";
   private static final String TABLE_PREFIX = "t/";
 
@@ -79,6 +83,29 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
         Client.builder().endpoints(uri.split(",")).keepaliveWithoutCalls(false).build();
     this.client = etcdClient;
     this.kv = etcdClient.getKVClient();
+    try {
+      kv.get(ByteSequence.from("/", StandardCharsets.UTF_8))
+          .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      logger.info("Connected to etcd at {}", uri);
+    } catch (TimeoutException e) {
+      throw new RuntimeIOException(
+          new IOException(
+              "Failed to connect to etcd at "
+                  + uri
+                  + ": timed out after "
+                  + DEFAULT_TIMEOUT_SECONDS
+                  + "s",
+              e));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeIOException(
+          new IOException("Interrupted connecting to etcd at " + uri, e));
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause() != null ? e.getCause() : e;
+      throw new RuntimeIOException(
+          new IOException(
+              "Failed to connect to etcd at " + uri + ": " + cause.getMessage(), cause));
+    }
     this.io = io;
   }
 
@@ -145,19 +172,30 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
 
   private static <T> T unwrapCommit(java.util.concurrent.CompletableFuture<T> x) {
     try {
-      return x.get();
-    } catch (InterruptedException | ExecutionException e) {
-      // TODO: Thread.currentThread().interrupt();?
+      return x.get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      throw new CommitStateUnknownException(
+          new IOException("etcd commit timed out after " + DEFAULT_TIMEOUT_SECONDS + "s", e));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new CommitStateUnknownException(e);
+    } catch (ExecutionException e) {
       throw new CommitStateUnknownException(e);
     }
   }
 
   private static <T> T unwrap(java.util.concurrent.CompletableFuture<T> x) {
     try {
-      return x.get();
-    } catch (InterruptedException | ExecutionException e) {
-      // TODO: Thread.currentThread().interrupt();?
+      return x.get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      throw new RuntimeIOException(
+          new IOException("etcd request timed out after " + DEFAULT_TIMEOUT_SECONDS + "s", e));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new RuntimeIOException(new IOException(e));
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause() != null ? e.getCause() : e;
+      throw new RuntimeIOException(new IOException(cause.getMessage(), cause));
     }
   }
 
