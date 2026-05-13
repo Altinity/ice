@@ -534,8 +534,15 @@ public final class Main implements Callable<Integer> {
     Catalog catalog;
     if (EtcdCatalog.class.getName().equals(catalogImpl)) {
       catalog = newEctdCatalog(catalogName, icebergConfig);
+      logger.info("Catalog backend: etcd");
     } else {
       catalog = CatalogUtil.buildIcebergCatalog(catalogName, icebergConfig, null);
+      String uri = icebergConfig.getOrDefault(CatalogProperties.URI, "");
+      if (uri.toLowerCase().startsWith("jdbc:sqlite:")) {
+        logger.warn("Catalog backend: SQLite ({}); not recommended for production use", uri);
+      } else {
+        logger.info("Catalog backend: {} ({})", catalogImpl, uri);
+      }
     }
     return catalog;
   }
