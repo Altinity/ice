@@ -25,6 +25,7 @@ import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
 import com.altinity.ice.cli.internal.cmd.ListNamespaces;
 import com.altinity.ice.cli.internal.cmd.ListPartitions;
+import com.altinity.ice.cli.internal.cmd.ListSnapshots;
 import com.altinity.ice.cli.internal.cmd.ListTables;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
@@ -744,6 +745,30 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       ListPartitions.run(catalog, TableIdentifier.parse(name), json);
+    }
+  }
+
+  @CommandLine.Command(
+      name = "list-snapshots",
+      description = "List current and previous snapshots of a table.")
+  void listSnapshots(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"--limit"},
+              description = "Show only the most recent N snapshots (0 = all)",
+              defaultValue = "0")
+          int limit,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      ListSnapshots.run(catalog, TableIdentifier.parse(name), json, limit);
     }
   }
 

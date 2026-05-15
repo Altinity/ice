@@ -10,19 +10,34 @@
 package com.altinity.ice.cli.internal.util;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public final class TreePrinter {
 
   private TreePrinter() {}
 
-  public record Node(String label, List<Node> children) {
+  public record Node(List<String> label, List<Node> children) {
     public Node(String label) {
-      this(label, List.of());
+      this(splitLines(label), List.of());
+    }
+
+    public Node(String label, List<Node> children) {
+      this(splitLines(label), children);
     }
 
     public Node {
+      label = List.copyOf(label);
       children = List.copyOf(children);
+    }
+
+    private static List<String> splitLines(String label) {
+      List<String> lines = new ArrayList<>(Arrays.asList(label.split("\n", -1)));
+      while (lines.size() > 1 && lines.getLast().isEmpty()) {
+        lines.removeLast();
+      }
+      return lines;
     }
   }
 
@@ -31,7 +46,9 @@ public final class TreePrinter {
   }
 
   public static void print(Node root, PrintStream out) {
-    out.println(root.label());
+    for (String line : root.label()) {
+      out.println(line);
+    }
     printChildren(root.children(), "", out);
   }
 
@@ -41,7 +58,11 @@ public final class TreePrinter {
       boolean isLast = (i == children.size() - 1);
       String connector = isLast ? "└── " : "├── ";
       String childDescendantIndent = descendantIndent + (isLast ? "    " : "│   ");
-      out.println(descendantIndent + connector + child.label());
+      List<String> lines = child.label();
+      out.println(descendantIndent + connector + lines.getFirst());
+      for (int j = 1; j < lines.size(); j++) {
+        out.println(childDescendantIndent + lines.get(j));
+      }
       printChildren(child.children(), childDescendantIndent, out);
     }
   }
