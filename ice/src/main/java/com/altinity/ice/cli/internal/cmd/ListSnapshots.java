@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
+import com.altinity.ice.cli.internal.util.TreePrinter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -16,7 +17,11 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -40,17 +45,76 @@ public final class ListSnapshots {
       rows = new ArrayList<>(rows.subList(rows.size() - limit, rows.size()));
     }
 
-    var result = new Result(tableId.toString(), currentSnapshotId, rows);
-    output(result, json);
+    if (json) {
+      var result = new Result(tableId.toString(), currentSnapshotId, rows);
+      ObjectMapper mapper = new ObjectMapper();
+      mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+      System.out.println(mapper.writeValueAsString(result));
+      return;
+    }
+
+    printTree(tableId.toString(), currentSnapshotId, rows);
   }
 
-  private static void output(Result result, boolean json) throws IOException {
-    ObjectMapper mapper =
-        json
-            ? new ObjectMapper()
-            : new ObjectMapper(new YAMLFactory().enable(YAMLGenerator.Feature.MINIMIZE_QUOTES));
-    mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-    System.out.println(mapper.writeValueAsString(result));
+  private static void printTree(
+      String tableName, Long currentSnapshotId, List<DescribeMetadata.SnapshotInfo> rows)
+      throws IOException {
+    StringBuilder rootLabel = new StringBuilder();
+    rootLabel.append("table: ").append(tableName);
+    if (currentSnapshotId != null) {
+      rootLabel.append("\ncurrentSnapshotId: ").append(currentSnapshotId);
+    }
+
+    if (rows.isEmpty()) {
+      TreePrinter.print(new TreePrinter.Node(rootLabel.toString(), List.of()));
+      System.out.println("(no snapshots)");
+      return;
+    }
+
+    ObjectMapper yamlMapper =
+        new ObjectMapper(
+            new YAMLFactory()
+                .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+                .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER));
+    yamlMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+
+    Set<Long> presentIds = new HashSet<>(rows.size());
+    for (DescribeMetadata.SnapshotInfo info : rows) {
+      presentIds.add(info.snapshotId());
+    }
+
+    Map<Long, List<DescribeMetadata.SnapshotInfo>> childrenByParent = new HashMap<>();
+    List<DescribeMetadata.SnapshotInfo> roots = new ArrayList<>();
+    for (DescribeMetadata.SnapshotInfo info : rows) {
+      Long parentId = info.parentId();
+      if (parentId == null || !presentIds.contains(parentId)) {
+        roots.add(info);
+      } else {
+        childrenByParent.computeIfAbsent(parentId, k -> new ArrayList<>()).add(info);
+      }
+    }
+
+    List<TreePrinter.Node> rootChildren = new ArrayList<>(roots.size());
+    for (DescribeMetadata.SnapshotInfo root : roots) {
+      rootChildren.add(buildNode(root, childrenByParent, yamlMapper));
+    }
+
+    TreePrinter.print(new TreePrinter.Node(rootLabel.toString(), rootChildren));
+  }
+
+  private static TreePrinter.Node buildNode(
+      DescribeMetadata.SnapshotInfo info,
+      Map<Long, List<DescribeMetadata.SnapshotInfo>> childrenByParent,
+      ObjectMapper yamlMapper)
+      throws IOException {
+    List<DescribeMetadata.SnapshotInfo> children =
+        childrenByParent.getOrDefault(info.snapshotId(), List.of());
+    List<TreePrinter.Node> childNodes = new ArrayList<>(children.size());
+
+    for (DescribeMetadata.SnapshotInfo child : children) {
+      childNodes.add(buildNode(child, childrenByParent, yamlMapper));
+    }
+    return new TreePrinter.Node(yamlMapper.writeValueAsString(info), childNodes);
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
