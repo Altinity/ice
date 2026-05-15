@@ -30,6 +30,10 @@ echo "OK list-namespaces listed ${NAMESPACE_NAME}"
 {{ICE_CLI}} --config {{CLI_CONFIG}} describe
 echo "OK Listed namespaces"
 
+# Explicit create-table (staged create + commit); regression for RESTCatalogAdapter UPDATE_TABLE path
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-table ${TABLE_CREATE_VIA_CLI} --schema-from-parquet "file://${INPUT_PATH}"
+echo "OK create-table ${TABLE_CREATE_VIA_CLI}"
+
 # Insert from file (like README: ice insert flowers.iris -p file://...)
 {{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_IRIS} -p "file://${INPUT_PATH}"
 echo "Inserted from file into ${TABLE_IRIS}"
@@ -230,6 +234,7 @@ echo "OK list-snapshots --limit 1 verified for ${TABLE_IRIS}"
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_IRIS}
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_PARTITIONED}
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_SORTED}
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_CREATE_VIA_CLI}
 echo "OK Deleted tables"
 
 # Delete the namespace via CLI

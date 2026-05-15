@@ -518,6 +518,18 @@ public final class Main {
               defaultValue = "-1")
           int threadCount,
       @CommandLine.Option(
+              names = {"--commit-retries"},
+              description =
+                  "Outer retry rounds after CommitFailedException (reload metadata and re-append;"
+                      + " set to 0 to disable)",
+              defaultValue = "10")
+          int commitRetries,
+      @CommandLine.Option(
+              names = {"--commit-retry-total-ms"},
+              description = "Total wall-clock budget (ms) for outer commit retries",
+              defaultValue = "300000")
+          long commitRetryTotalMs,
+      @CommandLine.Option(
               names = {"--compression"},
               description =
                   "Parquet compression codec: gzip (default), zstd, snappy, lz4, brotli, uncompressed, or as-source")
@@ -618,6 +630,8 @@ public final class Main {
               .sortOrderList(sortOrders)
               .threadCount(
                   threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount)
+              .commitRetries(commitRetries)
+              .commitRetryTotalMs(commitRetryTotalMs)
               .compression(compression)
               .build();
 

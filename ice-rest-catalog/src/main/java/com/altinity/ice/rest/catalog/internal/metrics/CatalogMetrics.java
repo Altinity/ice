@@ -16,10 +16,22 @@ import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.
 import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.CATALOG_OPERATION_LABELS;
 import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.CATALOG_TABLES_HELP;
 import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.CATALOG_TABLES_NAME;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.COMMIT_LOCK_ACQUIRE_SECONDS_HELP;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.COMMIT_LOCK_ACQUIRE_SECONDS_NAME;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.COMMIT_LOCK_ACQUIRE_TIMEOUTS_TOTAL_HELP;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.COMMIT_LOCK_ACQUIRE_TIMEOUTS_TOTAL_NAME;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.COMMIT_LOCK_HELD_SECONDS_HELP;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.COMMIT_LOCK_HELD_SECONDS_NAME;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.COMMIT_LOCK_LABELS;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.COMMIT_RETRIES_TOTAL_HELP;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.COMMIT_RETRIES_TOTAL_NAME;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.COMMIT_RETRY_LABELS;
+import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.DURATION_BUCKETS;
 import static com.altinity.ice.rest.catalog.internal.metrics.IcebergMetricNames.LABEL_CATALOG;
 
 import io.prometheus.metrics.core.metrics.Counter;
 import io.prometheus.metrics.core.metrics.Gauge;
+import io.prometheus.metrics.core.metrics.Histogram;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +64,10 @@ public class CatalogMetrics {
   private final Gauge tablesTotal;
   private final Gauge namespacesTotal;
   private final Counter operationsTotal;
+  private final Counter commitRetriesTotal;
+  private final Histogram commitLockAcquireSeconds;
+  private final Histogram commitLockHeldSeconds;
+  private final Counter commitLockAcquireTimeoutsTotal;
 
   /** Returns the singleton instance of the catalog metrics. */
   public static CatalogMetrics getInstance() {
@@ -78,6 +94,36 @@ public class CatalogMetrics {
             .name(CATALOG_OPERATIONS_TOTAL_NAME)
             .help(CATALOG_OPERATIONS_TOTAL_HELP)
             .labelNames(CATALOG_OPERATION_LABELS)
+            .register();
+
+    this.commitRetriesTotal =
+        Counter.builder()
+            .name(COMMIT_RETRIES_TOTAL_NAME)
+            .help(COMMIT_RETRIES_TOTAL_HELP)
+            .labelNames(COMMIT_RETRY_LABELS)
+            .register();
+
+    this.commitLockAcquireSeconds =
+        Histogram.builder()
+            .name(COMMIT_LOCK_ACQUIRE_SECONDS_NAME)
+            .help(COMMIT_LOCK_ACQUIRE_SECONDS_HELP)
+            .labelNames(COMMIT_LOCK_LABELS)
+            .classicUpperBounds(DURATION_BUCKETS)
+            .register();
+
+    this.commitLockHeldSeconds =
+        Histogram.builder()
+            .name(COMMIT_LOCK_HELD_SECONDS_NAME)
+            .help(COMMIT_LOCK_HELD_SECONDS_HELP)
+            .labelNames(COMMIT_LOCK_LABELS)
+            .classicUpperBounds(DURATION_BUCKETS)
+            .register();
+
+    this.commitLockAcquireTimeoutsTotal =
+        Counter.builder()
+            .name(COMMIT_LOCK_ACQUIRE_TIMEOUTS_TOTAL_NAME)
+            .help(COMMIT_LOCK_ACQUIRE_TIMEOUTS_TOTAL_HELP)
+            .labelNames(COMMIT_LOCK_LABELS)
             .register();
 
     logger.info("Catalog Prometheus metrics initialized");
@@ -116,6 +162,26 @@ public class CatalogMetrics {
   /** Record a catalog operation. */
   public void recordOperation(String catalog, String operation) {
     operationsTotal.labelValues(catalog, operation).inc();
+  }
+
+  /** Record one server-side commit retry after a commit CAS conflict (CommitFailedException). */
+  public void recordCommitRetry(String catalog, String namespace, String table) {
+    commitRetriesTotal.labelValues(catalog, namespace, table).inc();
+  }
+
+  /** Record duration of etcd commit lock acquisition (wait time). */
+  public void recordCommitLockAcquireSeconds(String catalog, double seconds) {
+    commitLockAcquireSeconds.labelValues(catalog).observe(seconds);
+  }
+
+  /** Record duration the etcd commit lock was held during a commit. */
+  public void recordCommitLockHeldSeconds(String catalog, double seconds) {
+    commitLockHeldSeconds.labelValues(catalog).observe(seconds);
+  }
+
+  /** Record a commit lock acquire that exceeded {@code acquireTimeoutMs}. */
+  public void recordCommitLockAcquireTimeout(String catalog) {
+    commitLockAcquireTimeoutsTotal.labelValues(catalog).inc();
   }
 
   /** Record a table creation. */

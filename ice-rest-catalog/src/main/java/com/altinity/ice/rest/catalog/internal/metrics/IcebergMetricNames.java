@@ -152,6 +152,28 @@ public final class IcebergMetricNames {
   public static final String COMMIT_DURATION_NAME = "iceberg_commit_duration_seconds";
   public static final String COMMIT_DURATION_HELP = "Duration of commit operations in seconds";
 
+  public static final String COMMIT_RETRIES_TOTAL_NAME = "iceberg_commit_retries_total";
+  public static final String COMMIT_RETRIES_TOTAL_HELP =
+      "Total number of CommitFailedException retries triggered by the server-side commit retry loop";
+
+  public static final String[] COMMIT_RETRY_LABELS = {LABEL_CATALOG, LABEL_NAMESPACE, LABEL_TABLE};
+
+  public static final String COMMIT_LOCK_ACQUIRE_SECONDS_NAME =
+      "iceberg_commit_lock_acquire_seconds";
+  public static final String COMMIT_LOCK_ACQUIRE_SECONDS_HELP =
+      "Time taken to acquire the etcd table commit lock (seconds)";
+
+  public static final String COMMIT_LOCK_HELD_SECONDS_NAME = "iceberg_commit_lock_held_seconds";
+  public static final String COMMIT_LOCK_HELD_SECONDS_HELP =
+      "Time the etcd table commit lock was held during commit (seconds)";
+
+  public static final String COMMIT_LOCK_ACQUIRE_TIMEOUTS_TOTAL_NAME =
+      "iceberg_commit_lock_acquire_timeouts_total";
+  public static final String COMMIT_LOCK_ACQUIRE_TIMEOUTS_TOTAL_HELP =
+      "Total number of etcd commit lock acquire attempts that exceeded acquireTimeoutMs";
+
+  public static final String[] COMMIT_LOCK_LABELS = {LABEL_CATALOG};
+
   // ==========================================================================
   // Histogram Buckets
   // ==========================================================================
