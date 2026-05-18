@@ -34,6 +34,10 @@ echo "OK Listed namespaces"
 {{ICE_CLI}} --config {{CLI_CONFIG}} check
 echo "OK checked configuration"
 
+# Explicit create-table (staged create + commit); regression for RESTCatalogAdapter UPDATE_TABLE path
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-table ${TABLE_CREATE_VIA_CLI} --schema-from-parquet "file://${INPUT_PATH}"
+echo "OK create-table ${TABLE_CREATE_VIA_CLI}"
+
 # Insert from file (like README: ice insert flowers.iris -p file://...)
 {{ICE_CLI}} --config {{CLI_CONFIG}} insert ${TABLE_IRIS} -p "file://${INPUT_PATH}"
 echo "Inserted from file into ${TABLE_IRIS}"
@@ -212,11 +216,29 @@ for t in ${TABLE_IRIS} ${TABLE_PARTITIONED} ${TABLE_SORTED}; do
 done
 echo "OK list-tables listed tables in ${NAMESPACE_NAME}"
 
+# List snapshots for the iris table
+{{ICE_CLI}} --config {{CLI_CONFIG}} list-snapshots ${TABLE_IRIS} > /tmp/basic_ops_list_snapshots.txt
+if ! grep -q "snapshotId" /tmp/basic_ops_list_snapshots.txt; then
+  echo "FAIL: list-snapshots output missing 'snapshotId'"
+  cat /tmp/basic_ops_list_snapshots.txt
+  exit 1
+fi
+echo "OK list-snapshots verified for ${TABLE_IRIS}"
+
+# List snapshots with --limit 1
+{{ICE_CLI}} --config {{CLI_CONFIG}} list-snapshots ${TABLE_IRIS} --limit 1 > /tmp/basic_ops_list_snapshots_limit.txt
+if ! grep -q "snapshotId" /tmp/basic_ops_list_snapshots_limit.txt; then
+  echo "FAIL: list-snapshots --limit 1 output missing 'snapshotId'"
+  cat /tmp/basic_ops_list_snapshots_limit.txt
+  exit 1
+fi
+echo "OK list-snapshots --limit 1 verified for ${TABLE_IRIS}"
 
 # Cleanup tables then namespace
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_IRIS}
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_PARTITIONED}
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_SORTED}
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_CREATE_VIA_CLI}
 echo "OK Deleted tables"
 
 # Delete the namespace via CLI

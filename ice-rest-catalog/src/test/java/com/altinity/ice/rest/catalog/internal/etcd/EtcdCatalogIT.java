@@ -12,12 +12,19 @@ package com.altinity.ice.rest.catalog.internal.etcd;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.altinity.ice.rest.catalog.internal.config.CommitLockConfig;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Txn;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import org.apache.iceberg.BaseMetastoreTableOperations;
@@ -313,6 +320,40 @@ public class EtcdCatalogIT {
     assertThat(catalog.loadTable(identifier)).isNotNull();
     assertThat(catalog.dropTable(identifier)).isTrue();
     assertThat(catalog.dropNamespace(namespace)).isTrue();
+  }
+
+  @Test
+  public void commitLockSerializesConcurrentAcquires() throws Exception {
+    CommitLock lock =
+        new CommitLock(
+            catalog.etcdClient(), catalog.name(), new CommitLockConfig(true, 30, 60_000));
+    TableIdentifier id = TableIdentifier.of(Namespace.of("ns"), "t");
+    AtomicInteger concurrent = new AtomicInteger(0);
+    AtomicInteger maxConcurrent = new AtomicInteger(0);
+    int threads = 10;
+    ExecutorService pool = Executors.newFixedThreadPool(threads);
+    CountDownLatch start = new CountDownLatch(1);
+    List<Future<?>> futures = new ArrayList<>();
+    for (int i = 0; i < threads; i++) {
+      futures.add(
+          pool.submit(
+              () -> {
+                start.await();
+                try (CommitLock.Handle h = lock.acquire(id)) {
+                  int c = concurrent.incrementAndGet();
+                  maxConcurrent.updateAndGet(m -> Math.max(m, c));
+                  Thread.sleep(5);
+                  concurrent.decrementAndGet();
+                }
+                return null;
+              }));
+    }
+    start.countDown();
+    for (Future<?> f : futures) {
+      f.get();
+    }
+    pool.shutdown();
+    assertThat(maxConcurrent.get()).isEqualTo(1);
   }
 
   private static String rand() {

@@ -13,6 +13,7 @@ A CLI for loading data into Iceberg REST catalogs.
   - [Delete Partition](#delete-partition)
   - [Insert Without Copy](#insert-without-copy)
   - [Multiple Files](#multiple-files)
+  - [Parallel inserts and commit retries](#parallel-inserts-and-commit-retries)
   - [Namespace Management](#namespace-management)
   - [Inspect](#inspect)
   - [S3 with Public Data](#s3-with-public-data)
@@ -135,6 +136,24 @@ cat filelist | ice insert flowers.iris -p -
 
 where `filelist` contains one file path per line. If any file fails, the entire transaction is rolled back.
 
+### Parallel inserts and commit retries
+
+Several concurrent `ice insert` processes (or high catalog contention) can hit optimistic concurrency: one commit wins and others see `CommitFailedException` with a message like `Requirement failed: branch main has changed`. That means the table moved forward while this client was committing; it is not a data corruption signal.
+
+By default, `ice insert` performs **outer** commit retries: it reloads table metadata, re-appends the staged data files, and tries again (default **10** rounds within **300000** ms / 5 minutes). Tune with:
+
+```shell
+# disable outer retries (previous behavior)
+ice insert ns.table file://a.parquet --commit-retries=0
+
+# more headroom under heavy parallel load
+ice insert ns.table file://a.parquet --commit-retries=20 --commit-retry-total-ms=600000
+```
+
+Note: `--commit-retry-total-ms` only applies when `--commit-retries` is greater than zero.
+
+If all retries are exhausted, `ice` logs each **orphaned** data file path (uploaded but not registered in the table). You can delete those objects from object storage if you do not plan to retry.
+
 ### Namespace Management
 
 ```shell
@@ -164,6 +183,12 @@ ice files flowers.iris
 
 # list partitions
 ice list-partitions nyc.taxis_p_by_day
+
+# list current and previous snapshots
+ice list-snapshots flowers.iris
+
+# only the latest 5
+ice list-snapshots flowers.iris --limit 5
 
 # describe a parquet file directly
 ice describe-parquet file://iris.parquet

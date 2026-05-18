@@ -25,6 +25,7 @@ import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
 import com.altinity.ice.cli.internal.cmd.ListNamespaces;
 import com.altinity.ice.cli.internal.cmd.ListPartitions;
+import com.altinity.ice.cli.internal.cmd.ListSnapshots;
 import com.altinity.ice.cli.internal.cmd.ListTables;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
@@ -517,6 +518,18 @@ public final class Main {
               defaultValue = "-1")
           int threadCount,
       @CommandLine.Option(
+              names = {"--commit-retries"},
+              description =
+                  "Outer retry rounds after CommitFailedException (reload metadata and re-append;"
+                      + " set to 0 to disable)",
+              defaultValue = "10")
+          int commitRetries,
+      @CommandLine.Option(
+              names = {"--commit-retry-total-ms"},
+              description = "Total wall-clock budget (ms) for outer commit retries",
+              defaultValue = "300000")
+          long commitRetryTotalMs,
+      @CommandLine.Option(
               names = {"--compression"},
               description =
                   "Parquet compression codec: gzip (default), zstd, snappy, lz4, brotli, uncompressed, or as-source")
@@ -617,6 +630,8 @@ public final class Main {
               .sortOrderList(sortOrders)
               .threadCount(
                   threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount)
+              .commitRetries(commitRetries)
+              .commitRetryTotalMs(commitRetryTotalMs)
               .compression(compression)
               .build();
 
@@ -730,6 +745,30 @@ public final class Main {
       throws IOException {
     try (RESTCatalog catalog = loadCatalog()) {
       ListPartitions.run(catalog, TableIdentifier.parse(name), json);
+    }
+  }
+
+  @CommandLine.Command(
+      name = "list-snapshots",
+      description = "List current and previous snapshots of a table.")
+  void listSnapshots(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"--limit"},
+              description = "Show only the most recent N snapshots (0 = all)",
+              defaultValue = "0")
+          int limit,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      ListSnapshots.run(catalog, TableIdentifier.parse(name), json, limit);
     }
   }
 
