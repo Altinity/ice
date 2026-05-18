@@ -199,6 +199,13 @@
   "methods":[{"name":"data","parameterTypes":[] }, {"name":"error","parameterTypes":[] }, {"name":"kind","parameterTypes":[] }, {"name":"metadata","parameterTypes":[] }]
 },
 {
+  "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$ColumnMetrics",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"lowerBound","parameterTypes":[] }, {"name":"name","parameterTypes":[] }, {"name":"nested","parameterTypes":[] }, {"name":"nullCount","parameterTypes":[] }, {"name":"upperBound","parameterTypes":[] }, {"name":"valueCount","parameterTypes":[] }]
+},
+{
   "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Data",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
@@ -209,7 +216,8 @@
   "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Error",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "queryAllDeclaredConstructors":true
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"message","parameterTypes":[] }]
 },
 {
   "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Metadata",
@@ -217,6 +225,13 @@
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"id","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Metrics",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"columns","parameterTypes":[] }, {"name":"file","parameterTypes":[] }, {"name":"recordCount","parameterTypes":[] }]
 },
 {
   "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Snapshot",
@@ -528,6 +543,10 @@
 },
 {
   "name":"com.sun.crypto.provider.HmacCore$HmacSHA256",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.HmacCore$HmacSHA384",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
@@ -1130,6 +1149,10 @@
 },
 {
   "name":"sun.security.rsa.RSASignature$SHA256withRSA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.rsa.RSASignature$SHA384withRSA",
   "methods":[{"name":"<init>","parameterTypes":[] }]
 },
 {
