@@ -63,22 +63,26 @@ public final class CatalogAdminService {
     int skipped = 0;
     int overwritten = 0;
 
-    for (CatalogSnapshot.NamespaceEntry entry : snapshot.namespaces()) {
-      EtcdCatalog.PutCatalogKvResult result =
-          etcdCatalog.putCatalogKv(entry.key(), marshal(entry.value()), overwrite, dryRun);
-      switch (result) {
-        case CREATED -> created++;
-        case SKIPPED -> skipped++;
-        case OVERWRITTEN -> overwritten++;
+    if (snapshot.namespaces() != null) {
+      for (CatalogSnapshot.NamespaceEntry entry : snapshot.namespaces()) {
+        EtcdCatalog.PutCatalogKvResult result =
+            etcdCatalog.putCatalogKv(entry.key(), marshal(entry.value()), overwrite, dryRun);
+        switch (result) {
+          case CREATED -> created++;
+          case SKIPPED -> skipped++;
+          case OVERWRITTEN -> overwritten++;
+        }
       }
     }
-    for (CatalogSnapshot.TableEntry entry : snapshot.tables()) {
-      EtcdCatalog.PutCatalogKvResult result =
-          etcdCatalog.putCatalogKv(entry.key(), marshal(entry.value()), overwrite, dryRun);
-      switch (result) {
-        case CREATED -> created++;
-        case SKIPPED -> skipped++;
-        case OVERWRITTEN -> overwritten++;
+    if (snapshot.tables() != null) {
+      for (CatalogSnapshot.TableEntry entry : snapshot.tables()) {
+        EtcdCatalog.PutCatalogKvResult result =
+            etcdCatalog.putCatalogKv(entry.key(), marshal(entry.value()), overwrite, dryRun);
+        switch (result) {
+          case CREATED -> created++;
+          case SKIPPED -> skipped++;
+          case OVERWRITTEN -> overwritten++;
+        }
       }
     }
 

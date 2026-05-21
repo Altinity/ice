@@ -238,7 +238,7 @@ public final class Main implements Callable<Integer> {
       Config config,
       Map<String, String> icebergConfig,
       PrometheusMetricsReporter metricsReporter) {
-    var s = createBaseServer(catalog, config, icebergConfig, true, metricsReporter);
+    var s = createBaseServer(catalog, config, icebergConfig, true, true, metricsReporter);
     ServerConnector connector = new ServerConnector(s);
     connector.setHost(host);
     connector.setPort(port);
@@ -253,7 +253,7 @@ public final class Main implements Callable<Integer> {
       Config config,
       Map<String, String> icebergConfig,
       PrometheusMetricsReporter metricsReporter) {
-    var s = createBaseServer(catalog, config, icebergConfig, false, metricsReporter);
+    var s = createBaseServer(catalog, config, icebergConfig, false, false, metricsReporter);
     ServerConnector connector = new ServerConnector(s);
     connector.setHost(host);
     connector.setPort(port);
@@ -266,6 +266,7 @@ public final class Main implements Callable<Integer> {
       Config config,
       Map<String, String> icebergConfig,
       boolean requireAuth,
+      boolean registerAdminServlet,
       PrometheusMetricsReporter metricsReporter) {
     var mux = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
     mux.insertHandler(new GzipHandler());
@@ -338,8 +339,10 @@ public final class Main implements Callable<Integer> {
     var h = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter));
     mux.addServlet(h, "/*");
 
-    var adminServlet = new ServletHolder(new CatalogAdminServlet(catalog, config.name()));
-    mux.addServlet(adminServlet, "/admin/*");
+    if (registerAdminServlet) {
+      var adminServlet = new ServletHolder(new CatalogAdminServlet(catalog, config.name()));
+      mux.addServlet(adminServlet, "/admin/*");
+    }
 
     var s = new Server();
     overrideJettyDefaults(s);
@@ -500,10 +503,7 @@ public final class Main implements Callable<Integer> {
               icebergConfig,
               metricsReporter);
       adminServer.start();
-      logger.warn(
-          "Serving admin endpoint at http://{}/v1/{{config,*}} and http://{}/admin/v1/{{catalog-export,catalog-import}}",
-          adminHostAndPort,
-          adminHostAndPort);
+      logger.warn("Serving admin endpoint at http://{}/v1/{{config,*}}", adminHostAndPort);
     }
 
     HostAndPort hostAndPort = HostAndPort.fromString(config.addr());

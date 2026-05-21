@@ -10,9 +10,10 @@
 package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
-import com.altinity.ice.cli.internal.catalog.AdminCatalogSnapshot;
 import com.altinity.ice.cli.internal.catalog.CatalogAdminClient;
 import com.altinity.ice.cli.internal.cmd.AlterTable;
+import com.altinity.ice.cli.internal.cmd.CatalogExport;
+import com.altinity.ice.cli.internal.cmd.CatalogImport;
 import com.altinity.ice.cli.internal.cmd.Check;
 import com.altinity.ice.cli.internal.cmd.CreateNamespace;
 import com.altinity.ice.cli.internal.cmd.CreateTable;
@@ -829,18 +830,7 @@ public final class Main {
           String namespace)
       throws IOException {
     try (CatalogAdminClient client = createCatalogAdminClient(this.configFile())) {
-      var snapshot = client.catalogExport(namespace);
-      String json =
-          new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(snapshot);
-      if (Strings.isNullOrEmpty(output) || "-".equals(output)) {
-        System.out.print(json);
-        if (!json.endsWith("\n")) {
-          System.out.println();
-        }
-      } else {
-        java.nio.file.Files.writeString(Path.of(output), json);
-        logger.info("Wrote catalog snapshot to {}", output);
-      }
+      CatalogExport.run(client, namespace, output);
     }
   }
 
@@ -859,20 +849,9 @@ public final class Main {
               description = "Replace existing keys (default: skip existing keys)")
           boolean overwrite)
       throws IOException {
-    String snapshotJson = readCatalogSnapshotInput(input);
-    ObjectMapper mapper = new ObjectMapper();
-    var snapshot = mapper.readValue(snapshotJson, AdminCatalogSnapshot.class);
     try (CatalogAdminClient client = createCatalogAdminClient(this.configFile())) {
-      var result = client.catalogImport(snapshot, dryRun, overwrite);
-      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(result));
+      CatalogImport.run(client, input, dryRun, overwrite);
     }
-  }
-
-  private static String readCatalogSnapshotInput(String inputPath) throws IOException {
-    if (Strings.isNullOrEmpty(inputPath) || "-".equals(inputPath)) {
-      return new String(System.in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-    }
-    return java.nio.file.Files.readString(Path.of(inputPath));
   }
 
   private CatalogAdminClient createCatalogAdminClient(String configFile) throws IOException {
