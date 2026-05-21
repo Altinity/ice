@@ -27,6 +27,8 @@ import com.altinity.ice.cli.internal.cmd.ListNamespaces;
 import com.altinity.ice.cli.internal.cmd.ListPartitions;
 import com.altinity.ice.cli.internal.cmd.ListTables;
 import com.altinity.ice.cli.internal.cmd.Scan;
+import com.altinity.ice.cli.internal.catalog.AdminCatalogSnapshot;
+import com.altinity.ice.cli.internal.catalog.CatalogAdminClient;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
 import com.altinity.ice.internal.jetty.DebugServer;
@@ -811,6 +813,87 @@ public final class Main {
     try (RESTCatalog catalog = loadCatalog()) {
       DeleteNamespace.run(catalog, Namespace.of(name.split("[.]")), ignoreNotFound);
     }
+  }
+
+  @CommandLine.Command(
+      name = "catalog-export",
+      description = "Export catalog registry (namespaces and tables) via REST admin API.")
+  void catalogExport(
+      @CommandLine.Option(
+              names = {"-o", "--output"},
+              description = "Output file path (- for stdout, default)")
+          String output,
+      @CommandLine.Option(
+              names = "--namespace",
+              description = "Export only this namespace and its tables (e.g. flowers)")
+          String namespace)
+      throws IOException {
+    try (CatalogAdminClient client = createCatalogAdminClient(this.configFile())) {
+      var snapshot = client.catalogExport(namespace);
+      String json = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(snapshot);
+      if (Strings.isNullOrEmpty(output) || "-".equals(output)) {
+        System.out.print(json);
+        if (!json.endsWith("\n")) {
+          System.out.println();
+        }
+      } else {
+        java.nio.file.Files.writeString(Path.of(output), json);
+        logger.info("Wrote catalog snapshot to {}", output);
+      }
+    }
+  }
+
+  @CommandLine.Command(
+      name = "catalog-import",
+      description = "Import catalog registry snapshot via REST admin API.")
+  void catalogImport(
+      @CommandLine.Option(
+              names = {"-i", "--input"},
+              description = "Input file path (- for stdin, default)")
+          String input,
+      @CommandLine.Option(names = "--dry-run", description = "Preview changes without writing")
+          boolean dryRun,
+      @CommandLine.Option(
+              names = "--overwrite",
+              description = "Replace existing keys (default: skip existing keys)")
+          boolean overwrite)
+      throws IOException {
+    String snapshotJson = readCatalogSnapshotInput(input);
+    ObjectMapper mapper = new ObjectMapper();
+    var snapshot = mapper.readValue(snapshotJson, AdminCatalogSnapshot.class);
+    try (CatalogAdminClient client = createCatalogAdminClient(this.configFile())) {
+      var result = client.catalogImport(snapshot, dryRun, overwrite);
+      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(result));
+    }
+  }
+
+  private static String readCatalogSnapshotInput(String inputPath) throws IOException {
+    if (Strings.isNullOrEmpty(inputPath) || "-".equals(inputPath)) {
+      return new String(System.in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    }
+    return java.nio.file.Files.readString(Path.of(inputPath));
+  }
+
+  private CatalogAdminClient createCatalogAdminClient(String configFile) throws IOException {
+    Config config = Config.load(configFile);
+
+    byte[] caCrt = null;
+    if (!Strings.isNullOrEmpty(config.caCrt())) {
+      String caCrtSrc = config.caCrt().trim();
+      if (caCrtSrc.startsWith("base64:")) {
+        caCrt = Base64.getDecoder().decode(Strings.removePrefix(caCrtSrc, "base64:"));
+      } else {
+        caCrt = caCrtSrc.getBytes();
+      }
+    }
+
+    boolean sslVerify = !insecure;
+    if (config.sslVerify() != null) {
+      sslVerify = config.sslVerify() && !insecure;
+    }
+
+    String uri = config.toIcebergConfig().get(CatalogProperties.URI);
+    return CatalogAdminClient.create(uri, config.bearerToken(), caCrt, sslVerify);
   }
 
   @CommandLine.Command(name = "list-namespaces", description = "List namespaces.")

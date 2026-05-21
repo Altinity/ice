@@ -30,6 +30,7 @@ import com.altinity.ice.rest.catalog.internal.maintenance.OrphanCleanup;
 import com.altinity.ice.rest.catalog.internal.maintenance.SnapshotCleanup;
 import com.altinity.ice.rest.catalog.internal.metrics.CatalogMetrics;
 import com.altinity.ice.rest.catalog.internal.metrics.PrometheusMetricsReporter;
+import com.altinity.ice.rest.catalog.internal.rest.CatalogAdminServlet;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAdapter;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogAuthorizationHandler;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogHandler;
@@ -337,6 +338,10 @@ public final class Main implements Callable<Integer> {
     var h = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter));
     mux.addServlet(h, "/*");
 
+    var adminServlet =
+        new ServletHolder(new CatalogAdminServlet(catalog, config.name()));
+    mux.addServlet(adminServlet, "/admin/*");
+
     var s = new Server();
     overrideJettyDefaults(s);
     s.setHandler(mux);
@@ -496,7 +501,10 @@ public final class Main implements Callable<Integer> {
               icebergConfig,
               metricsReporter);
       adminServer.start();
-      logger.warn("Serving admin endpoint at http://{}/v1/{config,*}", adminHostAndPort);
+      logger.warn(
+          "Serving admin endpoint at http://{}/v1/{{config,*}} and http://{}/admin/v1/{{catalog-export,catalog-import}}",
+          adminHostAndPort,
+          adminHostAndPort);
     }
 
     HostAndPort hostAndPort = HostAndPort.fromString(config.addr());
