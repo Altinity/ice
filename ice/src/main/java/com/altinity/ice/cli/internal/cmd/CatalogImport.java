@@ -22,8 +22,7 @@ public final class CatalogImport {
 
   private CatalogImport() {}
 
-  public static void run(
-      CatalogAdminClient client, String input, boolean dryRun, boolean overwrite)
+  public static void run(CatalogAdminClient client, String input, boolean dryRun, boolean overwrite)
       throws IOException {
     String snapshotJson = readCatalogSnapshotInput(input);
     ObjectMapper mapper = new ObjectMapper();
