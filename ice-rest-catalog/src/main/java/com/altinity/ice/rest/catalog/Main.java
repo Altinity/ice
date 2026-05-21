@@ -338,8 +338,7 @@ public final class Main implements Callable<Integer> {
     var h = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter));
     mux.addServlet(h, "/*");
 
-    var adminServlet =
-        new ServletHolder(new CatalogAdminServlet(catalog, config.name()));
+    var adminServlet = new ServletHolder(new CatalogAdminServlet(catalog, config.name()));
     mux.addServlet(adminServlet, "/admin/*");
 
     var s = new Server();

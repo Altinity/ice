@@ -43,11 +43,7 @@ public final class CatalogAdminService {
     }
 
     return new CatalogSnapshot(
-        CatalogSnapshot.CURRENT_VERSION,
-        catalogName,
-        Instant.now().toString(),
-        namespaces,
-        tables);
+        CatalogSnapshot.CURRENT_VERSION, catalogName, Instant.now().toString(), namespaces, tables);
   }
 
   public static CatalogImportResult importSnapshot(

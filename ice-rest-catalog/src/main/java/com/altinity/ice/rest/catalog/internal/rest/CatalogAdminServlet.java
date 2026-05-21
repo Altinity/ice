@@ -53,8 +53,7 @@ public class CatalogAdminServlet extends HttpServlet {
     handle(request, response);
   }
 
-  private void handle(HttpServletRequest request, HttpServletResponse response)
-      throws IOException {
+  private void handle(HttpServletRequest request, HttpServletResponse response) throws IOException {
     String path = normalizePath(request.getRequestURI());
     try {
       if (PATH_EXPORT.equals(path) && "GET".equals(request.getMethod())) {
@@ -71,7 +70,8 @@ public class CatalogAdminServlet extends HttpServlet {
           "NotFoundException",
           "No route for " + request.getMethod() + " " + path);
     } catch (IllegalArgumentException e) {
-      writeError(response, HttpServletResponse.SC_BAD_REQUEST, "BadRequestException", e.getMessage());
+      writeError(
+          response, HttpServletResponse.SC_BAD_REQUEST, "BadRequestException", e.getMessage());
     } catch (Exception e) {
       logger.error("{} {}", request.getMethod(), path, e);
       writeError(
@@ -131,11 +131,7 @@ public class CatalogAdminServlet extends HttpServlet {
   private static void writeError(
       HttpServletResponse response, int status, String type, String message) throws IOException {
     ErrorResponse error =
-        ErrorResponse.builder()
-            .responseCode(status)
-            .withType(type)
-            .withMessage(message)
-            .build();
+        ErrorResponse.builder().responseCode(status).withType(type).withMessage(message).build();
     byte[] bytes = RESTObjectMapper.mapper().writeValueAsBytes(error);
     response.setStatus(status);
     response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());

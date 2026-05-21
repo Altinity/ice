@@ -81,8 +81,7 @@ public final class CatalogAdminClient implements AutoCloseable {
     if (overwrite) {
       path.append(sep).append("overwrite=true");
     }
-    return httpClient.post(
-        path.toString(), snapshot, AdminImportResult.class, Map.of(), e -> {});
+    return httpClient.post(path.toString(), snapshot, AdminImportResult.class, Map.of(), e -> {});
   }
 
   @Override

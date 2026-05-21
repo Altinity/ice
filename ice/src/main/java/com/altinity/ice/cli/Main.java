@@ -10,6 +10,8 @@
 package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
+import com.altinity.ice.cli.internal.catalog.AdminCatalogSnapshot;
+import com.altinity.ice.cli.internal.catalog.CatalogAdminClient;
 import com.altinity.ice.cli.internal.cmd.AlterTable;
 import com.altinity.ice.cli.internal.cmd.Check;
 import com.altinity.ice.cli.internal.cmd.CreateNamespace;
@@ -27,8 +29,6 @@ import com.altinity.ice.cli.internal.cmd.ListNamespaces;
 import com.altinity.ice.cli.internal.cmd.ListPartitions;
 import com.altinity.ice.cli.internal.cmd.ListTables;
 import com.altinity.ice.cli.internal.cmd.Scan;
-import com.altinity.ice.cli.internal.catalog.AdminCatalogSnapshot;
-import com.altinity.ice.cli.internal.catalog.CatalogAdminClient;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
 import com.altinity.ice.internal.jetty.DebugServer;
@@ -830,7 +830,8 @@ public final class Main {
       throws IOException {
     try (CatalogAdminClient client = createCatalogAdminClient(this.configFile())) {
       var snapshot = client.catalogExport(namespace);
-      String json = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(snapshot);
+      String json =
+          new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(snapshot);
       if (Strings.isNullOrEmpty(output) || "-".equals(output)) {
         System.out.print(json);
         if (!json.endsWith("\n")) {
