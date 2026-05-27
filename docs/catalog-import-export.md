@@ -72,5 +72,6 @@ curl -s -X POST "http://localhost:8181/admin/v1/catalog-import?dry-run=true" \
 - Move catalog metadata between environments (dev → staging)
 - Registry backup lighter than a full etcd snapshot
 - Clone a namespace into another catalog instance
+- [Migrate 1-node etcd to 3-node etcd](catalog-export-import-migration.md) using export/import (no `etcdctl` snapshot restore)
 
 For full etcd cluster backup/restore, see [etcd backup & restore (3-node)](etcd-backup-restore-upgrade-3-node.md).
