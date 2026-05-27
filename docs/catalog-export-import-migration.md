@@ -92,6 +92,7 @@ ice catalog-export --namespace flowers -o catalog-snapshot.json
 ```
 
 Visually Inspect the exported JSON to confirm it contains the expected keys.
+
 Stop writes on the source (recommended before cutover):
 
 ```bash
