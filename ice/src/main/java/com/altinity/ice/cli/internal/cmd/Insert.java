@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -66,6 +67,8 @@ import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.exceptions.CommitFailedException;
+import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.io.CloseableIterable;
@@ -123,6 +126,16 @@ public final class Insert {
         throw new IllegalArgumentException(
             "Unknown --compression value: " + options.compression() + ". Accepted: " + accepted);
       }
+    }
+
+    if (options.commitRetries() < 0 || options.commitRetryTotalMs() < 0) {
+      throw new IllegalArgumentException(
+          "--commit-retries and --commit-retry-total-ms must be non-negative");
+    }
+    if (options.commitRetries() == 0 && options.commitRetryTotalMs() > 0) {
+      logger.warn(
+          "--commit-retry-total-ms has no effect when --commit-retries is 0; "
+              + "set --commit-retries > 0 to enable outer commit retries");
     }
 
     Table table = catalog.loadTable(nsTable);
@@ -183,6 +196,7 @@ public final class Insert {
 
         // appendOp to use the same transaction.
         AppendFiles appendOp = txn.newAppend();
+        List<DataFile> stagedFiles = new ArrayList<>();
 
         try (FileIO inputIO = Input.newIO(filesExpanded.getFirst(), table, s3ClientLazy);
             RetryLog retryLog =
@@ -241,6 +255,7 @@ public final class Insert {
                 for (DataFile df : dataFiles) {
                   atLeastOneFileAppended = true;
                   appendOp.appendFile(df); // Only main thread appends now
+                  stagedFiles.add(df);
                 }
               } catch (ExecutionException e) {
                 failed++;
@@ -257,16 +272,33 @@ public final class Insert {
           if (!options.noCommit()) {
             // TODO: log
             if (atLeastOneFileAppended) {
-              appendOp.commit();
+              try {
+                appendOp.commit();
+                txn.commitTransaction();
+                verifyCommitOrThrow(catalog, nsTable, stagedFiles);
+              } catch (CommitFailedException e) {
+                logger.error("CommitFailedException");
+                commitWithRetryAfterInitialFailure(catalog, nsTable, stagedFiles, options, e);
+              } catch (CommitStateUnknownException e) {
+                logCommitOrphans(stagedFiles);
+                throw new IOException(
+                    "DATA LOSS RISK: commit state unknown; "
+                        + stagedFiles.size()
+                        + " data file(s) uploaded; manual reconciliation required",
+                    e);
+              } catch (RuntimeException e) {
+                logCommitOrphans(stagedFiles);
+                throw new IOException(
+                    "DATA LOSS: unexpected error during commit; "
+                        + stagedFiles.size()
+                        + " data file(s) may NOT be registered",
+                    e);
+              }
+              if (retryLog != null) {
+                retryLog.commit();
+              }
             } else {
               logger.warn("Table commit skipped (no files to append)");
-            }
-            if (retryLog != null) {
-              retryLog.commit();
-            }
-            if (atLeastOneFileAppended) {
-              // Commit transaction.
-              txn.commitTransaction();
             }
           } else {
             logger.warn("Table commit skipped (--no-commit)");
@@ -840,6 +872,151 @@ public final class Insert {
     }
   }
 
+  private static void sleepCommitRetryBackoff(int round) throws InterruptedException {
+    int shift = Math.min(round - 1, 20);
+    long capMs = Math.min(100L << shift, 30_000L);
+    long sleepMs = ThreadLocalRandom.current().nextLong(0, capMs + 1);
+    Thread.sleep(sleepMs);
+  }
+
+  private static void logCommitOrphans(List<DataFile> stagedFiles) {
+    for (DataFile df : stagedFiles) {
+      logger.error(
+          "DATA LOSS: orphaned data file after exhausted commit retries: {}", df.location());
+    }
+  }
+
+  /**
+   * Ensures every staged data file appears in the table after commit (detects server-side no-op
+   * commits where HTTP succeeds but metadata did not change).
+   */
+  private static void verifyCommitOrThrow(
+      RESTCatalog catalog, TableIdentifier tableId, List<DataFile> stagedFiles) throws IOException {
+    if (stagedFiles.isEmpty()) {
+      return;
+    }
+    Set<String> committed = new HashSet<>();
+    Table fresh = catalog.loadTable(tableId);
+    try (var plan = fresh.newScan().planFiles()) {
+      for (var task : plan) {
+        committed.add(task.file().location());
+      }
+    }
+    List<DataFile> missing =
+        stagedFiles.stream()
+            .filter(df -> !committed.contains(df.location()))
+            .collect(Collectors.toList());
+    if (!missing.isEmpty()) {
+      for (DataFile df : missing) {
+        logger.error(
+            "DATA LOSS: post-commit verification failed; staged file not present in table: {}",
+            df.location());
+      }
+      throw new IOException(
+          "DATA LOSS: "
+              + missing.size()
+              + " of "
+              + stagedFiles.size()
+              + " staged file(s) NOT found in table after commit; "
+              + "client believed commit succeeded but server may have early-returned (empty metadata changes)");
+    }
+  }
+
+  /**
+   * Retries transaction commit after {@link CommitFailedException} by reloading table metadata and
+   * re-appending staged {@link DataFile}s (fixes stale snapshot requirements under contention).
+   */
+  private static void commitWithRetryAfterInitialFailure(
+      RESTCatalog catalog,
+      TableIdentifier tableId,
+      List<DataFile> stagedFiles,
+      Options options,
+      CommitFailedException initialFailure)
+      throws IOException, InterruptedException {
+
+    logger.warn(
+        "Outer commit retry engaged for {} after initial CommitFailedException "
+            + "(commit-retries={}, commit-retry-total-ms={}, stagedFiles={}): {}",
+        tableId,
+        options.commitRetries(),
+        options.commitRetryTotalMs(),
+        stagedFiles.size(),
+        initialFailure.getMessage());
+
+    if (options.commitRetries() == 0) {
+      logCommitOrphans(stagedFiles);
+      throw new IOException(
+          "DATA LOSS: commit failed (--commit-retries is 0); data file(s) may not be registered",
+          initialFailure);
+    }
+
+    long deadlineNs =
+        System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(options.commitRetryTotalMs());
+    CommitFailedException last = initialFailure;
+
+    for (int round = 1; round <= options.commitRetries(); round++) {
+      if (System.nanoTime() > deadlineNs) {
+        logger.warn(
+            "Commit retry wall-clock budget ({} ms) exhausted before completing outer retry round "
+                + "{}/{}",
+            options.commitRetryTotalMs(),
+            round,
+            options.commitRetries());
+        break;
+      }
+
+      sleepCommitRetryBackoff(round);
+
+      if (System.nanoTime() > deadlineNs) {
+        break;
+      }
+
+      try {
+        Table fresh = catalog.loadTable(tableId);
+        Transaction freshTxn = fresh.newTransaction();
+        AppendFiles freshAppend = freshTxn.newAppend();
+        for (DataFile df : stagedFiles) {
+          freshAppend.appendFile(df);
+        }
+        freshAppend.commit();
+        freshTxn.commitTransaction();
+        verifyCommitOrThrow(catalog, tableId, stagedFiles);
+        return;
+      } catch (CommitFailedException retryEx) {
+        last = retryEx;
+        logger.warn(
+            "Commit retry {}/{} failed: {}", round, options.commitRetries(), retryEx.getMessage());
+      } catch (IOException verifyEx) {
+        logCommitOrphans(stagedFiles);
+        throw new IOException(
+            String.format(
+                "DATA LOSS: post-commit verification failed during outer retry round %d/%d; "
+                    + "halting retries to avoid duplicate appends. Manual reconciliation required.",
+                round, options.commitRetries()),
+            verifyEx);
+      } catch (CommitStateUnknownException e) {
+        logCommitOrphans(stagedFiles);
+        throw new IOException(
+            String.format(
+                "DATA LOSS RISK: commit state unknown during outer retry round %d/%d; manual reconciliation required",
+                round, options.commitRetries()),
+            e);
+      } catch (RuntimeException e) {
+        last = new CommitFailedException(e, "Commit retry failed unexpectedly");
+        logger.warn("Commit retry {}/{} failed unexpectedly", round, options.commitRetries(), e);
+      }
+    }
+
+    logCommitOrphans(stagedFiles);
+    throw new IOException(
+        "DATA LOSS: commit failed after "
+            + options.commitRetries()
+            + " outer commit retries. "
+            + stagedFiles.size()
+            + " data file(s) uploaded but NOT registered in the table.",
+        last);
+  }
+
   public record Options(
       DataFileNamingStrategy.Name dataFileNamingStrategy,
       boolean skipDuplicates,
@@ -857,7 +1034,9 @@ public final class Insert {
       @Nullable List<Main.IcePartition> partitionList,
       @Nullable List<Main.IceSortOrder> sortOrderList,
       int threadCount,
-      @Nullable String compression) {
+      @Nullable String compression,
+      int commitRetries,
+      long commitRetryTotalMs) {
 
     public static Builder builder() {
       return new Builder();
@@ -881,6 +1060,8 @@ public final class Insert {
       private List<Main.IceSortOrder> sortOrderList = List.of();
       private int threadCount = Runtime.getRuntime().availableProcessors();
       private String compression;
+      private int commitRetries = 10;
+      private long commitRetryTotalMs = 300_000L;
 
       private Builder() {}
 
@@ -969,6 +1150,16 @@ public final class Insert {
         return this;
       }
 
+      public Builder commitRetries(int commitRetries) {
+        this.commitRetries = commitRetries;
+        return this;
+      }
+
+      public Builder commitRetryTotalMs(long commitRetryTotalMs) {
+        this.commitRetryTotalMs = commitRetryTotalMs;
+        return this;
+      }
+
       public Options build() {
         return new Options(
             dataFileNamingStrategy,
@@ -987,7 +1178,9 @@ public final class Insert {
             partitionList,
             sortOrderList,
             threadCount,
-            compression);
+            compression,
+            commitRetries,
+            commitRetryTotalMs);
       }
     }
   }

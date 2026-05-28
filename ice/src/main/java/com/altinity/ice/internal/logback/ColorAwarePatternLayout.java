@@ -21,6 +21,10 @@ import picocli.CommandLine;
 public class ColorAwarePatternLayout extends PatternLayout {
 
   static {
+    // Logback 1.5.x resolves patterns from DEFAULT_CONVERTER_SUPPLIER_MAP; %processId is not
+    // built into logback-classic 1.5.18, so we register our own.
+    DEFAULT_CONVERTER_SUPPLIER_MAP.put("processId", ProcessIdClassicConverter::new);
+    DEFAULT_CONVERTER_MAP.put("processId", ProcessIdClassicConverter.class.getName());
     if (!CommandLine.Help.Ansi.AUTO.enabled()) { // Usage of Picocli heuristic
       DEFAULT_CONVERTER_MAP.put("black", NoColorConverter.class.getName());
       DEFAULT_CONVERTER_MAP.put("red", NoColorConverter.class.getName());

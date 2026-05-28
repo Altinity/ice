@@ -76,7 +76,9 @@ public final class DescribeMetadata {
 
     List<SnapshotInfo> snapshots = null;
     if (includeAll || optionsSet.contains(Option.SNAPSHOTS)) {
-      snapshots = extractSnapshots(metadata);
+      Snapshot cur = metadata.currentSnapshot();
+      Long currentSnapshotId = cur != null ? cur.snapshotId() : null;
+      snapshots = extractSnapshots(metadata.snapshots(), currentSnapshotId);
     }
 
     HistoryInfo history = null;
@@ -125,10 +127,11 @@ public final class DescribeMetadata {
     return new SchemaInfo(schema.schemaId(), fields);
   }
 
-  private static List<SnapshotInfo> extractSnapshots(TableMetadata metadata) {
-    List<SnapshotInfo> snapshots = new ArrayList<>();
-    for (Snapshot snapshot : metadata.snapshots()) {
-      snapshots.add(
+  public static List<SnapshotInfo> extractSnapshots(
+      Iterable<Snapshot> snapshots, Long currentSnapshotId) {
+    List<SnapshotInfo> result = new ArrayList<>();
+    for (Snapshot snapshot : snapshots) {
+      result.add(
           new SnapshotInfo(
               snapshot.snapshotId(),
               snapshot.parentId(),
@@ -136,10 +139,11 @@ public final class DescribeMetadata {
               snapshot.timestampMillis(),
               Instant.ofEpochMilli(snapshot.timestampMillis()).toString(),
               snapshot.operation(),
+              currentSnapshotId != null && snapshot.snapshotId() == currentSnapshotId,
               snapshot.summary(),
               snapshot.manifestListLocation()));
     }
-    return snapshots;
+    return result;
   }
 
   private static HistoryInfo extractHistory(TableMetadata metadata) {
@@ -266,6 +270,7 @@ public final class DescribeMetadata {
       long timestampMillis,
       String timestamp,
       String operation,
+      boolean current,
       Map<String, String> summary,
       String manifestListLocation) {}
 

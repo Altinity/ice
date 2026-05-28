@@ -10,7 +10,10 @@
 package com.altinity.ice.cli;
 
 import ch.qos.logback.classic.Level;
+import com.altinity.ice.cli.internal.catalog.CatalogAdminClient;
 import com.altinity.ice.cli.internal.cmd.AlterTable;
+import com.altinity.ice.cli.internal.cmd.CatalogExport;
+import com.altinity.ice.cli.internal.cmd.CatalogImport;
 import com.altinity.ice.cli.internal.cmd.Check;
 import com.altinity.ice.cli.internal.cmd.CreateNamespace;
 import com.altinity.ice.cli.internal.cmd.CreateTable;
@@ -25,6 +28,7 @@ import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
 import com.altinity.ice.cli.internal.cmd.ListNamespaces;
 import com.altinity.ice.cli.internal.cmd.ListPartitions;
+import com.altinity.ice.cli.internal.cmd.ListSnapshots;
 import com.altinity.ice.cli.internal.cmd.ListTables;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
@@ -517,6 +521,18 @@ public final class Main {
               defaultValue = "-1")
           int threadCount,
       @CommandLine.Option(
+              names = {"--commit-retries"},
+              description =
+                  "Outer retry rounds after CommitFailedException (reload metadata and re-append;"
+                      + " set to 0 to disable)",
+              defaultValue = "10")
+          int commitRetries,
+      @CommandLine.Option(
+              names = {"--commit-retry-total-ms"},
+              description = "Total wall-clock budget (ms) for outer commit retries",
+              defaultValue = "300000")
+          long commitRetryTotalMs,
+      @CommandLine.Option(
               names = {"--compression"},
               description =
                   "Parquet compression codec: gzip (default), zstd, snappy, lz4, brotli, uncompressed, or as-source")
@@ -617,6 +633,8 @@ public final class Main {
               .sortOrderList(sortOrders)
               .threadCount(
                   threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount)
+              .commitRetries(commitRetries)
+              .commitRetryTotalMs(commitRetryTotalMs)
               .compression(compression)
               .build();
 
@@ -733,6 +751,30 @@ public final class Main {
     }
   }
 
+  @CommandLine.Command(
+      name = "list-snapshots",
+      description = "List current and previous snapshots of a table.")
+  void listSnapshots(
+      @CommandLine.Parameters(
+              arity = "1",
+              paramLabel = "<name>",
+              description = "Table name (e.g. ns1.table1)")
+          String name,
+      @CommandLine.Option(
+              names = {"--limit"},
+              description = "Show only the most recent N snapshots (0 = all)",
+              defaultValue = "0")
+          int limit,
+      @CommandLine.Option(
+              names = {"--json"},
+              description = "Output JSON instead of YAML")
+          boolean json)
+      throws IOException {
+    try (RESTCatalog catalog = loadCatalog()) {
+      ListSnapshots.run(catalog, TableIdentifier.parse(name), json, limit);
+    }
+  }
+
   @CommandLine.Command(name = "delete-table", description = "Delete table.")
   void deleteTable(
       @CommandLine.Parameters(
@@ -797,6 +839,66 @@ public final class Main {
     try (RESTCatalog catalog = loadCatalog()) {
       DeleteNamespace.run(catalog, Namespace.of(name.split("[.]")), ignoreNotFound);
     }
+  }
+
+  @CommandLine.Command(
+      name = "catalog-export",
+      description = "Export catalog registry (namespaces and tables) via REST admin API.")
+  void catalogExport(
+      @CommandLine.Option(
+              names = {"-o", "--output"},
+              description = "Output file path (- for stdout, default)")
+          String output,
+      @CommandLine.Option(
+              names = "--namespace",
+              description = "Export only this namespace and its tables (e.g. flowers)")
+          String namespace)
+      throws IOException {
+    try (CatalogAdminClient client = createCatalogAdminClient(this.configFile())) {
+      CatalogExport.run(client, namespace, output);
+    }
+  }
+
+  @CommandLine.Command(
+      name = "catalog-import",
+      description = "Import catalog registry snapshot via REST admin API.")
+  void catalogImport(
+      @CommandLine.Option(
+              names = {"-i", "--input"},
+              description = "Input file path (- for stdin, default)")
+          String input,
+      @CommandLine.Option(names = "--dry-run", description = "Preview changes without writing")
+          boolean dryRun,
+      @CommandLine.Option(
+              names = "--overwrite",
+              description = "Replace existing keys (default: skip existing keys)")
+          boolean overwrite)
+      throws IOException {
+    try (CatalogAdminClient client = createCatalogAdminClient(this.configFile())) {
+      CatalogImport.run(client, input, dryRun, overwrite);
+    }
+  }
+
+  private CatalogAdminClient createCatalogAdminClient(String configFile) throws IOException {
+    Config config = Config.load(configFile);
+
+    byte[] caCrt = null;
+    if (!Strings.isNullOrEmpty(config.caCrt())) {
+      String caCrtSrc = config.caCrt().trim();
+      if (caCrtSrc.startsWith("base64:")) {
+        caCrt = Base64.getDecoder().decode(Strings.removePrefix(caCrtSrc, "base64:"));
+      } else {
+        caCrt = caCrtSrc.getBytes();
+      }
+    }
+
+    boolean sslVerify = !insecure;
+    if (config.sslVerify() != null) {
+      sslVerify = config.sslVerify() && !insecure;
+    }
+
+    String uri = config.toIcebergConfig().get(CatalogProperties.URI);
+    return CatalogAdminClient.create(uri, config.bearerToken(), caCrt, sslVerify);
   }
 
   @CommandLine.Command(name = "list-namespaces", description = "List namespaces.")

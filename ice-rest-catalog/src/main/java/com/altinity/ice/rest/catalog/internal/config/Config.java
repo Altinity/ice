@@ -57,6 +57,12 @@ public record Config(
         String maintenanceSchedule,
     @JsonPropertyDescription("Maintenance config") MaintenanceConfig maintenance,
     @JsonPropertyDescription(
+            "Server-side commit retry config; tune up for high-contention workloads (e.g., parallel `ice insert` to one table)")
+        CommitRetryConfig commitRetry,
+    @JsonPropertyDescription(
+            "Optional etcd per-table commit lock (etcd metastore only). Reduces CommitFailedException under concurrent writers.")
+        CommitLockConfig commitLock,
+    @JsonPropertyDescription(
             "(experimental) Extra properties to include in loadTable REST response.")
         Map<String, String> loadTableProperties,
     @JsonPropertyDescription(
@@ -81,6 +87,8 @@ public record Config(
       AnonymousAccess anonymousAccess,
       String maintenanceSchedule,
       MaintenanceConfig maintenance,
+      CommitRetryConfig commitRetry,
+      CommitLockConfig commitLock,
       Map<String, String> loadTableProperties,
       @JsonProperty("iceberg") Map<String, String> icebergProperties) {
     this.addr = Strings.orDefault(addr, DEFAULT_ADDR);
@@ -98,6 +106,8 @@ public record Config(
     this.maintenance =
         Objects.requireNonNullElseGet(
             maintenance, () -> new MaintenanceConfig(null, 0, 0, 0, 0, 0, 0, null, false));
+    this.commitRetry = Objects.requireNonNullElse(commitRetry, CommitRetryConfig.defaults());
+    this.commitLock = Objects.requireNonNullElse(commitLock, CommitLockConfig.defaults());
     this.loadTableProperties = Objects.requireNonNullElse(loadTableProperties, Map.of());
     this.icebergProperties = Objects.requireNonNullElse(icebergProperties, Map.of());
   }

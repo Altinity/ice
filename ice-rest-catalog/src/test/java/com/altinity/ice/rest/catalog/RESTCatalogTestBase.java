@@ -20,6 +20,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.iceberg.catalog.Catalog;
@@ -102,6 +103,8 @@ public abstract class RESTCatalogTestBase {
                     false, null)), // anonymousAccess - enable with read-write for testing
             null, // maintenanceSchedule
             null, // maintenance
+            null, // commitRetry
+            null, // commitLock
             null, // loadTableProperties
             null // icebergProperties
             );
@@ -218,6 +221,17 @@ public abstract class RESTCatalogTestBase {
     Path scenariosDir = getScenariosDirectory();
     ScenarioTestRunner runner = new ScenarioTestRunner(scenariosDir, Map.of());
     List<String> scenarios = runner.discoverScenarios();
+
+    String filtered = System.getProperty("scenario");
+    if (filtered != null && !filtered.isBlank()) {
+      List<String> requested =
+          Arrays.stream(filtered.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+      scenarios = scenarios.stream().filter(requested::contains).toList();
+      if (scenarios.isEmpty()) {
+        throw new IllegalArgumentException(
+            "No scenarios matched -Dscenario=" + filtered + " in " + scenariosDir);
+      }
+    }
 
     if (scenarios.isEmpty()) {
       logger.warn("No test scenarios found in: {}", scenariosDir);

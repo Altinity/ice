@@ -67,7 +67,7 @@ public class RESTCatalogFactory {
                 .build());
   }
 
-  private static SSLContext loadCABundle(byte[] caCrt)
+  public static SSLContext loadCABundle(byte[] caCrt)
       throws CertificateException,
           KeyStoreException,
           IOException,
@@ -90,7 +90,7 @@ public class RESTCatalogFactory {
     return sslContext;
   }
 
-  private static SSLContext createInsecureSSLContext()
+  public static SSLContext createInsecureSSLContext()
       throws NoSuchAlgorithmException, KeyManagementException {
     TrustManager[] trustAllCerts =
         new TrustManager[] {

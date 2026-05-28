@@ -58,6 +58,10 @@ These metrics are reported by Iceberg clients when they perform operations on ta
 | `iceberg_commit_added_equality_deletes_total` | Counter | catalog, namespace, table, operation | Total number of equality deletes added in commits |
 | `iceberg_commit_total_files_size_bytes` | Counter | catalog, namespace, table, operation | Total size in bytes of files involved in commits |
 | `iceberg_commit_duration_seconds` | Histogram | catalog, namespace, table, operation | Duration of commit operations in seconds |
+| `iceberg_commit_retries_total` | Counter | catalog, namespace, table | Server-side retries after a commit CAS conflict (`CommitFailedException`) in the REST catalog commit loop; tune `commitRetry` in `.ice-rest-catalog.yaml` if this grows under parallel writers |
+| `iceberg_commit_lock_acquire_seconds` | Histogram | catalog | Time to acquire the etcd per-table commit lock (`commitLock` in `.ice-rest-catalog.yaml`; etcd backend only) |
+| `iceberg_commit_lock_held_seconds` | Histogram | catalog | Time the etcd commit lock was held during a table commit |
+| `iceberg_commit_lock_acquire_timeouts_total` | Counter | catalog | Acquire attempts that exceeded `commitLock.acquireTimeoutMs` (HTTP 503 to clients) |
 
 #### Reporter Metrics
 

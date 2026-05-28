@@ -29,11 +29,14 @@ import io.etcd.jetcd.options.PutOption;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.iceberg.BaseMetastoreCatalog;
 import org.apache.iceberg.BaseMetastoreTableOperations;
 import org.apache.iceberg.CatalogUtil;
@@ -61,6 +64,8 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
 
   private static final Logger logger = LoggerFactory.getLogger(EtcdCatalog.class);
 
+  private static final long DEFAULT_TIMEOUT_SECONDS = 30;
+
   private static final String NAMESPACE_PREFIX = "n/";
   private static final String TABLE_PREFIX = "t/";
 
@@ -79,7 +84,92 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
         Client.builder().endpoints(uri.split(",")).keepaliveWithoutCalls(false).build();
     this.client = etcdClient;
     this.kv = etcdClient.getKVClient();
+    try {
+      kv.get(ByteSequence.from("/", StandardCharsets.UTF_8))
+          .get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      logger.info("Connected to etcd at {}", uri);
+    } catch (TimeoutException e) {
+      throw new RuntimeIOException(
+          new IOException(
+              "Failed to connect to etcd at "
+                  + uri
+                  + ": timed out after "
+                  + DEFAULT_TIMEOUT_SECONDS
+                  + "s",
+              e));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeIOException(new IOException("Interrupted connecting to etcd at " + uri, e));
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause() != null ? e.getCause() : e;
+      throw new RuntimeIOException(
+          new IOException(
+              "Failed to connect to etcd at " + uri + ": " + cause.getMessage(), cause));
+    }
     this.io = io;
+  }
+
+  /** Shared jetcd client for auxiliary features (e.g. commit locks) without a second connection. */
+  public Client etcdClient() {
+    return client;
+  }
+
+  /** UTF-8 etcd key and JSON value for catalog export/import. */
+  public record CatalogKv(String key, String value) {}
+
+  /** All namespace entries under this catalog's {@code n/} prefix. */
+  public List<CatalogKv> listAllNamespaceKvs() {
+    return prefixScan(namespacePrefix());
+  }
+
+  /**
+   * All table entries under this catalog's {@code t/} prefix. When {@code namespacePath} is set,
+   * only tables in that namespace (e.g. {@code flowers} or {@code parent/child}) are included.
+   */
+  public List<CatalogKv> listAllTableKvs(String namespacePath) {
+    String prefix = tablePrefix();
+    if (namespacePath != null && !namespacePath.isBlank()) {
+      prefix = prefix + namespacePath + "/";
+    }
+    return prefixScan(prefix);
+  }
+
+  private List<CatalogKv> prefixScan(String prefix) {
+    GetResponse res = unwrap(kv.get(byteSeq(prefix), GetOption.builder().isPrefix(true).build()));
+    return res.getKvs().stream()
+        .map(
+            entry ->
+                new CatalogKv(
+                    entry.getKey().toString(StandardCharsets.UTF_8),
+                    entry.getValue().toString(StandardCharsets.UTF_8)))
+        .sorted(Comparator.comparing(CatalogKv::key))
+        .toList();
+  }
+
+  public enum PutCatalogKvResult {
+    CREATED,
+    SKIPPED,
+    OVERWRITTEN
+  }
+
+  /**
+   * Writes a catalog key. When {@code overwrite} is false and the key exists, returns {@link
+   * PutCatalogKvResult#SKIPPED} without writing. When {@code dryRun} is true, no write is
+   * performed.
+   */
+  public PutCatalogKvResult putCatalogKv(
+      String key, String jsonValue, boolean overwrite, boolean dryRun) {
+    ByteSequence k = byteSeq(key);
+    GetResponse existing = unwrap(kv.get(k, GetOption.builder().withCountOnly(true).build()));
+    boolean exists = existing.getCount() > 0;
+    if (exists && !overwrite) {
+      return PutCatalogKvResult.SKIPPED;
+    }
+    if (dryRun) {
+      return exists ? PutCatalogKvResult.OVERWRITTEN : PutCatalogKvResult.CREATED;
+    }
+    unwrapCommit(kv.put(k, byteSeq(jsonValue)));
+    return exists ? PutCatalogKvResult.OVERWRITTEN : PutCatalogKvResult.CREATED;
   }
 
   // Used by EtcdCatalogTest to test concurrent modifications.
@@ -140,19 +230,30 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
 
   private static <T> T unwrapCommit(java.util.concurrent.CompletableFuture<T> x) {
     try {
-      return x.get();
-    } catch (InterruptedException | ExecutionException e) {
-      // TODO: Thread.currentThread().interrupt();?
+      return x.get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      throw new CommitStateUnknownException(
+          new IOException("etcd commit timed out after " + DEFAULT_TIMEOUT_SECONDS + "s", e));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new CommitStateUnknownException(e);
+    } catch (ExecutionException e) {
       throw new CommitStateUnknownException(e);
     }
   }
 
   private static <T> T unwrap(java.util.concurrent.CompletableFuture<T> x) {
     try {
-      return x.get();
-    } catch (InterruptedException | ExecutionException e) {
-      // TODO: Thread.currentThread().interrupt();?
+      return x.get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      throw new RuntimeIOException(
+          new IOException("etcd request timed out after " + DEFAULT_TIMEOUT_SECONDS + "s", e));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new RuntimeIOException(new IOException(e));
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause() != null ? e.getCause() : e;
+      throw new RuntimeIOException(new IOException(cause.getMessage(), cause));
     }
   }
 
