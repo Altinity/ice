@@ -9,12 +9,14 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
+import com.altinity.ice.cli.internal.util.UserInputParser;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.io.IOException;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdatePartitionSpec;
@@ -22,6 +24,8 @@ import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.expressions.Literal;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 import org.slf4j.Logger;
@@ -53,6 +57,8 @@ public class AlterTable {
     @Nullable private final String after;
     @Nullable private final String before;
     private final boolean first;
+    private final boolean required;
+    @Nullable private final String initialDefault;
 
     public AddColumn(
         @JsonProperty(value = "name", required = true) String name,
@@ -60,13 +66,17 @@ public class AlterTable {
         @JsonProperty("doc") @Nullable String doc,
         @JsonProperty("after") @Nullable String after,
         @JsonProperty("before") @Nullable String before,
-        @JsonProperty("first") @Nullable Boolean first) {
+        @JsonProperty("first") @Nullable Boolean first,
+        @JsonProperty("required") @Nullable Boolean required,
+        @JsonProperty("initial_default") @Nullable String initialDefault) {
       this.name = name;
       this.type = Types.fromPrimitiveString(type);
       this.doc = doc;
       this.after = after;
       this.before = before;
       this.first = first != null && first;
+      this.required = required != null && required;
+      this.initialDefault = initialDefault;
     }
   }
 
@@ -148,7 +158,7 @@ public class AlterTable {
         case AddColumn up -> {
           // TODO: support nested columns
           UpdateSchema us = schemaUpdates.getValue();
-          us.addColumn(up.name, up.type, up.doc);
+          applyAddColumn(table, us, up);
           if (up.after != null) {
             us.moveAfter(up.name, up.after);
           } else if (up.before != null) {
@@ -198,5 +208,47 @@ public class AlterTable {
       catalog.renameTable(tableId, TableIdentifier.parse(renameTo.newName));
     }
     logger.info("Applied {} changes to table {}", updates.size(), tableId.toString());
+  }
+
+  private static void applyAddColumn(Table table, UpdateSchema us, AddColumn up) {
+    if (up.required) {
+      if (up.initialDefault != null) {
+        Literal<?> defaultValue = UserInputParser.parseLiteral(up.type, up.initialDefault);
+        if (up.doc != null) {
+          us.addRequiredColumn(up.name, up.type, up.doc, defaultValue);
+        } else {
+          us.addRequiredColumn(up.name, up.type, defaultValue);
+        }
+      } else {
+        if (tableHasData(table)) {
+          throw new IllegalArgumentException(
+              "Adding required column '"
+                  + up.name
+                  + "' without initial_default is not allowed when the table has existing data; "
+                  + "provide initial_default");
+        }
+        // Empty table: Iceberg still rejects required adds without a default unless
+        // incompatible changes are explicitly allowed (e.g. table has a snapshot but no files).
+        us.allowIncompatibleChanges();
+        if (up.doc != null) {
+          us.addRequiredColumn(up.name, up.type, up.doc);
+        } else {
+          us.addRequiredColumn(up.name, up.type);
+        }
+      }
+    } else {
+      us.addColumn(up.name, up.type, up.doc);
+    }
+  }
+
+  private static boolean tableHasData(Table table) {
+    if (table.currentSnapshot() == null) {
+      return false;
+    }
+    try (CloseableIterable<FileScanTask> tasks = table.newScan().planFiles()) {
+      return tasks.iterator().hasNext();
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to scan table for existing data files", e);
+    }
   }
 }

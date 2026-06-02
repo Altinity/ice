@@ -29,6 +29,7 @@ import io.etcd.jetcd.options.PutOption;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -111,6 +112,64 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
   /** Shared jetcd client for auxiliary features (e.g. commit locks) without a second connection. */
   public Client etcdClient() {
     return client;
+  }
+
+  /** UTF-8 etcd key and JSON value for catalog export/import. */
+  public record CatalogKv(String key, String value) {}
+
+  /** All namespace entries under this catalog's {@code n/} prefix. */
+  public List<CatalogKv> listAllNamespaceKvs() {
+    return prefixScan(namespacePrefix());
+  }
+
+  /**
+   * All table entries under this catalog's {@code t/} prefix. When {@code namespacePath} is set,
+   * only tables in that namespace (e.g. {@code flowers} or {@code parent/child}) are included.
+   */
+  public List<CatalogKv> listAllTableKvs(String namespacePath) {
+    String prefix = tablePrefix();
+    if (namespacePath != null && !namespacePath.isBlank()) {
+      prefix = prefix + namespacePath + "/";
+    }
+    return prefixScan(prefix);
+  }
+
+  private List<CatalogKv> prefixScan(String prefix) {
+    GetResponse res = unwrap(kv.get(byteSeq(prefix), GetOption.builder().isPrefix(true).build()));
+    return res.getKvs().stream()
+        .map(
+            entry ->
+                new CatalogKv(
+                    entry.getKey().toString(StandardCharsets.UTF_8),
+                    entry.getValue().toString(StandardCharsets.UTF_8)))
+        .sorted(Comparator.comparing(CatalogKv::key))
+        .toList();
+  }
+
+  public enum PutCatalogKvResult {
+    CREATED,
+    SKIPPED,
+    OVERWRITTEN
+  }
+
+  /**
+   * Writes a catalog key. When {@code overwrite} is false and the key exists, returns {@link
+   * PutCatalogKvResult#SKIPPED} without writing. When {@code dryRun} is true, no write is
+   * performed.
+   */
+  public PutCatalogKvResult putCatalogKv(
+      String key, String jsonValue, boolean overwrite, boolean dryRun) {
+    ByteSequence k = byteSeq(key);
+    GetResponse existing = unwrap(kv.get(k, GetOption.builder().withCountOnly(true).build()));
+    boolean exists = existing.getCount() > 0;
+    if (exists && !overwrite) {
+      return PutCatalogKvResult.SKIPPED;
+    }
+    if (dryRun) {
+      return exists ? PutCatalogKvResult.OVERWRITTEN : PutCatalogKvResult.CREATED;
+    }
+    unwrapCommit(kv.put(k, byteSeq(jsonValue)));
+    return exists ? PutCatalogKvResult.OVERWRITTEN : PutCatalogKvResult.CREATED;
   }
 
   // Used by EtcdCatalogTest to test concurrent modifications.

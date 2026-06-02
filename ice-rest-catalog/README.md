@@ -29,6 +29,10 @@ If `enabled` is true but the catalog backend is not etcd, the lock is ignored (w
 - [Architecture](../docs/architecture.md) -- components, design principles, HA, backup/recovery
 - [Kubernetes Setup](../docs/k8s_setup.md) -- k8s deployment with etcd StatefulSet and replicas
 - [etcd Cluster Setup](../docs/etcd-cluster-setup.md) -- docker-compose setup with 3-node etcd, data insertion, replication verification, ClickHouse queries
+- [etcd Cluster upgrade](../docs/etcd-backup-restore-upgrade-3-node.md) -- Includes k8s manifest and steps to backup data from 1 node etcd and restoring to 3 nodes.(with downtime)
+- [Scaling ice-rest-catalog (StatefulSet) from 1 to 3 replicas](../docs/ice-rest-catalog-statefulset-scale.md) -- deploy with 1 replica, verify, then scale to 3 for HA
 - [GCS Setup](../docs/ice-rest-catalog-gcs.md) -- configuring ice-rest-catalog with Google Cloud Storage
 - [etcd Backend Schema](../docs/etcd-backend-schema.md) -- etcd key/value schema (`n/`, `t/` prefixes) and mapping to SQLite
 - [SQLite Backend Schema](../docs/sqlite-backend-schema.md) -- SQLite tables (`iceberg_tables`, `iceberg_namespace_properties`)
+- [Catalog Import/Export](../docs/catalog-import-export.md) -- export and import catalog registry (namespaces and table metadata pointers) via CLI or REST API
+- [Catalog migration (1-node to 3-node etcd)](../docs/catalog-export-import-migration.md) -- migrate registry via `ice catalog-export` / `catalog-import`; optional recovery from an etcd snapshot backup first

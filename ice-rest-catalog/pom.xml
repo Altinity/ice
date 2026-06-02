@@ -15,7 +15,7 @@
   <properties>
     <sqlite.version>3.46.1.0</sqlite.version>
     <jetcd.version>0.8.5</jetcd.version>
-    <grpc.version>1.70.0</grpc.version>
+    <grpc.version>1.76.0</grpc.version>
     <testcontainers.version>1.21.4</testcontainers.version>
     <ice.native>false</ice.native>
   </properties>
@@ -155,7 +155,7 @@
       <!-- transitive -->
       <groupId>commons-codec</groupId>
       <artifactId>commons-codec</artifactId>
-      <version>1.17.1</version>
+      <version>${commons.codec.version}</version>
     </dependency>
     <!-- s3tables -->
     <dependency>
@@ -231,7 +231,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-storage</artifactId>
-      <version>2.43.1</version>
+      <version>${google.cloud.storage.version}</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.guava</groupId>
@@ -244,6 +244,18 @@
         <exclusion>
           <groupId>com.fasterxml.jackson.core</groupId>
           <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.datatype</groupId>
+          <artifactId>jackson-datatype-jsr310</artifactId>
         </exclusion>
         <exclusion>
           <groupId>com.google.errorprone</groupId>
@@ -401,6 +413,18 @@
       <version>${jetcd.version}</version>
       <exclusions>
         <exclusion>
+          <groupId>io.grpc</groupId>
+          <artifactId>grpc-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.grpc</groupId>
+          <artifactId>grpc-util</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.grpc</groupId>
+          <artifactId>grpc-grpclb</artifactId>
+        </exclusion>
+        <exclusion>
           <groupId>com.google.guava</groupId>
           <artifactId>guava</artifactId>
         </exclusion>
@@ -478,7 +502,7 @@
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>33.4.0-jre</version>
+      <version>33.5.0-jre</version>
       <exclusions>
         <exclusion>
           <groupId>org.checkerframework</groupId>
@@ -569,6 +593,7 @@
           <excludes>
             <exclude>**/DockerScenarioBasedIT.java</exclude>
             <exclude>**/DockerLocalFileIOClickHouseIT.java</exclude>
+            <exclude>**/DockerLocalFileIOClickHouseAllTypesIT.java</exclude>
           </excludes>
         </configuration>
       </plugin>
