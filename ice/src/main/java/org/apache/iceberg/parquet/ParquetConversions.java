@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.types.Type;
+import org.apache.iceberg.util.UUIDUtil;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.LogicalTypeAnnotation.DecimalLogicalTypeAnnotation;
@@ -72,6 +73,55 @@ class ParquetConversions {
       case DECIMAL:
         Function<Object, Object> decimalConversion = converterFromParquet(parquetType);
         return (Literal<T>) Literal.of((BigDecimal) decimalConversion.apply(value));
+      default:
+        throw new IllegalArgumentException("Unsupported primitive type: " + type);
+    }
+  }
+
+  // Iceberg 1.9 introduced this API in upstream ParquetConversions and uses it from
+  // ParquetMetrics. Provide a compatible shim here so callers compiled against 1.9
+  // continue to resolve against this shadowed class. The TIME/TIMESTAMP branch keeps
+  // the local millis -> micros normalization used by fromParquetPrimitive above.
+  @SuppressWarnings("unchecked")
+  static <T> T convertValue(Type type, PrimitiveType parquetType, Object value) {
+    switch (type.typeId()) {
+      case BOOLEAN:
+      case INTEGER:
+      case DATE:
+      case LONG:
+      case TIMESTAMP_NANO:
+      case FLOAT:
+      case DOUBLE:
+        return (T) value;
+      case TIME:
+      case TIMESTAMP:
+        if (parquetType.getLogicalTypeAnnotation()
+                instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation tsAnno
+            && tsAnno.getUnit() == LogicalTypeAnnotation.TimeUnit.MILLIS) {
+          return (T) Long.valueOf(((Number) value).longValue() * 1000L);
+        }
+        return (T) value;
+      case STRING:
+        return (T) ((Binary) value).toStringUsingUTF8();
+      case UUID:
+        return (T) UUIDUtil.convert(((Binary) value).toByteBuffer());
+      case FIXED:
+      case BINARY:
+        return (T) ((Binary) value).toByteBuffer();
+      case DECIMAL:
+        int scale =
+            ((DecimalLogicalTypeAnnotation) parquetType.getLogicalTypeAnnotation()).getScale();
+        switch (parquetType.getPrimitiveTypeName()) {
+          case INT32:
+          case INT64:
+            return (T) BigDecimal.valueOf(((Number) value).longValue(), scale);
+          case FIXED_LEN_BYTE_ARRAY:
+          case BINARY:
+            return (T) new BigDecimal(new BigInteger(((Binary) value).getBytes()), scale);
+          default:
+            throw new IllegalArgumentException(
+                "Unsupported primitive type for decimal: " + parquetType.getPrimitiveTypeName());
+        }
       default:
         throw new IllegalArgumentException("Unsupported primitive type: " + type);
     }
