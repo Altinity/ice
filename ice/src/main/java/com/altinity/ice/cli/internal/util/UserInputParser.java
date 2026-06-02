@@ -39,11 +39,10 @@ public final class UserInputParser {
         if (((Types.TimestampType) primitive).shouldAdjustToUTC()) {
           yield Literal.of(
               DateTimeUtil.microsFromTimestamp(
-                  LocalDateTime.from(OffsetDateTime.parse(value).toInstant())));
+                  LocalDateTime.ofInstant(
+                      OffsetDateTime.parse(value).toInstant(), ZoneOffset.UTC)));
         }
-        yield Literal.of(
-            DateTimeUtil.microsFromTimestamp(
-                LocalDateTime.from(LocalDateTime.parse(value).toInstant(ZoneOffset.UTC))));
+        yield Literal.of(DateTimeUtil.microsFromTimestamp(LocalDateTime.parse(value)));
       }
       case TIME, UUID, FIXED, BINARY, DECIMAL ->
           throw new UnsupportedOperationException(

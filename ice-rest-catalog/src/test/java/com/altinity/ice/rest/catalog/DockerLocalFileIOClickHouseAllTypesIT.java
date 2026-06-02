@@ -227,7 +227,7 @@ public class DockerLocalFileIOClickHouseAllTypesIT {
     }
 
     String valuesSql =
-        "SELECT b_int, b_string, toString(b_date), formatDateTime(b_ts, '%Y-%m-%d %H:%M:%S') FROM `"
+        "SELECT b_int, b_string, toString(b_date), formatDateTime(b_ts, '%Y-%m-%d %H:%i:%S') FROM `"
             + CH_DB
             + "`.`"
             + TABLE
