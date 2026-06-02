@@ -113,7 +113,7 @@
   "name":"com.altinity.ice.cli.Main",
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
-  "methods":[{"name":"alterTable","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"check","parameterTypes":[] }, {"name":"createNamespace","parameterTypes":["java.lang.String","boolean"] }, {"name":"createTable","parameterTypes":["java.lang.String","java.lang.String","boolean","boolean","java.lang.String","boolean","java.lang.String","java.lang.String","java.lang.String"] }, {"name":"delete","parameterTypes":["java.lang.String","java.lang.String","java.lang.Boolean"] }, {"name":"deleteNamespace","parameterTypes":["java.lang.String","boolean"] }, {"name":"deleteTable","parameterTypes":["java.lang.String","boolean","boolean"] }, {"name":"describe","parameterTypes":["java.lang.String","boolean","boolean","boolean","boolean","boolean"] }, {"name":"describeMetadata","parameterTypes":["java.lang.String","boolean","boolean","boolean","boolean","boolean","boolean","boolean"] }, {"name":"describeParquet","parameterTypes":["java.lang.String","boolean","boolean","boolean","boolean","boolean","boolean","java.lang.String","boolean"] }, {"name":"files","parameterTypes":["java.lang.String"] }, {"name":"insert","parameterTypes":["java.lang.String","boolean","java.lang.String[]","java.lang.String","boolean","boolean","boolean","java.lang.String","boolean","boolean","int","boolean","com.altinity.ice.cli.internal.cmd.Insert$DataFileNamingStrategy$Name","boolean","boolean","java.lang.String","int","java.lang.String","java.lang.String","boolean","int","int","long","java.lang.String","java.lang.String","java.lang.String","boolean","java.lang.String"] }, {"name":"insert","parameterTypes":["java.lang.String","boolean","java.lang.String[]","java.lang.String","boolean","boolean","boolean","java.lang.String","boolean","boolean","int","boolean","com.altinity.ice.cli.internal.cmd.Insert$DataFileNamingStrategy$Name","boolean","boolean","java.lang.String","int","java.lang.String","java.lang.String","boolean","int","java.lang.String","java.lang.String","java.lang.String","boolean","java.lang.String"] }, {"name":"listNamespaces","parameterTypes":["java.lang.String","boolean"] }, {"name":"listPartitions","parameterTypes":["java.lang.String","boolean"] }, {"name":"listSnapshots","parameterTypes":["java.lang.String","int","boolean"] }, {"name":"listTables","parameterTypes":["java.lang.String","boolean"] }, {"name":"scanTable","parameterTypes":["java.lang.String","int","boolean"] }, {"name":"shell","parameterTypes":[] }]
+  "methods":[{"name":"alterTable","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"catalogExport","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"catalogImport","parameterTypes":["java.lang.String","boolean","boolean"] }, {"name":"check","parameterTypes":[] }, {"name":"createNamespace","parameterTypes":["java.lang.String","boolean"] }, {"name":"createTable","parameterTypes":["java.lang.String","java.lang.String","boolean","boolean","java.lang.String","boolean","java.lang.String","java.lang.String","java.lang.String"] }, {"name":"delete","parameterTypes":["java.lang.String","java.lang.String","java.lang.Boolean"] }, {"name":"deleteNamespace","parameterTypes":["java.lang.String","boolean"] }, {"name":"deleteTable","parameterTypes":["java.lang.String","boolean","boolean"] }, {"name":"describe","parameterTypes":["java.lang.String","boolean","boolean","boolean","boolean","boolean"] }, {"name":"describeMetadata","parameterTypes":["java.lang.String","boolean","boolean","boolean","boolean","boolean","boolean","boolean"] }, {"name":"describeParquet","parameterTypes":["java.lang.String","boolean","boolean","boolean","boolean","boolean","boolean","java.lang.String","boolean"] }, {"name":"files","parameterTypes":["java.lang.String"] }, {"name":"insert","parameterTypes":["java.lang.String","boolean","java.lang.String[]","java.lang.String","boolean","boolean","boolean","java.lang.String","boolean","boolean","int","boolean","com.altinity.ice.cli.internal.cmd.Insert$DataFileNamingStrategy$Name","boolean","boolean","java.lang.String","int","java.lang.String","java.lang.String","boolean","int","int","long","java.lang.String","java.lang.String","java.lang.String","boolean","java.lang.String"] }, {"name":"insert","parameterTypes":["java.lang.String","boolean","java.lang.String[]","java.lang.String","boolean","boolean","boolean","java.lang.String","boolean","boolean","int","boolean","com.altinity.ice.cli.internal.cmd.Insert$DataFileNamingStrategy$Name","boolean","boolean","java.lang.String","int","java.lang.String","java.lang.String","boolean","int","java.lang.String","java.lang.String","java.lang.String","boolean","java.lang.String"] }, {"name":"listNamespaces","parameterTypes":["java.lang.String","boolean"] }, {"name":"listPartitions","parameterTypes":["java.lang.String","boolean"] }, {"name":"listSnapshots","parameterTypes":["java.lang.String","int","boolean"] }, {"name":"listTables","parameterTypes":["java.lang.String","boolean"] }, {"name":"scanTable","parameterTypes":["java.lang.String","int","boolean"] }, {"name":"shell","parameterTypes":[] }]
 },
 {
   "name":"com.altinity.ice.cli.Main$IcePartition",
@@ -135,6 +135,34 @@
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
   "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.util.List"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.catalog.AdminCatalogSnapshot",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["int","java.lang.String","java.lang.String","java.util.List","java.util.List"] }, {"name":"catalogName","parameterTypes":[] }, {"name":"exportedAt","parameterTypes":[] }, {"name":"namespaces","parameterTypes":[] }, {"name":"tables","parameterTypes":[] }, {"name":"version","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.catalog.AdminCatalogSnapshot$NamespaceEntry",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.util.Map"] }, {"name":"key","parameterTypes":[] }, {"name":"value","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.catalog.AdminCatalogSnapshot$TableEntry",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.util.Map"] }, {"name":"key","parameterTypes":[] }, {"name":"value","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.catalog.AdminImportResult",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["int","int","int","java.lang.String","java.lang.String"] }, {"name":"catalogName","parameterTypes":[] }, {"name":"created","parameterTypes":[] }, {"name":"exportedAt","parameterTypes":[] }, {"name":"overwritten","parameterTypes":[] }, {"name":"skipped","parameterTypes":[] }]
 },
 {
   "name":"com.altinity.ice.cli.internal.cmd.AlterTable$AddColumn",
