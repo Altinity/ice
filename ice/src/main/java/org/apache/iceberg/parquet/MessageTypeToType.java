@@ -226,11 +226,21 @@ public class MessageTypeToType extends ParquetTypeVisitor<Type> {
               intType.isSigned() || intType.getBitWidth() < 64,
               "Cannot use uint64: not a supported Java type");
       */
-      if (intType.getBitWidth() < 32) {
+
+      // Preserve logical type information by choosing appropriate Iceberg types
+      // that can represent the full range of the original type
+      int bitWidth = intType.getBitWidth();
+      boolean isSigned = intType.isSigned();
+
+      // Determine the appropriate Iceberg type based on bit width and signedness
+      if (bitWidth <= 16) {
+        // INT8/INT16, UINT8/UINT16 all fit in INT32
         return Optional.of(Types.IntegerType.get());
-      } else if (intType.getBitWidth() == 32 && intType.isSigned()) {
-        return Optional.of(Types.IntegerType.get());
+      } else if (bitWidth <= 32) {
+        // INT32 fits in INT32, UINT32 needs INT64 to avoid overflow
+        return Optional.of(isSigned ? Types.IntegerType.get() : Types.LongType.get());
       } else {
+        // INT64 needs INT64, UINT64 - best effort with INT64, may have range issues
         return Optional.of(Types.LongType.get());
       }
     }
