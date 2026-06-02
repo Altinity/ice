@@ -256,6 +256,10 @@ public class DockerLocalFileIOClickHouseAllTypesIT {
     iceExecOrThrow(
         "alter-table",
         TABLE,
+        "[{\"op\":\"set_tblproperty\",\"key\":\"format-version\",\"value\":\"3\"}]");
+    iceExecOrThrow(
+        "alter-table",
+        TABLE,
         "[{\"op\":\"add_column\",\"name\":\"req_col\",\"type\":\"int\",\"required\":true,\"initial_default\":\"0\"},"
             + "{\"op\":\"add_column\",\"name\":\"opt_col\",\"type\":\"int\",\"required\":false}]");
 
