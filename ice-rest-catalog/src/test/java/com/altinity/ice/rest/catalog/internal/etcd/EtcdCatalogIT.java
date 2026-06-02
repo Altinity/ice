@@ -12,6 +12,9 @@ package com.altinity.ice.rest.catalog.internal.etcd;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.altinity.ice.rest.catalog.internal.cmd.CatalogAdminService;
+import com.altinity.ice.rest.catalog.internal.cmd.CatalogImportResult;
+import com.altinity.ice.rest.catalog.internal.cmd.CatalogSnapshot;
 import com.altinity.ice.rest.catalog.internal.config.CommitLockConfig;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Txn;
@@ -354,6 +357,52 @@ public class EtcdCatalogIT {
     }
     pool.shutdown();
     assertThat(maxConcurrent.get()).isEqualTo(1);
+  }
+
+  @Test
+  public void testCatalogExportAndImport() {
+    String ns = rand();
+    Namespace namespace = Namespace.of(ns);
+    catalog.createNamespace(namespace);
+    TableIdentifier identifier = TableIdentifier.of(namespace, "bar");
+    catalog.createTable(identifier, SCHEMA);
+
+    assertThat(catalog.namespaceExists(namespace)).isTrue();
+
+    CatalogSnapshot snapshot = CatalogAdminService.export(catalog, catalog.name(), ns);
+    assertThat(snapshot.version()).isEqualTo(CatalogSnapshot.CURRENT_VERSION);
+    assertThat(snapshot.namespaces())
+        .extracting(CatalogSnapshot.NamespaceEntry::key)
+        .anyMatch(k -> k.equals("n/" + ns));
+    assertThat(snapshot.tables()).hasSize(1);
+    assertThat(snapshot.tables().getFirst().key()).isEqualTo("t/" + ns + "/bar");
+    assertThat(snapshot.tables().getFirst().value()).containsKey("metadata_location");
+
+    // Test import without overriding when keys already present
+    CatalogImportResult skipResult =
+        CatalogAdminService.importSnapshot(catalog, snapshot, false, false);
+    assertThat(skipResult.created()).isZero();
+    assertThat(skipResult.skipped())
+        .isEqualTo(snapshot.namespaces().size() + snapshot.tables().size());
+
+    // Drop from etcd before reimporting
+    catalog.dropTable(identifier, false);
+    catalog.dropNamespace(namespace);
+
+    // Test dry run
+    CatalogImportResult dryResult =
+        CatalogAdminService.importSnapshot(catalog, snapshot, true, false);
+    assertThat(dryResult.created())
+        .isEqualTo(snapshot.namespaces().size() + snapshot.tables().size());
+    assertThat(catalog.namespaceExists(namespace)).isFalse();
+
+    CatalogImportResult importResult =
+        CatalogAdminService.importSnapshot(catalog, snapshot, false, false);
+    assertThat(importResult.created())
+        .isEqualTo(snapshot.namespaces().size() + snapshot.tables().size());
+    assertThat(catalog.namespaceExists(namespace)).isTrue();
+    assertThat(catalog.listTables(namespace)).containsExactly(identifier);
+    assertThat(catalog.loadTable(identifier)).isNotNull();
   }
 
   private static String rand() {
