@@ -122,7 +122,8 @@ public class AlterTableTest {
     catalog.buildTable(tableId, schema).create();
 
     List<AlterTable.Update> updates =
-        Arrays.asList(new AlterTable.AddColumn("age", "long", null, "name", null, null, null));
+        Arrays.asList(
+            new AlterTable.AddColumn("age", "long", null, "name", null, null, null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -137,7 +138,7 @@ public class AlterTableTest {
 
     List<AlterTable.Update> updates =
         Arrays.asList(
-            new AlterTable.AddColumn("age", "long", null, null, "timestamp_col", null, null));
+            new AlterTable.AddColumn("age", "long", null, null, "timestamp_col", null, null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -151,7 +152,7 @@ public class AlterTableTest {
     catalog.buildTable(tableId, schema).create();
 
     List<AlterTable.Update> updates =
-        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, null, true, null));
+        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, null, true, null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -166,7 +167,8 @@ public class AlterTableTest {
     catalog.buildTable(tableId, schema).create();
 
     List<AlterTable.Update> updates =
-        Arrays.asList(new AlterTable.AddColumn("bad", "string", null, "name", "id", null, null));
+        Arrays.asList(
+            new AlterTable.AddColumn("bad", "string", null, "name", "id", null, null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -180,7 +182,7 @@ public class AlterTableTest {
     catalog.buildTable(tableId, schema).create();
 
     List<AlterTable.Update> updates =
-        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, null, null, true));
+        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, null, null, true, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -193,7 +195,7 @@ public class AlterTableTest {
     catalog.buildTable(tableId, schema).create();
 
     List<AlterTable.Update> updates =
-        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, null, null, null));
+        Arrays.asList(new AlterTable.AddColumn("age", "long", null, null, null, null, null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
