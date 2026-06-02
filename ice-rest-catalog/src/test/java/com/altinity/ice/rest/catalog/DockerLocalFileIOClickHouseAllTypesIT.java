@@ -227,7 +227,7 @@ public class DockerLocalFileIOClickHouseAllTypesIT {
     }
 
     String valuesSql =
-        "SELECT b_int, b_string, toString(b_date), formatDateTime(b_ts, '%Y-%m-%d %H:%m:%S') FROM `"
+        "SELECT b_int, b_string, toString(b_date), formatDateTime(b_ts, '%Y-%m-%d %H:%M:%S') FROM `"
             + CH_DB
             + "`.`"
             + TABLE
@@ -246,8 +246,8 @@ public class DockerLocalFileIOClickHouseAllTypesIT {
     if (!"2024-06-15".equals(cells[2])) {
       throw new AssertionError("b_date: expected 2024-06-15, got " + cells[2]);
     }
-    if (!"2024-06-15 12:06:45".equals(cells[3])) {
-      throw new AssertionError("b_ts: expected 2024-06-15 12:06:45, got " + cells[3]);
+    if (!"2024-06-15 12:30:45".equals(cells[3])) {
+      throw new AssertionError("b_ts: expected 2024-06-15 12:30:45, got " + cells[3]);
     }
   }
 
