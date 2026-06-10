@@ -169,7 +169,7 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String"] }, {"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.Boolean"] }]
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String"] }, {"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.Boolean"] }, {"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.Boolean","java.lang.Boolean","java.lang.String"] }]
 },
 {
   "name":"com.altinity.ice.cli.internal.cmd.AlterTable$AlterColumn",
@@ -898,11 +898,15 @@
 },
 {
   "name":"org.apache.iceberg.GenericManifestFile",
-  "methods":[{"name":"<init>","parameterTypes":["org.apache.avro.Schema"] }]
+  "methods":[{"name":"<init>","parameterTypes":["org.apache.avro.Schema"] }, {"name":"<init>","parameterTypes":["org.apache.iceberg.types.Types$StructType"] }]
 },
 {
   "name":"org.apache.iceberg.GenericPartitionFieldSummary",
-  "methods":[{"name":"<init>","parameterTypes":["org.apache.avro.Schema"] }]
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"<init>","parameterTypes":["org.apache.avro.Schema"] }, {"name":"<init>","parameterTypes":["org.apache.iceberg.types.Types$StructType"] }]
+},
+{
+  "name":"org.apache.iceberg.InternalParquet",
+  "methods":[{"name":"register","parameterTypes":[] }]
 },
 {
   "name":"org.apache.iceberg.PartitionData",
@@ -961,6 +965,10 @@
 {
   "name":"org.apache.iceberg.rest.RESTResponse",
   "queryAllDeclaredMethods":true
+},
+{
+  "name":"org.apache.iceberg.rest.auth.NoopAuthManager",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
 },
 {
   "name":"org.apache.iceberg.rest.requests.CreateNamespaceRequest",
