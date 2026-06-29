@@ -19,7 +19,7 @@
     <parquet.version>1.15.2</parquet.version>
     <aws.java.sdk.version>2.31.13</aws.java.sdk.version>
     <picocli.version>4.7.6</picocli.version>
-    <jackson.version>2.18.3</jackson.version>
+    <jackson.version>2.18.8</jackson.version>
     <slf4j.version>2.0.17</slf4j.version>
     <logback.version>1.5.18</logback.version>
     <prometheus.version>1.3.6</prometheus.version>
