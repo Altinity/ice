@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
+import com.altinity.ice.cli.internal.util.IcebergTypeParser;
 import com.altinity.ice.cli.internal.util.UserInputParser;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -70,7 +71,7 @@ public class AlterTable {
         @JsonProperty("required") @Nullable Boolean required,
         @JsonProperty("initial_default") @Nullable String initialDefault) {
       this.name = name;
-      this.type = Types.fromPrimitiveString(type);
+      this.type = IcebergTypeParser.parseType(type);
       this.doc = doc;
       this.after = after;
       this.before = before;

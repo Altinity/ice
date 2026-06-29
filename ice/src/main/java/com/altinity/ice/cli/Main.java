@@ -405,10 +405,13 @@ public final class Main {
                   e.g. [{"op":"drop_column","name":"foo"}]
 
                   Supported operations:
-                    - add_column           (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types), "doc" (optional),
+                    - add_column           (params: "name", "type", "doc" (optional),
                                                     "after"/"before"/"first" (optional, at most one;
                                                     position the new column after/before a named column,
-                                                    or at the start of the schema))
+                                                    or at the start of the schema).
+                                                    "type" supports primitives (https://iceberg.apache.org/spec/#primitive-types)
+                                                    and complex types: list<T>, map<K,V>, struct<name:T,...>,
+                                                    e.g. "list<string>", "map<string,long>", "struct<a:string,b:long>")
                     - alter_column         (params: "name", "type" (https://iceberg.apache.org/spec/#primitive-types))
                     - rename_column        (params: "name", "new_name")
                     - drop_column          (params: "name")
