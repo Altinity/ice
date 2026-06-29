@@ -210,8 +210,7 @@ public class AlterTableTest {
 
     List<AlterTable.Update> updates =
         Arrays.asList(
-            new AlterTable.AddColumn(
-                "tags", "list<string>", null, null, null, null, null, null));
+            new AlterTable.AddColumn("tags", "list<string>", null, null, null, null, null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -230,8 +229,7 @@ public class AlterTableTest {
 
     List<AlterTable.Update> updates =
         Arrays.asList(
-            new AlterTable.AddColumn(
-                "scores", "list<long>", null, null, null, null, null, null));
+            new AlterTable.AddColumn("scores", "list<long>", null, null, null, null, null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -249,8 +247,7 @@ public class AlterTableTest {
 
     List<AlterTable.Update> updates =
         Arrays.asList(
-            new AlterTable.AddColumn(
-                "tags", "list<string>", null, "name", null, null, null, null));
+            new AlterTable.AddColumn("tags", "list<string>", null, "name", null, null, null, null));
 
     AlterTable.run(catalog, tableId, updates);
 
@@ -337,8 +334,7 @@ public class AlterTableTest {
 
     List<AlterTable.Update> updates =
         Arrays.asList(
-            new AlterTable.AddColumn(
-                "score", "double", null, null, null, null, null, null));
+            new AlterTable.AddColumn("score", "double", null, null, null, null, null, null));
 
     AlterTable.run(catalog, tableId, updates);
 

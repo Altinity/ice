@@ -125,8 +125,7 @@ public final class IcebergTypeParser {
     if (trimmed.length() < prefixLen + 2
         || trimmed.charAt(prefixLen) != '<'
         || trimmed.charAt(trimmed.length() - 1) != '>') {
-      throw new IllegalArgumentException(
-          "Expected " + prefix + "<...> syntax, got: " + trimmed);
+      throw new IllegalArgumentException("Expected " + prefix + "<...> syntax, got: " + trimmed);
     }
     String inner = trimmed.substring(prefixLen + 1, trimmed.length() - 1).strip();
     if (inner.isEmpty()) {
