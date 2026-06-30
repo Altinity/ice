@@ -81,6 +81,19 @@ public final class CreateTable {
       }
       schemaFile = files.getFirst();
     }
+    if ((schemaFile.startsWith("http://") || schemaFile.startsWith("https://"))
+        && schemaFile.contains("*")) {
+      try {
+        var files = com.altinity.ice.cli.internal.http.MinioWildcard.listHTTPWildcard(schemaFile);
+        if (files.isEmpty()) {
+          throw new BadRequestException(
+              String.format("No files matching \"%s\" found", schemaFile));
+        }
+        schemaFile = files.get(0);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to expand HTTP wildcard: " + schemaFile, e);
+      }
+    }
     try (var inputIO = Input.newIO(schemaFile, null, s3ClientLazy)) {
       InputFile inputFile = Input.newFile(schemaFile, catalog, inputIO);
 
