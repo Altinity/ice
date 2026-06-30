@@ -17,7 +17,6 @@ jobs:
       - run: ./mvnw clean verify
       - name: Install
         run: ./mvnw install
-      # TODO: check native-image can build ice
       - name: Run Scenario-Based Integration Tests
         run: ../mvnw test -Dtest=ScenarioBasedIT
         working-directory: ice-rest-catalog
@@ -58,3 +57,33 @@ jobs:
           -Dit.test=DockerScenarioBasedIT,DockerLocalFileIOClickHouseIT,DockerLocalFileIOClickHouseAllTypesIT
           -Ddocker.image=altinity/ice-rest-catalog:debug-with-ice-latest-master-amd64
           -Dclickhouse.image=altinity/clickhouse-server:25.8.16.20002.altinityantalya
+  native-build:
+    name: Build and test native image (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            artifact: ice-native-amd64-dynamic
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            artifact: ice-native-arm64-dynamic
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'graalvm'
+          cache: maven
+      - name: Build native image (dynamic linking - no musl required)
+        run: ./mvnw -Pnative clean install -Dmaven.test.skip=true
+      - name: Run Scenario-Based Integration Tests
+        run: ../mvnw test -Dtest=ScenarioBasedIT -Dice.native=true
+        working-directory: ice-rest-catalog
+      - name: Upload native binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ice/target/ice
+          if-no-files-found: error

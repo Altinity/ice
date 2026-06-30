@@ -23,6 +23,8 @@ import java.util.Map;
  */
 public class ScenarioBasedIT extends RESTCatalogTestBase {
 
+  private static final boolean USE_NATIVE = Boolean.getBoolean("ice.native");
+
   @Override
   protected ScenarioTestRunner createScenarioRunner(String scenarioName) throws Exception {
     Path scenariosDir = getScenariosDirectory();
@@ -42,18 +44,24 @@ public class ScenarioBasedIT extends RESTCatalogTestBase {
 
     // Try to find ice-jar in the build
     String projectRoot = Paths.get("").toAbsolutePath().getParent().toString();
-    String iceJar = projectRoot + "/ice/target/ice-jar";
+    String iceJar =
+        USE_NATIVE ? projectRoot + "/ice/target/ice" : projectRoot + "/ice/target/ice-jar";
     File iceJarFile = new File(iceJar);
 
-    if (iceJarFile.exists() && iceJarFile.canExecute()) {
-      // Use pre-built ice-jar if available
-      templateVars.put("ICE_CLI", iceJar);
-      logger.info("Using ice-jar from: {}", iceJar);
+    String override = System.getenv("ICE_CLI_OVERRIDE");
+    if (override != null) {
+      templateVars.put("ICE_CLI", override);
     } else {
-      // Fall back to using local-ice wrapper script
-      String localIce = projectRoot + "/.bin/local-ice";
-      templateVars.put("ICE_CLI", localIce);
-      logger.info("Using local-ice script from: {}", localIce);
+      if (iceJarFile.exists() && iceJarFile.canExecute()) {
+        // Use pre-built ice-jar if available
+        templateVars.put("ICE_CLI", iceJar);
+        logger.info("Using ice-jar from: {}", iceJar);
+      } else {
+        // Fall back to using local-ice wrapper script
+        String localIce = projectRoot + "/.bin/local-ice";
+        templateVars.put("ICE_CLI", localIce);
+        logger.info("Using local-ice script from: {}", localIce);
+      }
     }
 
     return new ScenarioTestRunner(scenariosDir, templateVars);

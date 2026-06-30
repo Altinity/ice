@@ -1,0 +1,10 @@
+name: "Describe parquet metadata"
+description: "Tests describe-parquet against a local iris parquet file across all option flags and both YAML and JSON output formats"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  INPUT_FILE: "input.parquet"
+  EXPECTED_ROWS: "150"
+  EXPECTED_COLUMN_COUNT: "5"

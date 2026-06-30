@@ -1,0 +1,151 @@
+#!/bin/bash
+set -e
+
+echo "Running describe-parquet test..."
+
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/${INPUT_FILE}"
+TARGET="file://${INPUT_PATH}"
+
+# Default invocation: YAML, summary only
+DEFAULT_OUT=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe-parquet "${TARGET}")
+for expected in "summary:" "rows: ${EXPECTED_ROWS}" "rowGroups:" "compressedSize:" "uncompressedSize:" "columnCount: ${EXPECTED_COLUMN_COUNT}" "createdBy:"; do
+  if ! grep -qF "${expected}" <<<"${DEFAULT_OUT}"; then
+    echo "FAIL default describe-parquet output missing '${expected}'"
+    printf '%s\n' "${DEFAULT_OUT}"
+    exit 1
+  fi
+done
+if grep -q "^columns:" <<<"${DEFAULT_OUT}"; then
+  echo "FAIL default describe-parquet output should not include columns section"
+  printf '%s\n' "${DEFAULT_OUT}"
+  exit 1
+fi
+echo "OK Default output verified"
+
+# -s / --summary
+SUMMARY_OUT=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe-parquet -s "${TARGET}")
+if ! grep -qF "rows: ${EXPECTED_ROWS}" <<<"${SUMMARY_OUT}"; then
+  echo "FAIL --summary output missing expected row count"
+  printf '%s\n' "${SUMMARY_OUT}"
+  exit 1
+fi
+echo "OK --summary output verified"
+
+# --columns: each iris column with type and repetition
+COLUMNS_OUT=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe-parquet --columns "${TARGET}")
+if ! grep -q "^columns:" <<<"${COLUMNS_OUT}"; then
+  echo "FAIL --columns output missing 'columns:' section"
+  printf '%s\n' "${COLUMNS_OUT}"
+  exit 1
+fi
+for col in "sepal.length" "sepal.width" "petal.length" "petal.width" "variety"; do
+  if ! grep -qF "name: ${col}" <<<"${COLUMNS_OUT}" && ! grep -qF "name: \"${col}\"" <<<"${COLUMNS_OUT}"; then
+    echo "FAIL --columns output missing column '${col}'"
+    printf '%s\n' "${COLUMNS_OUT}"
+    exit 1
+  fi
+done
+if ! grep -qE 'repetition: "?(REQUIRED|OPTIONAL|REPEATED)"?' <<<"${COLUMNS_OUT}"; then
+  echo "FAIL --columns output missing repetition field"
+  printf '%s\n' "${COLUMNS_OUT}"
+  exit 1
+fi
+if ! grep -qE 'type: "?(DOUBLE|FLOAT|INT32|INT64|BINARY|BOOLEAN|FIXED_LEN_BYTE_ARRAY|INT96)"?' <<<"${COLUMNS_OUT}"; then
+  echo "FAIL --columns output missing primitive type field"
+  printf '%s\n' "${COLUMNS_OUT}"
+  exit 1
+fi
+echo "OK --columns output verified"
+
+# -r / --row-groups (no per-column details)
+ROWGROUPS_OUT=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe-parquet -r "${TARGET}")
+if ! grep -q "^rowGroups:" <<<"${ROWGROUPS_OUT}"; then
+  echo "FAIL -r output missing 'rowGroups:' section"
+  printf '%s\n' "${ROWGROUPS_OUT}"
+  exit 1
+fi
+for expected in "index:" "rowCount:" "totalSize:" "compressedSize:" "startingPos:"; do
+  if ! grep -qF "${expected}" <<<"${ROWGROUPS_OUT}"; then
+    echo "FAIL -r output missing '${expected}'"
+    printf '%s\n' "${ROWGROUPS_OUT}"
+    exit 1
+  fi
+done
+if grep -qE "encodings:|codec:" <<<"${ROWGROUPS_OUT}"; then
+  echo "FAIL -r output should not include per-column details (encodings/codec)"
+  printf '%s\n' "${ROWGROUPS_OUT}"
+  exit 1
+fi
+echo "OK -r output verified"
+
+# -d / --row-group-details: encodings, codec, stats
+DETAILS_OUT=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe-parquet -d "${TARGET}")
+for expected in "rowGroups:" "encodings:" "codec:" "valueCount:" "path:"; do
+  if ! grep -qF "${expected}" <<<"${DETAILS_OUT}"; then
+    echo "FAIL -d output missing '${expected}'"
+    printf '%s\n' "${DETAILS_OUT}"
+    exit 1
+  fi
+done
+if ! grep -q "nulls:" <<<"${DETAILS_OUT}"; then
+  echo "FAIL -d output missing column stats ('nulls:')"
+  printf '%s\n' "${DETAILS_OUT}"
+  exit 1
+fi
+echo "OK -d output verified"
+
+# -a / --all: every section present
+ALL_OUT=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe-parquet -a "${TARGET}")
+for expected in "summary:" "columns:" "rowGroups:" "encodings:" "codec:" "nulls:"; do
+  if ! grep -qF "${expected}" <<<"${ALL_OUT}"; then
+    echo "FAIL -a output missing '${expected}'"
+    printf '%s\n' "${ALL_OUT}"
+    exit 1
+  fi
+done
+echo "OK -a output verified"
+
+# --json: JSON output instead of YAML
+JSON_OUT=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe-parquet -a --json "${TARGET}")
+if ! grep -q '^{' <<<"${JSON_OUT}"; then
+  echo "FAIL --json output is not a JSON object"
+  printf '%s\n' "${JSON_OUT}"
+  exit 1
+fi
+for expected in '"summary"' '"columns"' '"rowGroups"' "\"rows\":${EXPECTED_ROWS}" "\"columnCount\":${EXPECTED_COLUMN_COUNT}"; do
+  if ! grep -qF "${expected}" <<<"${JSON_OUT}"; then
+    echo "FAIL --json output missing '${expected}'"
+    printf '%s\n' "${JSON_OUT}"
+    exit 1
+  fi
+done
+if grep -qE "^summary:" <<<"${JSON_OUT}"; then
+  echo "FAIL --json output looks like YAML"
+  printf '%s\n' "${JSON_OUT}"
+  exit 1
+fi
+echo "OK --json output verified"
+
+# Combined --summary --columns: both sections, no rowGroups
+COMBINED_OUT=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe-parquet -s --columns "${TARGET}")
+if ! grep -q "^summary:" <<<"${COMBINED_OUT}" || ! grep -q "^columns:" <<<"${COMBINED_OUT}"; then
+  echo "FAIL combined -s --columns missing summary or columns section"
+  printf '%s\n' "${COMBINED_OUT}"
+  exit 1
+fi
+if grep -q "^rowGroups:" <<<"${COMBINED_OUT}"; then
+  echo "FAIL combined -s --columns should not include rowGroups section"
+  printf '%s\n' "${COMBINED_OUT}"
+  exit 1
+fi
+echo "OK Combined --summary --columns output verified"
+
+# Missing file should fail
+if {{ICE_CLI}} --config {{CLI_CONFIG}} describe-parquet "file://${SCENARIO_DIR}/does-not-exist.parquet" >/dev/null 2>&1; then
+  echo "FAIL describe-parquet should fail on missing file"
+  exit 1
+fi
+echo "OK Missing file rejected"
+
+echo "Describe-parquet test completed successfully"
