@@ -19,6 +19,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
+import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -201,5 +202,145 @@ public class AlterTableTest {
 
     Table table = catalog.loadTable(tableId);
     assertThat(table.schema().findField("age").isOptional()).isTrue();
+  }
+
+  @Test
+  public void testAddListOfStringColumn() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(
+            new AlterTable.AddColumn("tags", "list<string>", null, null, null, null, null, null));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    Types.NestedField field = table.schema().findField("tags");
+    assertThat(field).isNotNull();
+    assertThat(field.isOptional()).isTrue();
+    assertThat(field.type()).isInstanceOf(Types.ListType.class);
+    Types.ListType listType = (Types.ListType) field.type();
+    assertThat(listType.elementType()).isInstanceOf(Types.StringType.class);
+  }
+
+  @Test
+  public void testAddListOfLongColumn() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(
+            new AlterTable.AddColumn("scores", "list<long>", null, null, null, null, null, null));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    Types.NestedField field = table.schema().findField("scores");
+    assertThat(field).isNotNull();
+    assertThat(field.type()).isInstanceOf(Types.ListType.class);
+    Types.ListType listType = (Types.ListType) field.type();
+    assertThat(listType.elementType()).isInstanceOf(Types.LongType.class);
+  }
+
+  @Test
+  public void testAddListColumnAfter() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(
+            new AlterTable.AddColumn("tags", "list<string>", null, "name", null, null, null, null));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    assertThat(table.schema().columns().stream().map(Types.NestedField::name).toList())
+        .containsExactly("id", "name", "tags", "timestamp_col", "date_col");
+    assertThat(table.schema().findField("tags").type()).isInstanceOf(Types.ListType.class);
+  }
+
+  @Test
+  public void testAddMapColumn() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(
+            new AlterTable.AddColumn(
+                "metadata", "map<string,long>", null, null, null, null, null, null));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    Types.NestedField field = table.schema().findField("metadata");
+    assertThat(field).isNotNull();
+    assertThat(field.type()).isInstanceOf(Types.MapType.class);
+    Types.MapType mapType = (Types.MapType) field.type();
+    assertThat(mapType.keyType()).isInstanceOf(Types.StringType.class);
+    assertThat(mapType.valueType()).isInstanceOf(Types.LongType.class);
+  }
+
+  @Test
+  public void testAddStructColumn() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(
+            new AlterTable.AddColumn(
+                "address", "struct<street:string,zip:int>", null, null, null, null, null, null));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    Types.NestedField field = table.schema().findField("address");
+    assertThat(field).isNotNull();
+    assertThat(field.type()).isInstanceOf(Types.StructType.class);
+    Types.StructType structType = (Types.StructType) field.type();
+    assertThat(structType.fields()).hasSize(2);
+    assertThat(structType.field("street").type()).isInstanceOf(Types.StringType.class);
+    assertThat(structType.field("zip").type()).isInstanceOf(Types.IntegerType.class);
+  }
+
+  @Test
+  public void testAddNestedListOfStructColumn() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(
+            new AlterTable.AddColumn(
+                "items",
+                "list<struct<product_id:long,name:string>>",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    Types.NestedField field = table.schema().findField("items");
+    assertThat(field).isNotNull();
+    assertThat(field.type().typeId()).isEqualTo(Type.TypeID.LIST);
+    Types.ListType listType = (Types.ListType) field.type();
+    assertThat(listType.elementType().typeId()).isEqualTo(Type.TypeID.STRUCT);
+    Types.StructType inner = (Types.StructType) listType.elementType();
+    assertThat(inner.fields()).hasSize(2);
+    assertThat(inner.field("product_id").type()).isInstanceOf(Types.LongType.class);
+    assertThat(inner.field("name").type()).isInstanceOf(Types.StringType.class);
+  }
+
+  @Test
+  public void testPrimitiveTypeStillWorks() throws Exception {
+    catalog.buildTable(tableId, schema).create();
+
+    List<AlterTable.Update> updates =
+        Arrays.asList(
+            new AlterTable.AddColumn("score", "double", null, null, null, null, null, null));
+
+    AlterTable.run(catalog, tableId, updates);
+
+    Table table = catalog.loadTable(tableId);
+    Types.NestedField field = table.schema().findField("score");
+    assertThat(field).isNotNull();
+    assertThat(field.type()).isInstanceOf(Types.DoubleType.class);
   }
 }

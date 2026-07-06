@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0](https://github.com/Altinity/ice/compare/v0.16.0...v0.17.0)
+
+### Added
+
+- `ice` - Upgrade iceberg-java to 1.9.2 and support adding required columns ([#145](https://github.com/Altinity/ice/pull/145))
+- `ice` - Add logic to add non-primitive types to alter table add ([#183](https://github.com/Altinity/ice/pull/183))
+
 ## [0.16.0](https://github.com/Altinity/ice/compare/v0.16.0...v0.15.0)
 
 ### Added

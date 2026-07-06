@@ -1,0 +1,9 @@
+name: "Schema evolution - add_column with complex types (list, map, struct)"
+description: "Tests alter-table add_column for list<string>, map<string,long>, and struct<street:string,zip:int>"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_schema_ev_complex"
+  TABLE_NAME: "test_schema_ev_complex.t1"
