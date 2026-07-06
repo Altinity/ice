@@ -1,0 +1,35 @@
+#!/bin/bash
+set -e
+
+echo "Running schema evolution (complex types) test..."
+
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/../insert-scan/input.parquet"
+
+# Setup
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} "file://${INPUT_PATH}"
+echo "OK Created table ${TABLE_NAME}"
+
+# Add list, map, struct columns in one alter-table call
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} \
+  '[{"op":"add_column","name":"tags","type":"list<string>"},{"op":"add_column","name":"metadata","type":"map<string,long>"},{"op":"add_column","name":"address","type":"struct<street:string,zip:int>"}]'
+echo "OK Altered table: added list, map, struct columns"
+
+# Verify all three columns appear in the schema
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/schema_ev_complex.txt
+for col in tags metadata address; do
+  if ! grep -q "$col" /tmp/schema_ev_complex.txt; then
+    echo "FAIL describe -s missing expected column '${col}'"
+    cat /tmp/schema_ev_complex.txt
+    exit 1
+  fi
+done
+echo "OK Schema verified: tags, metadata, address present"
+
+# Cleanup
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "OK Cleanup done"
+
+echo "Schema evolution (complex types) test completed successfully"

@@ -102,6 +102,12 @@ ice alter-table flowers.iris '[{"op":"add_column","name":"extra","type":"string"
 # add a NOT NULL column (`required: true`;)
 ice alter-table flowers.iris '[{"op":"add_column","name":"extra","type":"string","required":true}]'
 
+# add a list column
+ice alter-table flowers.iris '[{"op":"add_column","name":"tags","type":"list<string>"}]'
+
+# add a map column
+ice alter-table flowers.iris '[{"op":"add_column","name":"metadata","type":"map<string,long>"}]'
+
 # verify the schema change
 ice describe -s flowers.iris
 ```
