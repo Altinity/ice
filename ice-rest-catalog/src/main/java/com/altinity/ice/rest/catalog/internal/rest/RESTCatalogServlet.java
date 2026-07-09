@@ -76,10 +76,12 @@ public class RESTCatalogServlet extends HttpServlet {
 
   private final RESTCatalogHandler restCatalogAdapter;
   private final HttpMetrics httpMetrics;
+  private final RequestTracing tracing;
 
-  public RESTCatalogServlet(RESTCatalogHandler restCatalogAdapter) {
+  public RESTCatalogServlet(RESTCatalogHandler restCatalogAdapter, RequestTracing tracing) {
     this.restCatalogAdapter = restCatalogAdapter;
     this.httpMetrics = HttpMetrics.getInstance();
+    this.tracing = tracing;
   }
 
   protected void handle(HttpServletRequest request, HttpServletResponse response)
@@ -87,6 +89,24 @@ public class RESTCatalogServlet extends HttpServlet {
     HTTPRequest.HTTPMethod method = HTTPRequest.HTTPMethod.valueOf(request.getMethod());
     String path = request.getRequestURI().substring(1);
 
+    Session session = Session.from(request);
+    String clientId = tracing.resolveClientId(request, session);
+    String requestId = tracing.resolveRequestId(request);
+    tracing.begin(response, clientId, requestId);
+    try {
+      handleTraced(method, path, session, request, response);
+    } finally {
+      tracing.end();
+    }
+  }
+
+  private void handleTraced(
+      HTTPRequest.HTTPMethod method,
+      String path,
+      Session session,
+      HttpServletRequest request,
+      HttpServletResponse response)
+      throws IOException {
     Pair<Route, Map<String, String>> routeContext = Route.from(method, path);
     if (routeContext == null) {
       // Track unknown route requests
@@ -110,7 +130,6 @@ public class RESTCatalogServlet extends HttpServlet {
 
     // Track request with metrics
     try (var timer = httpMetrics.startRequest(method.name(), route.name())) {
-      Session session = Session.from(request);
       String userToLog = "";
       if (session != null) {
         userToLog = "@" + session.uid() + " ";
