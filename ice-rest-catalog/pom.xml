@@ -598,6 +598,7 @@
             <exclude>**/DockerScenarioBasedIT.java</exclude>
             <exclude>**/DockerLocalFileIOClickHouseIT.java</exclude>
             <exclude>**/DockerLocalFileIOClickHouseAllTypesIT.java</exclude>
+            <exclude>**/DockerSparkClientIdIT.java</exclude>
           </excludes>
         </configuration>
       </plugin>
