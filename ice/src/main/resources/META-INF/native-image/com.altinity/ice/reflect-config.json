@@ -1,0 +1,1264 @@
+[
+{
+  "name":"[B"
+},
+{
+  "name":"[Lcom.altinity.ice.cli.Main$IcePartition;"
+},
+{
+  "name":"[Lcom.altinity.ice.cli.Main$IceSortOrder;"
+},
+{
+  "name":"[Lcom.altinity.ice.cli.Main$PartitionFilter;"
+},
+{
+  "name":"[Lcom.altinity.ice.cli.internal.cmd.AlterTable$Update;"
+},
+{
+  "name":"[Lcom.altinity.ice.cli.internal.cmd.DescribeMetadata$ManifestInfo;"
+},
+{
+  "name":"[Lcom.fasterxml.jackson.databind.deser.BeanDeserializerModifier;"
+},
+{
+  "name":"[Lcom.fasterxml.jackson.databind.deser.Deserializers;"
+},
+{
+  "name":"[Lcom.fasterxml.jackson.databind.deser.KeyDeserializers;"
+},
+{
+  "name":"[Lcom.fasterxml.jackson.databind.deser.ValueInstantiators;"
+},
+{
+  "name":"[Lcom.fasterxml.jackson.databind.ser.BeanSerializerModifier;"
+},
+{
+  "name":"[Lcom.fasterxml.jackson.databind.ser.Serializers;"
+},
+{
+  "name":"[Ljava.lang.Object;"
+},
+{
+  "name":"[Ljava.lang.String;"
+},
+{
+  "name":"[Ljava.util.List;"
+},
+{
+  "name":"[Ljava.util.Map$Entry;"
+},
+{
+  "name":"[Lorg.apache.avro.util.springframework.ConcurrentReferenceHashMap$Segment;"
+},
+{
+  "name":"[Lorg.apache.iceberg.Accessor;"
+},
+{
+  "name":"[Lorg.apache.iceberg.avro.ValueWriter;"
+},
+{
+  "name":"[Lorg.apache.iceberg.parquet.ParquetValueReader;"
+},
+{
+  "name":"[Lorg.apache.iceberg.parquet.ParquetValueWriter;"
+},
+{
+  "name":"[Lorg.apache.iceberg.parquet.TripleIterator;"
+},
+{
+  "name":"[Lorg.apache.iceberg.relocated.com.google.common.collect.ImmutableMapEntry;"
+},
+{
+  "name":"[Lsun.security.pkcs.SignerInfo;"
+},
+{
+  "name":"ch.qos.logback.classic.joran.SerializedModelConfigurator",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"ch.qos.logback.classic.util.DefaultJoranConfigurator",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"ch.qos.logback.core.ConsoleAppender",
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setTarget","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"ch.qos.logback.core.Layout",
+  "methods":[{"name":"valueOf","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"ch.qos.logback.core.OutputStreamAppender",
+  "methods":[{"name":"setEncoder","parameterTypes":["ch.qos.logback.core.encoder.Encoder"] }]
+},
+{
+  "name":"ch.qos.logback.core.encoder.Encoder",
+  "methods":[{"name":"valueOf","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"ch.qos.logback.core.encoder.LayoutWrappingEncoder",
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"setLayout","parameterTypes":["ch.qos.logback.core.Layout"] }, {"name":"setParent","parameterTypes":["ch.qos.logback.core.spi.ContextAware"] }]
+},
+{
+  "name":"ch.qos.logback.core.pattern.PatternLayoutBase",
+  "methods":[{"name":"setPattern","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"ch.qos.logback.core.spi.ContextAware",
+  "methods":[{"name":"valueOf","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.Main",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "methods":[{"name":"alterTable","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"catalogExport","parameterTypes":["java.lang.String","java.lang.String"] }, {"name":"catalogImport","parameterTypes":["java.lang.String","boolean","boolean"] }, {"name":"check","parameterTypes":[] }, {"name":"createNamespace","parameterTypes":["java.lang.String","boolean"] }, {"name":"createTable","parameterTypes":["java.lang.String","java.lang.String","boolean","boolean","java.lang.String","boolean","java.lang.String","java.lang.String","java.lang.String"] }, {"name":"delete","parameterTypes":["java.lang.String","java.lang.String","java.lang.Boolean"] }, {"name":"deleteNamespace","parameterTypes":["java.lang.String","boolean"] }, {"name":"deleteTable","parameterTypes":["java.lang.String","boolean","boolean"] }, {"name":"describe","parameterTypes":["java.lang.String","boolean","boolean","boolean","boolean","boolean"] }, {"name":"describeMetadata","parameterTypes":["java.lang.String","boolean","boolean","boolean","boolean","boolean","boolean","boolean"] }, {"name":"describeParquet","parameterTypes":["java.lang.String","boolean","boolean","boolean","boolean","boolean","boolean","java.lang.String","boolean"] }, {"name":"files","parameterTypes":["java.lang.String"] }, {"name":"insert","parameterTypes":["java.lang.String","boolean","java.lang.String[]","java.lang.String","boolean","boolean","boolean","java.lang.String","boolean","boolean","int","boolean","com.altinity.ice.cli.internal.cmd.Insert$DataFileNamingStrategy$Name","boolean","boolean","java.lang.String","int","java.lang.String","java.lang.String","boolean","int","int","long","java.lang.String","java.lang.String","java.lang.String","boolean","java.lang.String"] }, {"name":"insert","parameterTypes":["java.lang.String","boolean","java.lang.String[]","java.lang.String","boolean","boolean","boolean","java.lang.String","boolean","boolean","int","boolean","com.altinity.ice.cli.internal.cmd.Insert$DataFileNamingStrategy$Name","boolean","boolean","java.lang.String","int","java.lang.String","java.lang.String","boolean","int","java.lang.String","java.lang.String","java.lang.String","boolean","java.lang.String"] }, {"name":"listNamespaces","parameterTypes":["java.lang.String","boolean"] }, {"name":"listPartitions","parameterTypes":["java.lang.String","boolean"] }, {"name":"listSnapshots","parameterTypes":["java.lang.String","int","boolean"] }, {"name":"listTables","parameterTypes":["java.lang.String","boolean"] }, {"name":"scanTable","parameterTypes":["java.lang.String","int","boolean"] }, {"name":"shell","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.Main$IcePartition",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.Main$IceSortOrder",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","boolean","boolean"] }]
+},
+{
+  "name":"com.altinity.ice.cli.Main$PartitionFilter",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.util.List"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.catalog.AdminCatalogSnapshot",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["int","java.lang.String","java.lang.String","java.util.List","java.util.List"] }, {"name":"catalogName","parameterTypes":[] }, {"name":"exportedAt","parameterTypes":[] }, {"name":"namespaces","parameterTypes":[] }, {"name":"tables","parameterTypes":[] }, {"name":"version","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.catalog.AdminCatalogSnapshot$NamespaceEntry",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.util.Map"] }, {"name":"key","parameterTypes":[] }, {"name":"value","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.catalog.AdminCatalogSnapshot$TableEntry",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.util.Map"] }, {"name":"key","parameterTypes":[] }, {"name":"value","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.catalog.AdminImportResult",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["int","int","int","java.lang.String","java.lang.String"] }, {"name":"catalogName","parameterTypes":[] }, {"name":"created","parameterTypes":[] }, {"name":"exportedAt","parameterTypes":[] }, {"name":"overwritten","parameterTypes":[] }, {"name":"skipped","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$AddColumn",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String"] }, {"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.Boolean"] }, {"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.String","java.lang.Boolean","java.lang.Boolean","java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$AlterColumn",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$DropColumn",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$DropPartitionField",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$RenameColumn",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$RenameTo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$SetTblProperty",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.AlterTable$Update",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.Describe$Table",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"data","parameterTypes":[] }, {"name":"error","parameterTypes":[] }, {"name":"kind","parameterTypes":[] }, {"name":"metadata","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$ColumnMetrics",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"lowerBound","parameterTypes":[] }, {"name":"name","parameterTypes":[] }, {"name":"nested","parameterTypes":[] }, {"name":"nullCount","parameterTypes":[] }, {"name":"upperBound","parameterTypes":[] }, {"name":"valueCount","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Data",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"currentSnapshot","parameterTypes":[] }, {"name":"location","parameterTypes":[] }, {"name":"metrics","parameterTypes":[] }, {"name":"partitionSpecRaw","parameterTypes":[] }, {"name":"properties","parameterTypes":[] }, {"name":"schemaRaw","parameterTypes":[] }, {"name":"sortOrderRaw","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Error",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"message","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Metadata",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"id","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Metrics",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"columns","parameterTypes":[] }, {"name":"file","parameterTypes":[] }, {"name":"recordCount","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Snapshot",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"id","parameterTypes":[] }, {"name":"location","parameterTypes":[] }, {"name":"operation","parameterTypes":[] }, {"name":"parentID","parameterTypes":[] }, {"name":"sequenceNumber","parameterTypes":[] }, {"name":"summary","parameterTypes":[] }, {"name":"timestamp","parameterTypes":[] }, {"name":"timestampISO","parameterTypes":[] }, {"name":"timestampISOLocal","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$DataFileInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"columnSizes","parameterTypes":[] }, {"name":"fileSizeInBytes","parameterTypes":[] }, {"name":"format","parameterTypes":[] }, {"name":"lowerBounds","parameterTypes":[] }, {"name":"nullValueCounts","parameterTypes":[] }, {"name":"partition","parameterTypes":[] }, {"name":"path","parameterTypes":[] }, {"name":"recordCount","parameterTypes":[] }, {"name":"upperBounds","parameterTypes":[] }, {"name":"valueCounts","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$FieldInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"fieldId","parameterTypes":[] }, {"name":"name","parameterTypes":[] }, {"name":"required","parameterTypes":[] }, {"name":"type","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$HistoryInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"metadataLog","parameterTypes":[] }, {"name":"snapshotLog","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$ManifestInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"addedFilesCount","parameterTypes":[] }, {"name":"dataFiles","parameterTypes":[] }, {"name":"deletedFilesCount","parameterTypes":[] }, {"name":"existingFilesCount","parameterTypes":[] }, {"name":"partitionSpecId","parameterTypes":[] }, {"name":"path","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$MetadataInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"history","parameterTypes":[] }, {"name":"manifests","parameterTypes":[] }, {"name":"schema","parameterTypes":[] }, {"name":"snapshots","parameterTypes":[] }, {"name":"summary","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$MetadataLogEntry",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"file","parameterTypes":[] }, {"name":"timestamp","parameterTypes":[] }, {"name":"timestampMillis","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$SchemaInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"fields","parameterTypes":[] }, {"name":"schemaId","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$SnapshotInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"current","parameterTypes":[] }, {"name":"manifestListLocation","parameterTypes":[] }, {"name":"operation","parameterTypes":[] }, {"name":"parentId","parameterTypes":[] }, {"name":"sequenceNumber","parameterTypes":[] }, {"name":"snapshotId","parameterTypes":[] }, {"name":"summary","parameterTypes":[] }, {"name":"timestamp","parameterTypes":[] }, {"name":"timestampMillis","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$SnapshotLogEntry",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"snapshotId","parameterTypes":[] }, {"name":"timestamp","parameterTypes":[] }, {"name":"timestampMillis","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$Summary",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"currentSnapshotId","parameterTypes":[] }, {"name":"formatVersion","parameterTypes":[] }, {"name":"lastUpdated","parameterTypes":[] }, {"name":"lastUpdatedMillis","parameterTypes":[] }, {"name":"location","parameterTypes":[] }, {"name":"numSnapshots","parameterTypes":[] }, {"name":"partitionSpec","parameterTypes":[] }, {"name":"properties","parameterTypes":[] }, {"name":"sortOrder","parameterTypes":[] }, {"name":"uuid","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeParquet$Column",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"logicalType","parameterTypes":[] }, {"name":"name","parameterTypes":[] }, {"name":"repetition","parameterTypes":[] }, {"name":"type","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeParquet$ColumnChunk",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"codec","parameterTypes":[] }, {"name":"encodings","parameterTypes":[] }, {"name":"path","parameterTypes":[] }, {"name":"stats","parameterTypes":[] }, {"name":"totalSize","parameterTypes":[] }, {"name":"type","parameterTypes":[] }, {"name":"uncompressedSize","parameterTypes":[] }, {"name":"valueCount","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeParquet$ColumnStats",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"max","parameterTypes":[] }, {"name":"min","parameterTypes":[] }, {"name":"nulls","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeParquet$ParquetInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"columns","parameterTypes":[] }, {"name":"rowGroups","parameterTypes":[] }, {"name":"summary","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeParquet$RowGroup",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"columns","parameterTypes":[] }, {"name":"compressedSize","parameterTypes":[] }, {"name":"index","parameterTypes":[] }, {"name":"rowCount","parameterTypes":[] }, {"name":"startingPos","parameterTypes":[] }, {"name":"totalSize","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.DescribeParquet$Summary",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"columnCount","parameterTypes":[] }, {"name":"compressedSize","parameterTypes":[] }, {"name":"createdBy","parameterTypes":[] }, {"name":"rowGroups","parameterTypes":[] }, {"name":"rows","parameterTypes":[] }, {"name":"uncompressedSize","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.ListNamespaces$Result",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"namespaces","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.ListPartitions$PartitionFieldInfo",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"name","parameterTypes":[] }, {"name":"sourceColumn","parameterTypes":[] }, {"name":"transform","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.ListPartitions$Result",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"partitionSpec","parameterTypes":[] }, {"name":"partitions","parameterTypes":[] }, {"name":"table","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.cmd.ListTables$Result",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"namespace","parameterTypes":[] }, {"name":"tables","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.config.Config",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String","java.lang.String","java.lang.Boolean","java.lang.String","java.lang.String","java.lang.String","java.lang.String[]","com.altinity.ice.cli.internal.config.Config$S3","java.util.Map"] }]
+},
+{
+  "name":"com.altinity.ice.cli.internal.config.Config$S3",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","boolean","java.lang.String","java.lang.String","java.lang.String"] }]
+},
+{
+  "name":"com.altinity.ice.internal.iceberg.io.SchemeFileIO",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.internal.logback.ColorAwarePatternLayout",
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.internal.logback.ColorAwarePatternLayout$NoColorConverter",
+  "queryAllPublicMethods":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.internal.logback.ProcessIdClassicConverter",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.altinity.ice.internal.picocli.VersionProvider",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.fasterxml.jackson.databind.ext.Java7SupportImpl",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.BBHeader$ReadAndWriteCounterRef",
+  "fields":[{"name":"writeCounter"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.BBHeader$ReadCounterRef",
+  "fields":[{"name":"readCounter"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.BLCHeader$DrainStatusRef",
+  "fields":[{"name":"drainStatus"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.BaseMpscLinkedArrayQueueColdProducerFields",
+  "fields":[{"name":"producerLimit"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.BaseMpscLinkedArrayQueueConsumerFields",
+  "fields":[{"name":"consumerIndex"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.BaseMpscLinkedArrayQueueProducerFields",
+  "fields":[{"name":"producerIndex"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.BoundedLocalCache",
+  "fields":[{"name":"refreshes"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.CacheLoader",
+  "methods":[{"name":"loadAll","parameterTypes":["java.util.Set"] }]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.FD",
+  "fields":[{"name":"value"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.FDMS",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.FS",
+  "fields":[{"name":"key"}, {"name":"value"}],
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.PS",
+  "fields":[{"name":"key"}, {"name":"value"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.PSA",
+  "fields":[{"name":"accessTime"}],
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.PW",
+  "fields":[{"name":"value"}],
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.SI",
+  "fields":[{"name":"FACTORY"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.SSA",
+  "fields":[{"name":"FACTORY"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.SSLA",
+  "fields":[{"name":"FACTORY"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.StripedBuffer",
+  "fields":[{"name":"tableBusy"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.UnboundedLocalCache",
+  "fields":[{"name":"refreshes"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.WILSMS",
+  "fields":[{"name":"FACTORY"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.WS",
+  "fields":[{"name":"FACTORY"}]
+},
+{
+  "name":"com.github.benmanes.caffeine.cache.WSL",
+  "fields":[{"name":"FACTORY"}]
+},
+{
+  "name":"com.sun.crypto.provider.AESCipher$General",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.ARCFOURCipher",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.ChaCha20Cipher$ChaCha20Poly1305",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.DESCipher",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.DESedeCipher",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.DHParameters",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.GaloisCounterMode$AESGCM",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.HmacCore$HmacSHA256",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.HmacCore$HmacSHA384",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.crypto.provider.TlsMasterSecretGenerator",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"groovy.lang.Closure"
+},
+{
+  "name":"java.io.Console",
+  "methods":[{"name":"isTerminal","parameterTypes":[] }]
+},
+{
+  "name":"java.io.Serializable",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.lang.Class",
+  "methods":[{"name":"getRecordComponents","parameterTypes":[] }]
+},
+{
+  "name":"java.lang.Comparable",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.lang.Double",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"java.lang.Iterable",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.lang.Number",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.lang.Object",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.lang.Record",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.lang.String"
+},
+{
+  "name":"java.lang.System",
+  "methods":[{"name":"console","parameterTypes":[] }]
+},
+{
+  "name":"java.lang.Thread",
+  "fields":[{"name":"threadLocalRandomProbe"}]
+},
+{
+  "name":"java.lang.constant.Constable",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.lang.constant.ConstantDesc",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.lang.reflect.Executable",
+  "methods":[{"name":"getParameters","parameterTypes":[] }]
+},
+{
+  "name":"java.lang.reflect.Method"
+},
+{
+  "name":"java.lang.reflect.Parameter",
+  "methods":[{"name":"getName","parameterTypes":[] }]
+},
+{
+  "name":"java.lang.reflect.RecordComponent",
+  "methods":[{"name":"getName","parameterTypes":[] }, {"name":"getType","parameterTypes":[] }]
+},
+{
+  "name":"java.nio.file.Path"
+},
+{
+  "name":"java.nio.file.Paths",
+  "methods":[{"name":"get","parameterTypes":["java.lang.String","java.lang.String[]"] }]
+},
+{
+  "name":"java.security.AlgorithmParametersSpi"
+},
+{
+  "name":"java.security.KeyStoreSpi"
+},
+{
+  "name":"java.security.SecureRandomParameters"
+},
+{
+  "name":"java.security.interfaces.ECPrivateKey"
+},
+{
+  "name":"java.security.interfaces.ECPublicKey"
+},
+{
+  "name":"java.security.interfaces.RSAPrivateKey"
+},
+{
+  "name":"java.security.interfaces.RSAPublicKey"
+},
+{
+  "name":"java.sql.Connection"
+},
+{
+  "name":"java.sql.Date"
+},
+{
+  "name":"java.sql.Driver"
+},
+{
+  "name":"java.sql.DriverManager",
+  "methods":[{"name":"getConnection","parameterTypes":["java.lang.String"] }, {"name":"getDriver","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"java.sql.Time",
+  "methods":[{"name":"<init>","parameterTypes":["long"] }]
+},
+{
+  "name":"java.sql.Timestamp",
+  "methods":[{"name":"valueOf","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"java.time.Duration",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.Instant",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.LocalDate",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.LocalDateTime",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.LocalTime",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.MonthDay",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.OffsetDateTime",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.OffsetTime",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.Period",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.Year",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.YearMonth",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.time.ZoneId",
+  "methods":[{"name":"of","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"java.time.ZoneOffset",
+  "methods":[{"name":"of","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"java.time.ZonedDateTime",
+  "methods":[{"name":"parse","parameterTypes":["java.lang.CharSequence"] }]
+},
+{
+  "name":"java.util.AbstractCollection",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.Collection",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.Collections$UnmodifiableMap",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"java.util.Date"
+},
+{
+  "name":"java.util.ImmutableCollections$AbstractImmutableCollection",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.ImmutableCollections$AbstractImmutableList",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.ImmutableCollections$ListN",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"java.util.List",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.Map",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.RandomAccess",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"java.util.concurrent.ForkJoinTask",
+  "fields":[{"name":"aux"}, {"name":"status"}]
+},
+{
+  "name":"java.util.concurrent.atomic.AtomicBoolean",
+  "fields":[{"name":"value"}]
+},
+{
+  "name":"java.util.concurrent.atomic.AtomicMarkableReference",
+  "fields":[{"name":"pair"}]
+},
+{
+  "name":"java.util.concurrent.atomic.AtomicReference",
+  "fields":[{"name":"value"}]
+},
+{
+  "name":"java.util.concurrent.atomic.Striped64",
+  "fields":[{"name":"base"}, {"name":"cellsBusy"}]
+},
+{
+  "name":"java.util.concurrent.atomic.Striped64$Cell",
+  "fields":[{"name":"value"}]
+},
+{
+  "name":"javax.security.auth.x500.X500Principal",
+  "fields":[{"name":"thisX500Name"}],
+  "methods":[{"name":"<init>","parameterTypes":["sun.security.x509.X500Name"] }]
+},
+{
+  "name":"jdk.internal.misc.Unsafe"
+},
+{
+  "name":"kotlin.Unit"
+},
+{
+  "name":"manifest_entry"
+},
+{
+  "name":"org.apache.commons.logging.LogFactory"
+},
+{
+  "name":"org.apache.commons.logging.impl.Log4JLogger",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }, {"name":"setLogFactory","parameterTypes":["org.apache.commons.logging.LogFactory"] }]
+},
+{
+  "name":"org.apache.commons.logging.impl.LogFactoryImpl",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.apache.commons.logging.impl.WeakHashtable",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.apache.hadoop.fs.FSDataInputStream"
+},
+{
+  "name":"org.apache.hadoop.mapred.JobConf"
+},
+{
+  "name":"org.apache.hadoop.mapred.JobConfigurable"
+},
+{
+  "name":"org.apache.hadoop.thirdparty.com.google.common.util.concurrent.AbstractFuture",
+  "fields":[{"name":"listeners"}, {"name":"value"}, {"name":"waiters"}]
+},
+{
+  "name":"org.apache.hadoop.thirdparty.com.google.common.util.concurrent.AbstractFuture$Waiter",
+  "fields":[{"name":"next"}, {"name":"thread"}]
+},
+{
+  "name":"org.apache.http.client.config.RequestConfig$Builder",
+  "methods":[{"name":"setNormalizeUri","parameterTypes":["boolean"] }]
+},
+{
+  "name":"org.apache.iceberg.GenericDataFile",
+  "methods":[{"name":"<init>","parameterTypes":["org.apache.iceberg.types.Types$StructType"] }]
+},
+{
+  "name":"org.apache.iceberg.GenericManifestEntry",
+  "methods":[{"name":"<init>","parameterTypes":["org.apache.iceberg.types.Types$StructType"] }]
+},
+{
+  "name":"org.apache.iceberg.GenericManifestFile",
+  "methods":[{"name":"<init>","parameterTypes":["org.apache.avro.Schema"] }, {"name":"<init>","parameterTypes":["org.apache.iceberg.types.Types$StructType"] }]
+},
+{
+  "name":"org.apache.iceberg.GenericPartitionFieldSummary",
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"<init>","parameterTypes":["org.apache.avro.Schema"] }, {"name":"<init>","parameterTypes":["org.apache.iceberg.types.Types$StructType"] }]
+},
+{
+  "name":"org.apache.iceberg.InternalParquet",
+  "methods":[{"name":"register","parameterTypes":[] }]
+},
+{
+  "name":"org.apache.iceberg.PartitionData",
+  "methods":[{"name":"<init>","parameterTypes":["org.apache.iceberg.types.Types$StructType"] }]
+},
+{
+  "name":"org.apache.iceberg.aws.ApacheHttpClientConfigurations",
+  "methods":[{"name":"create","parameterTypes":["java.util.Map"] }]
+},
+{
+  "name":"org.apache.iceberg.aws.AwsClientFactories$DefaultAwsClientFactory",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.apache.iceberg.aws.s3.S3FileIO",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.apache.iceberg.hadoop.HadoopMetricsContext",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"org.apache.iceberg.relocated.com.google.common.collect.BiMap",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"org.apache.iceberg.relocated.com.google.common.collect.ImmutableBiMap",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"org.apache.iceberg.relocated.com.google.common.collect.ImmutableMap",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"org.apache.iceberg.relocated.com.google.common.collect.RegularImmutableMap",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"org.apache.iceberg.relocated.com.google.common.collect.SingletonImmutableBiMap",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"org.apache.iceberg.rest.RESTMessage",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"org.apache.iceberg.rest.RESTRequest",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"org.apache.iceberg.rest.RESTResponse",
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"org.apache.iceberg.rest.auth.NoopAuthManager",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }]
+},
+{
+  "name":"org.apache.iceberg.rest.requests.CreateNamespaceRequest",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"org.apache.iceberg.rest.requests.CreateTableRequest",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"org.apache.iceberg.rest.requests.RenameTableRequest",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true
+},
+{
+  "name":"org.apache.iceberg.rest.responses.CreateNamespaceResponse",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.apache.iceberg.rest.responses.ListNamespacesResponse",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.apache.iceberg.rest.responses.ListTablesResponse",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.apache.iceberg.util.Pair$1"
+},
+{
+  "name":"org.apache.log4j.Level",
+  "fields":[{"name":"TRACE"}]
+},
+{
+  "name":"org.apache.log4j.Priority"
+},
+{
+  "name":"org.apache.parquet.column.values.bitpacking.ByteBitPackingBE",
+  "fields":[{"name":"factory"}]
+},
+{
+  "name":"org.apache.parquet.column.values.bitpacking.ByteBitPackingForLongBE",
+  "fields":[{"name":"factory"}]
+},
+{
+  "name":"org.apache.parquet.column.values.bitpacking.ByteBitPackingForLongLE",
+  "fields":[{"name":"factory"}]
+},
+{
+  "name":"org.apache.parquet.column.values.bitpacking.ByteBitPackingLE",
+  "fields":[{"name":"factory"}]
+},
+{
+  "name":"org.apache.parquet.column.values.bitpacking.LemireBitPackingBE",
+  "fields":[{"name":"factory"}]
+},
+{
+  "name":"org.apache.parquet.column.values.bitpacking.LemireBitPackingLE",
+  "fields":[{"name":"factory"}]
+},
+{
+  "name":"org.apache.parquet.hadoop.codec.SnappyCodec",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.apache.parquet.hadoop.codec.ZstandardCodec",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.brotli.dec.BrotliInputStream"
+},
+{
+  "name":"org.jline.terminal.impl.exec.ExecTerminalProvider",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.jline.terminal.impl.ffm.FfmTerminalProvider"
+},
+{
+  "name":"org.jline.terminal.impl.jansi.JansiTerminalProvider",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.jline.terminal.impl.jna.JnaTerminalProvider",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.jline.terminal.impl.jni.JniTerminalProvider",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"org.osgi.framework.BundleEvent"
+},
+{
+  "name":"picocli.AutoComplete$GenerateCompletion",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true,
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"picocli.CommandLine$AutoHelpMixin",
+  "allDeclaredFields":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"scala.util.Properties"
+},
+{
+  "name":"shaded.parquet.com.fasterxml.jackson.databind.ext.Java7SupportImpl",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.misc.Signal",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String"] }, {"name":"handle","parameterTypes":["sun.misc.Signal","sun.misc.SignalHandler"] }]
+},
+{
+  "name":"sun.misc.SignalHandler",
+  "fields":[{"name":"SIG_DFL"}]
+},
+{
+  "name":"sun.misc.Unsafe",
+  "allDeclaredFields":true,
+  "methods":[{"name":"invokeCleaner","parameterTypes":["java.nio.ByteBuffer"] }]
+},
+{
+  "name":"sun.security.pkcs12.PKCS12KeyStore",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.pkcs12.PKCS12KeyStore$DualFormatPKCS12",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.DSA$SHA224withDSA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.DSA$SHA256withDSA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.JavaKeyStore$DualFormatJKS",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.JavaKeyStore$JKS",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.MD5",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.NativePRNG",
+  "methods":[{"name":"<init>","parameterTypes":[] }, {"name":"<init>","parameterTypes":["java.security.SecureRandomParameters"] }]
+},
+{
+  "name":"sun.security.provider.SHA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.SHA2$SHA224",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.SHA2$SHA256",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.SHA5$SHA384",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.SHA5$SHA512",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.X509Factory",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.provider.certpath.PKIXCertPathValidator",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.rsa.PSSParameters",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.rsa.RSAKeyFactory$Legacy",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.rsa.RSAPSSSignature",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.rsa.RSASignature$SHA224withRSA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.rsa.RSASignature$SHA256withRSA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.rsa.RSASignature$SHA384withRSA",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.ssl.KeyManagerFactoryImpl$SunX509",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.ssl.SSLContextImpl$DefaultSSLContext",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.ssl.SSLContextImpl$TLSContext",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.ssl.TrustManagerFactoryImpl$PKIXFactory",
+  "methods":[{"name":"<init>","parameterTypes":[] }]
+},
+{
+  "name":"sun.security.util.ObjectIdentifier"
+},
+{
+  "name":"sun.security.x509.AuthorityInfoAccessExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.AuthorityKeyIdentifierExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.BasicConstraintsExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.CRLDistributionPointsExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.CertificateExtensions"
+},
+{
+  "name":"sun.security.x509.CertificatePoliciesExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.ExtendedKeyUsageExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.IssuerAlternativeNameExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.KeyUsageExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.NetscapeCertTypeExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.PrivateKeyUsageExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.SubjectAlternativeNameExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+},
+{
+  "name":"sun.security.x509.SubjectKeyIdentifierExtension",
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.Boolean","java.lang.Object"] }]
+}
+]
