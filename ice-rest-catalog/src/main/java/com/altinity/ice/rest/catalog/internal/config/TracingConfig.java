@@ -15,10 +15,11 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 /**
  * Per-request / per-client correlation configuration.
  *
- * <p>Adds a stable {@code clientId} (grouping all calls from one Iceberg client) and a per-request
- * {@code requestId} to logs (via MDC) and response headers, so a whole client session can be
- * grouped from the logs alone. All settings are optional; the feature is on by default and has no
- * external dependencies.
+ * <p>Adds a stable {@code clientId} (a deterministic per-identity fingerprint grouping all calls
+ * from the same uid + remote address + user-agent, including across separate client runs) and a
+ * per-request {@code requestId} to logs (via MDC) and response headers, so a whole client's
+ * activity can be grouped from the logs alone. All settings are optional; the feature is on by
+ * default and has no external dependencies.
  */
 public record TracingConfig(
     @JsonPropertyDescription(
@@ -30,7 +31,7 @@ public record TracingConfig(
     @JsonPropertyDescription("Header carrying the per-request id (X-Request-Id)")
         String requestIdHeader,
     @JsonPropertyDescription(
-            "Advertise a generated client id via the /v1/config response so Iceberg Java/PyIceberg clients echo it on every request (true by default)")
+            "Advertise the resolved (deterministic fingerprint) client id via the /v1/config response so Iceberg Java/PyIceberg clients echo the same id on every request, keeping it stable across runs (true by default)")
         Boolean advertiseClientId) {
 
   public static final String DEFAULT_CLIENT_ID_HEADER = "X-Ice-Client-Id";

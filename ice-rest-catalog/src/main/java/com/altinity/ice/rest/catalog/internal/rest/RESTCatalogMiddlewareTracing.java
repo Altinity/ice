@@ -13,14 +13,19 @@ import com.altinity.ice.rest.catalog.internal.auth.Session;
 import java.util.Map;
 import org.apache.iceberg.rest.RESTResponse;
 import org.apache.iceberg.rest.responses.ConfigResponse;
+import org.slf4j.MDC;
 
 /**
- * Advertises a per-client id to Iceberg clients via the {@code /v1/config} handshake.
+ * Advertises the client id to Iceberg clients via the {@code /v1/config} handshake.
  *
- * <p>The id is returned as a {@code header.<clientIdHeader>} override. Iceberg Java and PyIceberg
- * merge config overrides and re-send matching {@code header.*} properties on every subsequent
- * request, so all calls from that client instance share one {@code clientId}. Clients that ignore
- * config overrides (e.g. ClickHouse) simply fall back to the server-side fingerprint.
+ * <p>The advertised value is the id already resolved for the config request (read from the {@link
+ * MDC}) - a deterministic per-identity fingerprint ({@code fp-...}) derived from uid + remote
+ * address + user-agent. It is returned as a {@code header.<clientIdHeader>} override. Iceberg Java
+ * and PyIceberg merge config overrides and re-send matching {@code header.*} properties on every
+ * subsequent request, so all calls from that identity share one {@code clientId} - and because the
+ * value is deterministic (not a random per-instance id), it stays stable across separate
+ * short-lived client runs. Clients that ignore config overrides (e.g. ClickHouse) fall back to the
+ * same server-side fingerprint anyway.
  */
 public class RESTCatalogMiddlewareTracing extends RESTCatalogMiddleware {
 
@@ -42,9 +47,12 @@ public class RESTCatalogMiddlewareTracing extends RESTCatalogMiddleware {
       Class<T> responseType) {
     T restResponse = this.next.handle(session, route, vars, requestBody, responseType);
     if (restResponse instanceof ConfigResponse configResponse) {
-      configResponse
-          .overrides()
-          .putIfAbsent(HEADER_PREFIX + clientIdHeader, RequestTracing.newClientId());
+      // Advertise the id already resolved for this config request (the stable fingerprint), so
+      // echoing clients keep using the same deterministic id across runs.
+      String clientId = MDC.get(RequestTracing.MDC_CLIENT_ID);
+      if (clientId != null && !clientId.isEmpty()) {
+        configResponse.overrides().putIfAbsent(HEADER_PREFIX + clientIdHeader, clientId);
+      }
     }
     return restResponse;
   }

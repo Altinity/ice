@@ -22,18 +22,24 @@ import org.slf4j.MDC;
 /**
  * Resolves and propagates per-client / per-request correlation identifiers.
  *
- * <p>{@code clientId} groups every call from a single Iceberg client instance; {@code requestId} is
- * unique per HTTP request. Both are placed in the SLF4J {@link MDC} (rendered by the logback
- * pattern) and echoed back as response headers.
+ * <p>{@code clientId} groups every call from a single identity; {@code requestId} is unique per
+ * HTTP request. Both are placed in the SLF4J {@link MDC} (rendered by the logback pattern) and
+ * echoed back as response headers.
  *
- * <p>Client id resolution degrades gracefully:
+ * <p>Client id resolution:
  *
  * <ul>
- *   <li>If the request carries the client-id header (Iceberg Java / PyIceberg echo it once the
- *       server advertises it via the {@code /v1/config} response), that value is used.
+ *   <li>If the request carries the client-id header, that value is used. Iceberg Java / PyIceberg
+ *       echo it once the server advertises it via the {@code /v1/config} response, so all calls
+ *       from that client re-send the same value.
  *   <li>Otherwise a stable fingerprint derived from the auth token, remote address and User-Agent
- *       is used. This covers clients (e.g. ClickHouse) that do not echo config headers.
+ *       is used. This covers the {@code /v1/config} request itself (before the header is echoed)
+ *       and clients (e.g. ClickHouse) that do not echo config headers.
  * </ul>
+ *
+ * <p>The advertised id is this same fingerprint (see {@code RESTCatalogMiddlewareTracing}), so it
+ * is deterministic per identity and stable across separate client runs, giving identity-level
+ * grouping.
  */
 public final class RequestTracing {
 
@@ -57,11 +63,6 @@ public final class RequestTracing {
 
   public String clientIdHeader() {
     return clientIdHeader;
-  }
-
-  /** A freshly generated client id, suitable for advertising via the config response. */
-  public static String newClientId() {
-    return UUID.randomUUID().toString();
   }
 
   /** Client id from the request header, falling back to a stable fingerprint. */

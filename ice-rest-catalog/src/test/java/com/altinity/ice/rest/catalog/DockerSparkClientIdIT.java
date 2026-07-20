@@ -42,10 +42,11 @@ import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
  * Docker-based integration test that verifies request/client-id grouping.
  *
  * <p>Runs Apache Spark (spark-iceberg image) as an Iceberg REST client against the ice-rest-catalog
- * container and asserts that every catalog call made by a single Spark session shares one
- * server-assigned client id (the {@code X-Ice-Client-Id} UUID advertised via {@code /v1/config} and
- * echoed back by the Iceberg Java client). Grouping is checked from the catalog container logs,
- * where the logback pattern renders {@code %X{clientId}} on each request line.
+ * container and asserts that every catalog call made by a single Spark session shares one client
+ * id. The id is the deterministic per-identity fingerprint ({@code fp-...}) advertised via {@code
+ * /v1/config} (and echoed back by the Iceberg Java client), so even the {@code /v1/config} request
+ * shares the same id as the operations. Grouping is checked from the catalog container logs, where
+ * the logback pattern renders {@code %X{clientId}} on each request line.
  *
  * <p>Excluded from the default Failsafe run (see {@code ice-rest-catalog/pom.xml}); run explicitly
  * with {@code ./mvnw -pl ice-rest-catalog verify -Dit.test=DockerSparkClientIdIT}. Requires Docker
@@ -72,9 +73,8 @@ public class DockerSparkClientIdIT {
       Pattern.compile(
           "RESTCatalogServlet > (\\S+) (\\S+) @token:anonymous (GET|POST|HEAD|DELETE) (v1/\\S+)");
 
-  private static final Pattern UUID_PATTERN =
-      Pattern.compile(
-          "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+  // The deterministic per-identity fingerprint advertised by the catalog (fp-<crc32 hex>).
+  private static final Pattern FINGERPRINT_PATTERN = Pattern.compile("fp-[0-9a-fA-F]+");
 
   private Network network;
   private GenericContainer<?> minio;
@@ -243,8 +243,12 @@ public class DockerSparkClientIdIT {
 
     String sharedClientId = operationClientIds.iterator().next();
     assertThat(sharedClientId)
-        .as("shared client id must be the server-advertised UUID echoed by Spark")
-        .matches(UUID_PATTERN);
+        .as("shared client id must be the deterministic fingerprint advertised by the catalog")
+        .matches(FINGERPRINT_PATTERN);
+
+    assertThat(configClientId)
+        .as("the /v1/config request must share the same client id as the operations")
+        .isEqualTo(sharedClientId);
   }
 
   private static String sparkDefaultsConf() {
