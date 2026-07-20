@@ -42,7 +42,8 @@ public final class Delete {
       RESTCatalog catalog,
       TableIdentifier tableId,
       List<PartitionFilter> partitions,
-      boolean dryRun)
+      boolean dryRun,
+      boolean purge)
       throws IOException, URISyntaxException {
 
     Table table = catalog.loadTable(tableId);
@@ -98,7 +99,11 @@ public final class Delete {
     if (!filesToDelete.isEmpty()) {
       if (dryRun) {
         for (DataFile file : filesToDelete) {
-          logger.info("To be deleted: {}", file.location());
+          if (purge) {
+            logger.info("To be deleted and purged: {}", file.location());
+          } else {
+            logger.info("To be deleted: {}", file.location());
+          }
         }
       } else {
         RewriteFiles rewrite = table.newRewrite();
@@ -107,6 +112,13 @@ public final class Delete {
           rewrite.deleteFile(deleteFile);
         }
         rewrite.commit();
+
+        if (purge) {
+          for (DataFile deleteFile : filesToDelete) {
+            logger.info("Purging {}", deleteFile.location());
+            io.deleteFile(deleteFile.location());
+          }
+        }
       }
     } else {
       logger.info("No files to delete");
