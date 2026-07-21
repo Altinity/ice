@@ -975,7 +975,12 @@ public final class Main {
               names = "--dry-run",
               description =
                   "Log files that would be deleted without actually deleting them (true by default)")
-          Boolean dryRun)
+          Boolean dryRun,
+      @CommandLine.Option(
+              names = {"--purge"},
+              description =
+                  "Physically delete the matched data files from storage (breaks time-travel to snapshots that referenced them). No effect during a dry run.")
+          boolean purge)
       throws IOException {
     if (dryRun == null) {
       dryRun = true;
@@ -990,7 +995,7 @@ public final class Main {
       }
       TableIdentifier tableId = TableIdentifier.parse(name);
 
-      Delete.run(catalog, tableId, partitions, dryRun);
+      Delete.run(catalog, tableId, partitions, dryRun, purge);
     } catch (URISyntaxException e) {
       throw new RuntimeException(e);
     }

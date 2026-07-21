@@ -43,6 +43,10 @@ ice delete nyc.taxis_p_by_day  \
 ice delete nyc.taxis_p_by_day  \
   --partition '[{"name": "tpep_pickup_datetime_day", "op": "greater_than_or_equal", "values": ["2024-12-31T23:51:20"]}]' --dry-run=false
 
+# delete partition and physically purge the data files from storage
+ice delete nyc.taxis_p_by_day  \
+  --partition '[{"name": "tpep_pickup_datetime", "values": ["2024-12-31T23:51:20"]}]' --dry-run=false --purge
+
 # insert data ordered by tpep_pickup_datetime column
 ice insert nyc.taxis_s_by_day -p \
   https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet \
