@@ -36,7 +36,9 @@ import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
 import com.altinity.ice.internal.jetty.DebugServer;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -964,7 +966,10 @@ public final class Main {
               names = {"--partition"},
               description =
                   "JSON array of partition filters: [{\"name\": \"vendorId\", \"values\": [5, 6]}]. "
-                      + "For timestamp columns, use ISO Datetime format YYYY-MM-ddTHH:mm:ss")
+                      + "For timestamp columns, use ISO Datetime format YYYY-MM-ddTHH:mm:ss. "
+                      + "Each filter may set an optional \"op\": one of equals (default), less_than, "
+                      + "greater_than, less_than_or_equal, greater_than_or_equal, e.g. "
+                      + "[{\"name\": \"vendorId\", \"op\": \"greater_than_or_equal\", \"values\": [5]}]")
           String partitionJson,
       @CommandLine.Option(
               names = "--dry-run",
@@ -992,7 +997,43 @@ public final class Main {
   }
 
   public record PartitionFilter(
-      @JsonProperty("name") String name, @JsonProperty("values") List<Object> values) {}
+      @JsonProperty("name") String name,
+      @JsonProperty("values") List<Object> values,
+      @JsonProperty("op") Op op) {
+
+    public PartitionFilter {
+      op = op == null ? Op.EQUALS : op;
+    }
+
+    public enum Op {
+      EQUALS("equals"),
+      LESS_THAN("less_than"),
+      GREATER_THAN("greater_than"),
+      LESS_THAN_OR_EQUAL("less_than_or_equal"),
+      GREATER_THAN_OR_EQUAL("greater_than_or_equal");
+
+      private final String json;
+
+      Op(String json) {
+        this.json = json;
+      }
+
+      @JsonValue
+      public String json() {
+        return json;
+      }
+
+      @JsonCreator
+      public static Op fromJson(String v) {
+        for (Op op : values()) {
+          if (op.json.equalsIgnoreCase(v) || op.name().equalsIgnoreCase(v)) {
+            return op;
+          }
+        }
+        throw new IllegalArgumentException("unknown partition filter op: " + v);
+      }
+    }
+  }
 
   private RESTCatalog loadCatalog() throws IOException {
     return loadCatalog(this.configFile());

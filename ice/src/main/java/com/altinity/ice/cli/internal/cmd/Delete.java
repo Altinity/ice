@@ -72,7 +72,7 @@ public final class Delete {
             value = transformed;
           }
 
-          Expression singleValueExpr = Expressions.equal(fieldName, value);
+          Expression singleValueExpr = toPredicate(fieldName, value, pf.op());
           fieldExpr =
               fieldExpr == null ? singleValueExpr : Expressions.or(fieldExpr, singleValueExpr);
         }
@@ -111,5 +111,15 @@ public final class Delete {
     } else {
       logger.info("No files to delete");
     }
+  }
+
+  static Expression toPredicate(String fieldName, Object value, PartitionFilter.Op op) {
+    return switch (op) {
+      case EQUALS -> Expressions.equal(fieldName, value);
+      case LESS_THAN -> Expressions.lessThan(fieldName, value);
+      case GREATER_THAN -> Expressions.greaterThan(fieldName, value);
+      case LESS_THAN_OR_EQUAL -> Expressions.lessThanOrEqual(fieldName, value);
+      case GREATER_THAN_OR_EQUAL -> Expressions.greaterThanOrEqual(fieldName, value);
+    };
   }
 }
