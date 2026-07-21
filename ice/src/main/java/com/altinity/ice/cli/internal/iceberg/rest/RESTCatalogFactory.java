@@ -33,6 +33,7 @@ import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.SessionCatalog;
 import org.apache.iceberg.rest.HTTPClient;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.rest.RESTUtil;
 
 public class RESTCatalogFactory {
 
@@ -63,6 +64,7 @@ public class RESTCatalogFactory {
         x ->
             HTTPClient.builder(x)
                 .uri(x.get(CatalogProperties.URI))
+                .withHeaders(RESTUtil.configHeaders(x))
                 .withTlsSocketStrategy(tlsSocketStrategy)
                 .build());
   }
