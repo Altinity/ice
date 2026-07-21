@@ -123,7 +123,28 @@ ice delete nyc.taxis_p_by_day \
 ice delete nyc.taxis_p_by_day \
   --partition '[{"name": "tpep_pickup_datetime_day", "values": ["2024-12-31"]}]' \
   --dry-run=false
+
+# actually delete and physically purge the data files from storage
+ice delete nyc.taxis_p_by_day \
+  --partition '[{"name": "tpep_pickup_datetime_day", "values": ["2024-12-31"]}]' \
+  --dry-run=false --purge
+
+# delete a range of partitions using a comparison operator
+ice delete nyc.taxis_p_by_day \
+  --partition '[{"name": "tpep_pickup_datetime_day", "op": "greater_than_or_equal", "values": ["2024-12-31"]}]' \
+  --dry-run=false
 ```
+
+Each partition filter accepts an optional `op` field (default `equals`): one of
+`equals`, `less_than`, `greater_than`, `less_than_or_equal`, `greater_than_or_equal`.
+Values within a filter are OR'd together and filters across fields are AND'd, so a
+range delete typically uses a single value.
+
+Without `--purge`, `ice delete` only de-references the data files (a new snapshot is
+created); the physical files remain until catalog maintenance reclaims them via
+`SNAPSHOT_CLEANUP` / `ORPHAN_CLEANUP`. With `--purge`, the matched data files are
+deleted from storage immediately, which breaks time-travel to snapshots that
+referenced them.
 
 ### Insert Without Copy
 
