@@ -37,11 +37,11 @@ ice insert nyc.taxis_p_by_day -p \
 
 # delete partition
 ice delete nyc.taxis_p_by_day  \
-  --partition '[{"name": "tpep_pickup_datetime", "values": ["2024-12-31T23:51:20"]}]' --dry-run=false
+  --partition '[{"name": "tpep_pickup_datetime_day", "values": ["2024-12-31T23:51:20"]}]' --dry-run=false
 
 # delete a range of partitions using a comparison operator (default op is equals)
 ice delete nyc.taxis_p_by_day  \
-  --partition '[{"name": "tpep_pickup_datetime", "op": "greater_than_or_equal", "values": ["2024-12-31T23:51:20"]}]' --dry-run=false
+  --partition '[{"name": "tpep_pickup_datetime_day", "op": "greater_than_or_equal", "values": ["2024-12-31T23:51:20"]}]' --dry-run=false
 
 # insert data ordered by tpep_pickup_datetime column
 ice insert nyc.taxis_s_by_day -p \
@@ -79,7 +79,7 @@ CREATE DATABASE ice
   ENGINE = DataLakeCatalog('http://localhost:5000')
   SETTINGS catalog_type = 'rest',
     auth_header = 'Authorization: Bearer foo', 
-    storage_endpoint = 'http://localhost:9000', 
+    storage_endpoint = 'http://localhost:8999', 
     warehouse = 's3://bucket1';
 
 -- inspect
