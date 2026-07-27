@@ -46,7 +46,7 @@ services:
       CLICKHOUSE_SKIP_USER_SETUP: "1" # insecure
     ports:
       - "8123:8123" # clickhouse/http
-      - "9000:9000" # clickhouse/native
+      - "9002:9000" # clickhouse/native
     configs:
       - source: clickhouse-init
         target: /docker-entrypoint-initdb.d/init-db.sh

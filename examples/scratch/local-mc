@@ -8,5 +8,5 @@ set +a
 
 mkdir -p "$DIR/data/mc"
 
-mc --config-dir "$DIR/data/mc" alias set "local" "http://localhost:9000" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
+mc --config-dir "$DIR/data/mc" alias set "local" "http://localhost:8999" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
 exec mc --config-dir "$DIR/data/mc" "$@"

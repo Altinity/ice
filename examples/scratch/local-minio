@@ -8,4 +8,4 @@ set +a
 
 mkdir -p "$DIR/data/minio"
 
-exec minio server "$DIR/data/minio" --console-address ":9001" "$@"
+exec minio server "$DIR/data/minio" --address ":8999" --console-address ":9001" "$@"
