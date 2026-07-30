@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0](https://github.com/Altinity/ice/compare/v0.18.0...master)
+
+### Fixed
+
+- `ice` - Fix sorting when field ids are not provided in parquet files ([#201](https://github.com/Altinity/ice/pull/201))
+
 ## [0.18.0](https://github.com/Altinity/ice/compare/v0.17.0...master)
 
 ### Added
