@@ -1,0 +1,161 @@
+services:
+  minio:
+    image: minio/minio:RELEASE.2025-03-12T18-04-18Z
+    restart: unless-stopped
+    command: [ 'server', '/data', '--address', ':8999', '--console-address', ':9001' ]
+    environment:
+      MINIO_ROOT_USER: miniouser
+      MINIO_ROOT_PASSWORD: miniopassword
+    ports:
+      - '8999:8999' # 9000 is taken by clickhouse
+      - '9001:9001' # web console
+    volumes:
+      - minio:/data
+  minio-init:
+    image: minio/mc:RELEASE.2025-03-12T17-29-24Z
+    restart: on-failure  # run once and exit
+    entrypoint: >
+      /bin/sh -c "
+      sleep 1; until /usr/bin/mc alias set local http://minio:8999 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do echo waiting for minio to start...; sleep 1; done;
+      /usr/bin/mc mb --ignore-existing local/bucket1;
+      exit 0;
+      "
+    environment:
+      MINIO_ROOT_USER: miniouser
+      MINIO_ROOT_PASSWORD: miniopassword
+    depends_on:
+      - minio
+  polaris:
+    image: apache/polaris:${POLARIS_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - '8181:8181' # iceberg rest catalog api
+      - '8182:8182' # management / health
+    environment:
+      # REALM,CLIENT_ID,CLIENT_SECRET - auto-bootstraps the realm root principal on startup.
+      POLARIS_BOOTSTRAP_CREDENTIALS: "POLARIS,root,s3cr3t"
+      polaris.realm-context.realms: "POLARIS"
+      quarkus.otel.sdk.disabled: "true"
+      # Credentials Polaris uses for its own metadata IO to MinIO.
+      AWS_ACCESS_KEY_ID: miniouser
+      AWS_SECRET_ACCESS_KEY: miniopassword
+      AWS_REGION: minio
+    depends_on:
+      - minio-init
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8182/q/health" ]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+      start_period: 10s
+  polaris-setup:
+    image: alpine/curl
+    restart: on-failure # run once and exit
+    configs:
+      - source: polaris-bootstrap
+        target: /polaris-bootstrap.sh
+    entrypoint: [ "/bin/sh", "/polaris-bootstrap.sh" ]
+    depends_on:
+      polaris:
+        condition: service_healthy
+  clickhouse:
+    image: altinity/clickhouse-server:26.3.13.20001.altinityantalya
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1" # insecure
+      # Static MinIO credentials for reading data files (Polaris does not vend creds for MinIO).
+      AWS_ACCESS_KEY_ID: miniouser
+      AWS_SECRET_ACCESS_KEY: miniopassword
+    ports:
+      - "8123:8123" # clickhouse/http
+      - "9002:9000" # clickhouse/native
+    configs:
+      - source: clickhouse-init
+        target: /docker-entrypoint-initdb.d/init-db.sh
+    volumes:
+      # for access to clickhouse-logs
+      - ./data/docker-compose/clickhouse/var/log/clickhouse-server:/var/log/clickhouse-server
+    depends_on:
+      polaris-setup:
+        condition: service_completed_successfully
+configs:
+  polaris-bootstrap:
+    # NOTE: shell variables are escaped as $$ so docker compose does not interpolate them.
+    content: |
+      #!/bin/sh
+      set -e
+
+      POLARIS_URL="http://polaris:8181"
+      CLIENT_ID="root"
+      CLIENT_SECRET="s3cr3t"
+      CATALOG_NAME="polariscatalog"
+
+      apk add --no-cache jq >/dev/null
+
+      echo "Requesting OAuth token from Polaris...";
+      TOKEN=""
+      until [ -n "$$TOKEN" ] && [ "$$TOKEN" != "null" ]; do
+        TOKEN=$$(curl -s -X POST "$$POLARIS_URL/api/catalog/v1/oauth/tokens" \
+          -d "grant_type=client_credentials" \
+          -d "client_id=$$CLIENT_ID" \
+          -d "client_secret=$$CLIENT_SECRET" \
+          -d "scope=PRINCIPAL_ROLE:ALL" | jq -r '.access_token // empty')
+        if [ -z "$$TOKEN" ]; then echo "waiting for polaris oauth..."; sleep 2; fi
+      done
+      echo "OK got token";
+
+      AUTH="Authorization: Bearer $$TOKEN"
+      MGMT="$$POLARIS_URL/api/management/v1"
+
+      echo "Creating catalog $$CATALOG_NAME...";
+      code=$$(curl -s -o /tmp/cat.out -w "%{http_code}" -X POST "$$MGMT/catalogs" \
+        -H "$$AUTH" -H "Content-Type: application/json" \
+        -d "{\"catalog\":{\"name\":\"$$CATALOG_NAME\",\"type\":\"INTERNAL\",\"properties\":{\"default-base-location\":\"s3://bucket1\"},\"storageConfigInfo\":{\"storageType\":\"S3\",\"allowedLocations\":[\"s3://bucket1/*\"],\"region\":\"minio\",\"endpoint\":\"http://minio:8999\",\"pathStyleAccess\":true,\"stsUnavailable\":true}}}")
+      if [ "$$code" = "201" ] || [ "$$code" = "200" ] || [ "$$code" = "409" ]; then
+        echo "OK catalog ($$code)";
+      else
+        echo "FAIL catalog ($$code): $$(cat /tmp/cat.out)"; exit 1;
+      fi
+
+      echo "Assigning catalog_admin role to service_admin principal-role...";
+      code=$$(curl -s -o /tmp/role.out -w "%{http_code}" -X PUT \
+        "$$MGMT/principal-roles/service_admin/catalog-roles/$$CATALOG_NAME" \
+        -H "$$AUTH" -H "Content-Type: application/json" \
+        -d "{\"catalogRole\":{\"name\":\"catalog_admin\"}}")
+      if [ "$$code" = "201" ] || [ "$$code" = "200" ] || [ "$$code" = "409" ]; then
+        echo "OK role ($$code)";
+      else
+        echo "FAIL role ($$code): $$(cat /tmp/role.out)"; exit 1;
+      fi
+
+      echo "Granting CATALOG_MANAGE_CONTENT to catalog_admin...";
+      code=$$(curl -s -o /tmp/grant.out -w "%{http_code}" -X PUT \
+        "$$MGMT/catalogs/$$CATALOG_NAME/catalog-roles/catalog_admin/grants" \
+        -H "$$AUTH" -H "Content-Type: application/json" \
+        -d "{\"grant\":{\"type\":\"catalog\",\"privilege\":\"CATALOG_MANAGE_CONTENT\"}}")
+      if [ "$$code" = "201" ] || [ "$$code" = "200" ] || [ "$$code" = "409" ]; then
+        echo "OK grant ($$code)";
+      else
+        echo "FAIL grant ($$code): $$(cat /tmp/grant.out)"; exit 1;
+      fi
+
+      echo "Polaris bootstrap complete.";
+  clickhouse-init:
+    content: |
+      #!/bin/bash
+      exec clickhouse client --query $"
+        SET allow_experimental_database_iceberg = 1;
+
+        DROP DATABASE IF EXISTS ice;
+
+        CREATE DATABASE ice
+          ENGINE = DataLakeCatalog('http://polaris:8181/api/catalog/v1')
+          SETTINGS catalog_type = 'rest',
+            catalog_credential = 'root:s3cr3t',
+            warehouse = 'polariscatalog',
+            auth_scope = 'PRINCIPAL_ROLE:ALL',
+            oauth_server_uri = 'http://polaris:8181/api/catalog/v1/oauth/tokens',
+            storage_endpoint = 'http://minio:8999';
+      "
+volumes:
+  minio:
