@@ -42,7 +42,8 @@ public final class Delete {
       RESTCatalog catalog,
       TableIdentifier tableId,
       List<PartitionFilter> partitions,
-      boolean dryRun)
+      boolean dryRun,
+      boolean purge)
       throws IOException, URISyntaxException {
 
     Table table = catalog.loadTable(tableId);
@@ -72,7 +73,7 @@ public final class Delete {
             value = transformed;
           }
 
-          Expression singleValueExpr = Expressions.equal(fieldName, value);
+          Expression singleValueExpr = toPredicate(fieldName, value, pf.op());
           fieldExpr =
               fieldExpr == null ? singleValueExpr : Expressions.or(fieldExpr, singleValueExpr);
         }
@@ -98,7 +99,11 @@ public final class Delete {
     if (!filesToDelete.isEmpty()) {
       if (dryRun) {
         for (DataFile file : filesToDelete) {
-          logger.info("To be deleted: {}", file.location());
+          if (purge) {
+            logger.info("To be deleted and purged: {}", file.location());
+          } else {
+            logger.info("To be deleted: {}", file.location());
+          }
         }
       } else {
         RewriteFiles rewrite = table.newRewrite();
@@ -107,9 +112,26 @@ public final class Delete {
           rewrite.deleteFile(deleteFile);
         }
         rewrite.commit();
+
+        if (purge) {
+          for (DataFile deleteFile : filesToDelete) {
+            logger.info("Purging {}", deleteFile.location());
+            io.deleteFile(deleteFile.location());
+          }
+        }
       }
     } else {
       logger.info("No files to delete");
     }
+  }
+
+  static Expression toPredicate(String fieldName, Object value, PartitionFilter.Op op) {
+    return switch (op) {
+      case EQUALS -> Expressions.equal(fieldName, value);
+      case LESS_THAN -> Expressions.lessThan(fieldName, value);
+      case GREATER_THAN -> Expressions.greaterThan(fieldName, value);
+      case LESS_THAN_OR_EQUAL -> Expressions.lessThanOrEqual(fieldName, value);
+      case GREATER_THAN_OR_EQUAL -> Expressions.greaterThanOrEqual(fieldName, value);
+    };
   }
 }

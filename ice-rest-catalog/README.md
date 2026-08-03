@@ -36,3 +36,4 @@ If `enabled` is true but the catalog backend is not etcd, the lock is ignored (w
 - [SQLite Backend Schema](../docs/sqlite-backend-schema.md) -- SQLite tables (`iceberg_tables`, `iceberg_namespace_properties`)
 - [Catalog Import/Export](../docs/catalog-import-export.md) -- export and import catalog registry (namespaces and table metadata pointers) via CLI or REST API
 - [Catalog migration (1-node to 3-node etcd)](../docs/catalog-export-import-migration.md) -- migrate registry via `ice catalog-export` / `catalog-import`; optional recovery from an etcd snapshot backup first
+- [Rewriting table paths](../docs/rewrite-table-path.md) -- using Spark to rewrite paths in metadata files when copying a table to a new location

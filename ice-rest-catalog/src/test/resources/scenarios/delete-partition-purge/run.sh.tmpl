@@ -1,0 +1,89 @@
+#!/bin/bash
+set -e
+
+echo "Running delete partition with purge test..."
+
+# Create namespace
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "OK Created namespace: ${NAMESPACE_NAME}"
+
+# Reuse the tripdata.parquet input from the delete-partition scenario
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/../delete-partition/${INPUT_FILE}"
+
+# Create table with partitioning and insert data
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_NAME} ${INPUT_PATH} --partition="${PARTITION_SPEC}"
+echo "OK Inserted data with partitioning into table ${TABLE_NAME}"
+
+# Validate partition exists before deletion
+list_before=$({{ICE_CLI}} --config {{CLI_CONFIG}} list-partitions ${TABLE_NAME})
+if [[ "$list_before" != *"${TRANSFORMED_PARTITION_COLUMN}=${DELETE_PARTITION_DAY}"* ]]; then
+  echo "FAIL Expected partition key ${TRANSFORMED_PARTITION_COLUMN}=${DELETE_PARTITION_DAY} in list-partitions before delete"
+  exit 1
+fi
+echo "OK Partition exists before deletion"
+
+# Physical data file prefix for the partition being deleted
+DATA_PREFIX="s3://${S3_BUCKET}/warehouse/${NAMESPACE_NAME}/tripdata_p_by_day/data/${TRANSFORMED_PARTITION_COLUMN}=${DELETE_PARTITION_DAY}/"
+
+# Verify the partition's data files physically exist before purge (best-effort; requires aws + MinIO)
+CHECK_PHYSICAL=0
+if command -v aws &>/dev/null && [ -n "{{MINIO_ENDPOINT}}" ]; then
+  export AWS_ACCESS_KEY_ID=minioadmin
+  export AWS_SECRET_ACCESS_KEY=minioadmin
+  export AWS_REGION=us-east-1
+  export AWS_DEFAULT_REGION=us-east-1
+  CHECK_PHYSICAL=1
+
+  before_count=$(aws --endpoint-url "{{MINIO_ENDPOINT}}" s3 ls "${DATA_PREFIX}" 2>/dev/null | grep -c '\.parquet' || true)
+  if [ "${before_count}" -lt 1 ]; then
+    echo "FAIL Expected at least one .parquet under ${DATA_PREFIX} before purge, found ${before_count}"
+    exit 1
+  fi
+  echo "OK Found ${before_count} physical data file(s) before purge"
+else
+  echo "SKIP physical file check (aws unavailable or MINIO_ENDPOINT unset)"
+fi
+
+# Delete partition for a specific day and physically purge the data files
+output=$({{ICE_CLI}} --config {{CLI_CONFIG}} delete ${TABLE_NAME} --dry-run=false --purge --partition "[{\"name\": \"${TRANSFORMED_PARTITION_COLUMN}\", \"values\": [\"${DELETE_PARTITION_DAY}\"]}]" 2>&1)
+
+echo "$output"
+
+if ! echo "$output" | grep -qF "${TRANSFORMED_PARTITION_COLUMN}=${DELETE_PARTITION_DAY}"; then
+  echo "FAIL Expected output to contain '${TRANSFORMED_PARTITION_COLUMN}=${DELETE_PARTITION_DAY}'"
+  exit 1
+fi
+
+if ! echo "$output" | grep -qF "Purging"; then
+  echo "FAIL Expected output to contain 'Purging' when using --purge"
+  exit 1
+fi
+echo "OK Deleted and purged partition with value ${DELETE_PARTITION_DAY}"
+
+# Validate partition was deleted (logical)
+list_after=$({{ICE_CLI}} --config {{CLI_CONFIG}} list-partitions ${TABLE_NAME})
+if [[ "$list_after" == *"${TRANSFORMED_PARTITION_COLUMN}=${DELETE_PARTITION_DAY}"* ]]; then
+  echo "FAIL Deleted partition key ${TRANSFORMED_PARTITION_COLUMN}=${DELETE_PARTITION_DAY} in list-partitions after delete"
+  exit 1
+fi
+echo "OK Validated partition was logically deleted"
+
+# Validate the partition's data files were physically removed from storage
+if [ "${CHECK_PHYSICAL}" -eq 1 ]; then
+  after_count=$(aws --endpoint-url "{{MINIO_ENDPOINT}}" s3 ls "${DATA_PREFIX}" 2>/dev/null | grep -c '\.parquet' || true)
+  if [ "${after_count}" -ne 0 ]; then
+    echo "FAIL Expected no .parquet under ${DATA_PREFIX} after purge, found ${after_count}"
+    exit 1
+  fi
+  echo "OK Validated partition data files were physically purged"
+fi
+
+# Cleanup
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+echo "OK Deleted table: ${TABLE_NAME}"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "OK Deleted namespace: ${NAMESPACE_NAME}"
+
+echo "Delete partition with purge test completed successfully"

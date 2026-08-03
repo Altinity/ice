@@ -39,6 +39,8 @@ import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.InputFile;
+import org.apache.iceberg.mapping.MappingUtil;
+import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.transforms.Transform;
 import org.apache.iceberg.types.Type;
@@ -315,6 +317,15 @@ public final class Partitioning {
 
   public static Map<PartitionKey, List<org.apache.iceberg.data.Record>> partition(
       InputFile inputFile, Schema tableSchema, PartitionSpec partitionSpec) throws IOException {
+    return partition(inputFile, tableSchema, partitionSpec, MappingUtil.create(tableSchema));
+  }
+
+  public static Map<PartitionKey, List<org.apache.iceberg.data.Record>> partition(
+      InputFile inputFile,
+      Schema tableSchema,
+      PartitionSpec partitionSpec,
+      @Nullable NameMapping nameMapping)
+      throws IOException {
     PartitionKey partitionKeyMold = new PartitionKey(partitionSpec, tableSchema);
     Map<PartitionKey, List<org.apache.iceberg.data.Record>> partitionedRecords = new HashMap<>();
 
@@ -322,6 +333,9 @@ public final class Partitioning {
         Parquet.read(inputFile)
             .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
             .project(tableSchema);
+    if (nameMapping != null) {
+      readBuilder = readBuilder.withNameMapping(nameMapping);
+    }
 
     try (CloseableIterable<org.apache.iceberg.data.Record> records = readBuilder.build()) {
       org.apache.iceberg.data.Record partitionRecord = GenericRecord.create(tableSchema);
