@@ -11,6 +11,9 @@
   <!--ice-rest-catalog-->
   <!--<logger name="org.apache.iceberg.CatalogUtil" level="WARN"/>-->
   <logger name="org.apache.iceberg.BaseMetastoreCatalog" level="WARN"/>
+  <!-- Set ICE_REST_CATALOG_LOG_LEVEL=DEBUG to log REST request/response bodies. -->
+  <logger name="com.altinity.ice.rest.catalog.internal.rest.RESTCatalogServlet"
+          level="${ICE_REST_CATALOG_LOG_LEVEL:-INFO}"/>
   <logger name="org.eclipse.jetty" level="WARN"/>
   <!-- hide "Unable to load metrics class: 'org.apache.iceberg.hadoop.HadoopMetricsContext', falling back to null metrics" -->
   <logger name="org.apache.iceberg.aws.s3.S3FileIO" level="ERROR"/>
