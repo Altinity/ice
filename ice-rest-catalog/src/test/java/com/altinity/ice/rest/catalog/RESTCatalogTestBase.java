@@ -106,7 +106,8 @@ public abstract class RESTCatalogTestBase {
             null, // commitRetry
             null, // commitLock
             null, // loadTableProperties
-            null // icebergProperties
+            null, // icebergProperties
+            null // tracing
             );
 
     // Create backend catalog from config

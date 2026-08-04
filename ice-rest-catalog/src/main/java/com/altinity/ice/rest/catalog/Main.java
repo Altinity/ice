@@ -38,7 +38,9 @@ import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareConfig;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareCredentials;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableConfig;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTableCredentials;
+import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogMiddlewareTracing;
 import com.altinity.ice.rest.catalog.internal.rest.RESTCatalogServlet;
+import com.altinity.ice.rest.catalog.internal.rest.RequestTracing;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.net.HostAndPort;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
@@ -324,6 +326,14 @@ public final class Main implements Callable<Integer> {
       }
     }
 
+    var tracingConfig = config.tracing();
+    if (tracingConfig.enabledOrDefault() && tracingConfig.advertiseClientIdOrDefault()) {
+      restCatalogAdapter =
+          new RESTCatalogMiddlewareTracing(
+              restCatalogAdapter, tracingConfig.clientIdHeaderOrDefault());
+    }
+    RequestTracing tracing = new RequestTracing(tracingConfig);
+
     logger.info(
         "Commit retry config: numRetries={} minWaitMs={} maxWaitMs={} totalTimeoutMs={}",
         config.commitRetry().numRetries(),
@@ -336,7 +346,7 @@ public final class Main implements Callable<Integer> {
         config.commitLock().leaseTtlSeconds(),
         config.commitLock().acquireTimeoutMs());
 
-    var h = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter));
+    var h = new ServletHolder(new RESTCatalogServlet(restCatalogAdapter, tracing));
     mux.addServlet(h, "/*");
 
     if (registerAdminServlet) {

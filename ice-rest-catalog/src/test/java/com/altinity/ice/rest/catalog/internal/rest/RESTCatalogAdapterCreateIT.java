@@ -82,6 +82,7 @@ public class RESTCatalogAdapterCreateIT {
             null,
             null,
             null,
+            null,
             null);
     catalog = CatalogUtil.buildIcebergCatalog("it", config.toIcebergConfig(), null);
     adapter = new RESTCatalogAdapter(catalog);
