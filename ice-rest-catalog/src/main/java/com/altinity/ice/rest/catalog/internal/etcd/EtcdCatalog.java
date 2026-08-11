@@ -316,10 +316,12 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
     return res.getKvs().stream()
         .map(
             k ->
-                Namespace.of(
-                    Strings.removePrefix(
-                            k.getKey().toString(StandardCharsets.UTF_8), namespacePrefix())
-                        .split("/")))
+                Strings.removePrefix(k.getKey().toString(StandardCharsets.UTF_8), namespacePrefix())
+                    .split("/"))
+        .filter(
+            levels ->
+                levels.length > 0 && Arrays.stream(levels).noneMatch(l -> l == null || l.isEmpty()))
+        .map(Namespace::of)
         .toList();
   }
 
@@ -449,9 +451,12 @@ public class EtcdCatalog extends BaseMetastoreCatalog implements SupportsNamespa
     return res.getKvs().stream()
         .map(
             k ->
-                TableIdentifier.of(
-                    Strings.removePrefix(k.getKey().toString(StandardCharsets.UTF_8), tablePrefix())
-                        .split("/")))
+                Strings.removePrefix(k.getKey().toString(StandardCharsets.UTF_8), tablePrefix())
+                    .split("/"))
+        .filter(
+            parts ->
+                parts.length > 0 && Arrays.stream(parts).noneMatch(p -> p == null || p.isEmpty()))
+        .map(TableIdentifier::of)
         .toList();
   }
 
