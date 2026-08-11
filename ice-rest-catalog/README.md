@@ -38,3 +38,4 @@ If `enabled` is true but the catalog backend is not etcd, the lock is ignored (w
 - [Catalog migration (1-node to 3-node etcd)](../docs/catalog-export-import-migration.md) -- migrate registry via `ice catalog-export` / `catalog-import`; optional recovery from an etcd snapshot backup first
 - [Maintenance Configuration](../docs/maintenance.md) -- schedule, jobs, snapshot cleanup, data compaction, orphan cleanup
 - [Rewriting table paths](../docs/rewrite-table-path.md) -- using Spark to rewrite paths in metadata files when copying a table to a new location
+- [Client Connectivity](../docs/client-connectivity.md) -- connecting to ice-rest-catalog from DuckDB (and other clients)
