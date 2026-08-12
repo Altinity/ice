@@ -25,6 +25,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hc.core5.http.ContentType;
@@ -76,10 +77,12 @@ public class RESTCatalogServlet extends HttpServlet {
 
   private final RESTCatalogHandler restCatalogAdapter;
   private final HttpMetrics httpMetrics;
+  private final RequestTracing tracing;
 
-  public RESTCatalogServlet(RESTCatalogHandler restCatalogAdapter) {
+  public RESTCatalogServlet(RESTCatalogHandler restCatalogAdapter, RequestTracing tracing) {
     this.restCatalogAdapter = restCatalogAdapter;
     this.httpMetrics = HttpMetrics.getInstance();
+    this.tracing = tracing;
   }
 
   protected void handle(HttpServletRequest request, HttpServletResponse response)
@@ -87,6 +90,24 @@ public class RESTCatalogServlet extends HttpServlet {
     HTTPRequest.HTTPMethod method = HTTPRequest.HTTPMethod.valueOf(request.getMethod());
     String path = request.getRequestURI().substring(1);
 
+    Session session = Session.from(request);
+    String clientId = tracing.resolveClientId(request, session);
+    String requestId = tracing.resolveRequestId(request);
+    tracing.begin(response, clientId, requestId);
+    try {
+      handleTraced(method, path, session, request, response);
+    } finally {
+      tracing.end();
+    }
+  }
+
+  private void handleTraced(
+      HTTPRequest.HTTPMethod method,
+      String path,
+      Session session,
+      HttpServletRequest request,
+      HttpServletResponse response)
+      throws IOException {
     Pair<Route, Map<String, String>> routeContext = Route.from(method, path);
     if (routeContext == null) {
       // Track unknown route requests
@@ -110,7 +131,6 @@ public class RESTCatalogServlet extends HttpServlet {
 
     // Track request with metrics
     try (var timer = httpMetrics.startRequest(method.name(), route.name())) {
-      Session session = Session.from(request);
       String userToLog = "";
       if (session != null) {
         userToLog = "@" + session.uid() + " ";
@@ -122,10 +142,13 @@ public class RESTCatalogServlet extends HttpServlet {
       // FIXME: this should be in RESTCatalogAdapter, not here
       Object requestBody = null;
       if (route.requestClass() != null) {
-        requestBody =
-            RESTObjectMapper.mapper().readValue(request.getReader(), route.requestClass());
+        String rawBody = CharStreams.toString(request.getReader());
+        logger.debug("{}{} {} request body: {}", userToLog, method, path, rawBody);
+        requestBody = RESTObjectMapper.mapper().readValue(rawBody, route.requestClass());
       } else if (route == Route.TOKENS) {
-        requestBody = RESTUtil.decodeFormData(CharStreams.toString(request.getReader()));
+        String rawBody = CharStreams.toString(request.getReader());
+        logger.debug("{}{} {} request body: <redacted>", userToLog, method, path);
+        requestBody = RESTUtil.decodeFormData(rawBody);
       }
 
       Map<String, String> queryParams =
@@ -157,6 +180,12 @@ public class RESTCatalogServlet extends HttpServlet {
         response.setStatus(error.code());
         response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
         byte[] errorBytes = RESTObjectMapper.mapper().writeValueAsBytes(error);
+        logger.debug(
+            "{}{} {} error response body: {}",
+            userToLog,
+            method,
+            path,
+            new String(errorBytes, StandardCharsets.UTF_8));
         timer.setResponseSize(errorBytes.length);
         response.getOutputStream().write(errorBytes);
         return;
@@ -167,6 +196,12 @@ public class RESTCatalogServlet extends HttpServlet {
       response.setHeader(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
       if (responseBody != null) {
         byte[] responseBytes = RESTObjectMapper.mapper().writeValueAsBytes(responseBody);
+        logger.debug(
+            "{}{} {} response body: {}",
+            userToLog,
+            method,
+            path,
+            new String(responseBytes, StandardCharsets.UTF_8));
         timer.setResponseSize(responseBytes.length);
         response.getOutputStream().write(responseBytes);
       }

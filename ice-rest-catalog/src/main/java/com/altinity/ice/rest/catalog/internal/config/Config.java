@@ -68,7 +68,10 @@ public record Config(
     @JsonPropertyDescription(
             "(experimental) Iceberg properties (see https://iceberg.apache.org/javadoc/1.8.1/"
                 + "; e.g. https://iceberg.apache.org/javadoc/1.8.1/org/apache/iceberg/aws/s3/S3FileIOProperties.html)")
-        Map<String, String> icebergProperties) {
+        Map<String, String> icebergProperties,
+    @JsonPropertyDescription(
+            "OpenTelemetry tracing and request/client correlation config (disabled by default)")
+        TracingConfig tracing) {
 
   private static final String DEFAULT_ADDR = "0.0.0.0:5000";
   private static final String DEFAULT_DEBUG_ADDR = "0.0.0.0:5001";
@@ -90,7 +93,8 @@ public record Config(
       CommitRetryConfig commitRetry,
       CommitLockConfig commitLock,
       Map<String, String> loadTableProperties,
-      @JsonProperty("iceberg") Map<String, String> icebergProperties) {
+      @JsonProperty("iceberg") Map<String, String> icebergProperties,
+      TracingConfig tracing) {
     this.addr = Strings.orDefault(addr, DEFAULT_ADDR);
     this.debugAddr = Strings.orDefault(debugAddr, DEFAULT_DEBUG_ADDR);
     this.adminAddr = Strings.orDefault(adminAddr, System.getenv("ICE_REST_CATALOG_ADMIN_ADDR"));
@@ -110,6 +114,7 @@ public record Config(
     this.commitLock = Objects.requireNonNullElse(commitLock, CommitLockConfig.defaults());
     this.loadTableProperties = Objects.requireNonNullElse(loadTableProperties, Map.of());
     this.icebergProperties = Objects.requireNonNullElse(icebergProperties, Map.of());
+    this.tracing = Objects.requireNonNullElse(tracing, TracingConfig.defaults());
   }
 
   public record S3(

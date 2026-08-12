@@ -24,6 +24,23 @@ commitLock:
 
 If `enabled` is true but the catalog backend is not etcd, the lock is ignored (warning in logs). When lock acquisition exceeds `acquireTimeoutMs`, the server responds with HTTP **503** so clients can retry.
 
+## Debugging REST API traffic
+
+Set `ICE_REST_CATALOG_LOG_LEVEL=DEBUG` to log the full JSON request and response bodies for every REST call. This is useful for inspecting exactly what an Iceberg client sends and what the server returns.
+
+**Local:**
+```bash
+ICE_REST_CATALOG_LOG_LEVEL=DEBUG java -jar ice-rest-catalog/target/ice-rest-catalog-jar
+```
+
+**Docker / docker-compose:**
+```yaml
+environment:
+  ICE_REST_CATALOG_LOG_LEVEL: DEBUG
+```
+
+The default level is `INFO`, which logs one line per request (`@uid METHOD path`) without bodies.
+
 ## Documentation
 
 - [Architecture](../docs/architecture.md) -- components, design principles, HA, backup/recovery

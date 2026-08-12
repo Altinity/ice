@@ -11,6 +11,9 @@
   <!--ice-rest-catalog-->
   <!--<logger name="org.apache.iceberg.CatalogUtil" level="WARN"/>-->
   <logger name="org.apache.iceberg.BaseMetastoreCatalog" level="WARN"/>
+  <!-- Set ICE_REST_CATALOG_LOG_LEVEL=DEBUG to log REST request/response bodies. -->
+  <logger name="com.altinity.ice.rest.catalog.internal.rest.RESTCatalogServlet"
+          level="${ICE_REST_CATALOG_LOG_LEVEL:-INFO}"/>
   <logger name="org.eclipse.jetty" level="WARN"/>
   <!-- hide "Unable to load metrics class: 'org.apache.iceberg.hadoop.HadoopMetricsContext', falling back to null metrics" -->
   <logger name="org.apache.iceberg.aws.s3.S3FileIO" level="ERROR"/>
@@ -33,7 +36,7 @@
     <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
       <layout class="com.altinity.ice.internal.logback.ColorAwarePatternLayout">
         <!-- FIXME: stacktrace filtering has perf implications -->
-        <pattern>%gray(%d{yyyy-MM-dd HH:mm:ss} [%.11thread/%processId]) %highlight(%-4level) %gray(%logger{27} >) %X{msgContext}%msg%n%replace(%ex{full,
+        <pattern>%gray(%d{yyyy-MM-dd HH:mm:ss} [%.11thread/%processId]) %highlight(%-4level) %gray(%logger{27} >) %gray(%X{clientId} %X{requestId}) %X{msgContext}%msg%n%replace(%ex{full,
           org.eclipse.jetty,
           jakarta.servlet,
           software.amazon.awssdk.core.internal,
