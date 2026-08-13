@@ -76,6 +76,7 @@ import org.apache.iceberg.io.FileAppender;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.io.OutputFile;
+import org.apache.iceberg.mapping.MappingUtil;
 import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.mapping.NameMappingParser;
 import org.apache.iceberg.parquet.Parquet;
@@ -452,9 +453,17 @@ public final class Insert {
       throw e;
     }
 
+    MessageType type = metadata.getFileMetaData().getSchema();
+    Map<String, String> tableProps = table.properties();
+    String nameMappingString = tableProps.get(TableProperties.DEFAULT_NAME_MAPPING);
+    NameMapping nameMapping =
+        !Strings.isNullOrEmpty(nameMappingString)
+            ? NameMappingParser.fromJson(nameMappingString)
+            : MappingUtil.create(tableSchema);
+
     boolean sorted = options.assumeSorted;
     if (!sorted && sortOrder.isSorted()) {
-      var sortCheck = Sorting.checkSorted(inputFile, tableSchema, sortOrder);
+      var sortCheck = Sorting.checkSorted(inputFile, tableSchema, sortOrder, nameMapping);
       sorted = sortCheck.ok();
       if (!sorted) {
         if (options.noCopy || options.s3CopyObject) {
@@ -490,13 +499,6 @@ public final class Insert {
       }
     }
 
-    MessageType type = metadata.getFileMetaData().getSchema();
-    Map<String, String> tableProps = table.properties();
-    String nameMappingString = tableProps.get(TableProperties.DEFAULT_NAME_MAPPING);
-    NameMapping nameMapping =
-        !Strings.isNullOrEmpty(nameMappingString)
-            ? NameMappingParser.fromJson(nameMappingString)
-            : null;
     Schema fileSchema = MessageTypeToSchema.convert(type, nameMapping);
 
     if (!SchemaEvolution.isSubset(fileSchema, table.schema())) {
@@ -576,7 +578,8 @@ public final class Insert {
             inputFile,
             dstDataFileSource,
             table.properties(),
-            compressionCodecOverride);
+            compressionCodecOverride,
+            nameMapping);
       } else if (sortOrder.isSorted() && !sorted) {
         return Collections.singletonList(
             copySorted(
@@ -591,7 +594,8 @@ public final class Insert {
                 dataFileNamingStrategy,
                 partitionKey,
                 table.properties(),
-                compressionCodecOverride));
+                compressionCodecOverride,
+                nameMapping));
       } else {
         // Table isn't partitioned or sorted. Copy as is.
         String dstDataFile;
@@ -614,6 +618,7 @@ public final class Insert {
             Parquet.read(inputFile)
                 .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
                 .project(tableSchema)
+                .withNameMapping(nameMapping)
                 .reuseContainers();
 
         Parquet.WriteBuilder writeBuilder =
@@ -671,13 +676,14 @@ public final class Insert {
       InputFile inputFile,
       DataFileNamingStrategy dstDataFileSource,
       Map<String, String> tableProperties,
-      @Nullable String compressionCodecOverride)
+      @Nullable String compressionCodecOverride,
+      @Nullable NameMapping nameMapping)
       throws IOException {
     logger.info("{}: partitioning{}", file, sortOrder.isSorted() ? "+sorting" : "");
 
     // FIXME: stream to reduce memory usage
     Map<PartitionKey, List<Record>> partitionedRecords =
-        Partitioning.partition(inputFile, tableSchema, partitionSpec);
+        Partitioning.partition(inputFile, tableSchema, partitionSpec, nameMapping);
 
     // Create a comparator based on table.sortOrder()
     RecordComparator comparator =
@@ -758,7 +764,8 @@ public final class Insert {
       DataFileNamingStrategy.Name dataFileNamingStrategy,
       PartitionKey partitionKey,
       Map<String, String> tableProperties,
-      @Nullable String compressionCodecOverride)
+      @Nullable String compressionCodecOverride,
+      @Nullable NameMapping nameMapping)
       throws IOException {
     logger.info("{}: copying (sorted) to {}", file, dstDataFile);
 
@@ -770,7 +777,8 @@ public final class Insert {
     Parquet.ReadBuilder readBuilder =
         Parquet.read(inputFile)
             .createReaderFunc(s -> GenericParquetReaders.buildReader(tableSchema, s))
-            .project(tableSchema);
+            .project(tableSchema)
+            .withNameMapping(nameMapping);
 
     // Read records into memory
     List<Record> records = new ArrayList<>();

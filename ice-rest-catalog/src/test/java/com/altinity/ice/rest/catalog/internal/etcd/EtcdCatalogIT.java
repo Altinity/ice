@@ -16,9 +16,13 @@ import com.altinity.ice.rest.catalog.internal.cmd.CatalogAdminService;
 import com.altinity.ice.rest.catalog.internal.cmd.CatalogImportResult;
 import com.altinity.ice.rest.catalog.internal.cmd.CatalogSnapshot;
 import com.altinity.ice.rest.catalog.internal.config.CommitLockConfig;
+import com.altinity.ice.rest.catalog.internal.maintenance.MaintenanceRunner;
+import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Txn;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -403,6 +407,28 @@ public class EtcdCatalogIT {
     assertThat(catalog.namespaceExists(namespace)).isTrue();
     assertThat(catalog.listTables(namespace)).containsExactly(identifier);
     assertThat(catalog.loadTable(identifier)).isNotNull();
+  }
+
+  @Test
+  public void testMaintenanceWithSpuriousEmptyNamespaceKey() throws Exception {
+    ByteSequence prefixKey = ByteSequence.from("n/", StandardCharsets.UTF_8);
+    ByteSequence emptyVal = ByteSequence.from("{}", StandardCharsets.UTF_8);
+    catalog.kv.put(prefixKey, emptyVal).get();
+
+    String ns = rand();
+    catalog.createNamespace(Namespace.of(ns));
+    catalog.createTable(TableIdentifier.of(ns, "t1"), SCHEMA);
+
+    List<Namespace> namespaces = catalog.listNamespaces();
+    assertThat(namespaces).noneMatch(n -> Arrays.stream(n.levels()).anyMatch(String::isEmpty));
+    assertThat(namespaces).anyMatch(n -> n.level(0).equals(ns));
+
+    MaintenanceRunner runner = new MaintenanceRunner(catalog, List.of());
+    runner.run();
+
+    catalog.kv.delete(prefixKey).get();
+    catalog.dropTable(TableIdentifier.of(ns, "t1"));
+    catalog.dropNamespace(Namespace.of(ns));
   }
 
   private static String rand() {

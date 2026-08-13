@@ -43,6 +43,17 @@ if [[ "$list_after" == *"${TRANSFORMED_PARTITION_COLUMN}=${DELETE_PARTITION_DAY}
 fi
 echo "OK Validated partition was deleted"
 
+# Exercise a comparison operator (greater_than_or_equal) via a dry run.
+# >= 2000-01-01 matches all remaining data, so candidate files must be found.
+range_output=$({{ICE_CLI}} --config {{CLI_CONFIG}} delete ${TABLE_NAME} \
+  --partition "[{\"name\": \"${TRANSFORMED_PARTITION_COLUMN}\", \"op\": \"greater_than_or_equal\", \"values\": [\"2000-01-01\"]}]" 2>&1)
+echo "$range_output"
+if ! echo "$range_output" | grep -qF "To be deleted"; then
+  echo "FAIL Expected range (>= 2000-01-01) dry-run to find candidate files"
+  exit 1
+fi
+echo "OK Range operator (greater_than_or_equal) matched files"
+
 # Cleanup
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
 echo "OK Deleted table: ${TABLE_NAME}"

@@ -140,9 +140,21 @@ public class SchemeFileIO implements DelegateFileIO {
 
   public DelegateFileIO io(String location) {
     String s = scheme(location);
+    if (s == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "File location has no URI scheme (expected s3://, file://, gs://, etc.): \"%s\". "
+                  + "This usually means the create-table request specified a table \"location\" "
+                  + "without a scheme, or the catalog warehouse is misconfigured.",
+              location));
+    }
     String impl = SCHEME_TO_FILE_IO.get(s);
-    Preconditions.checkNotNull(
-        impl, String.format("unsupported scheme \"%s\": \"%s\"", s, location));
+    if (impl == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Unsupported file location scheme \"%s\": \"%s\". Supported schemes: %s",
+              s, location, SCHEME_TO_FILE_IO.keySet()));
+    }
     DelegateFileIO io = ioMap.get(impl);
     if (io != null) {
       return io;
