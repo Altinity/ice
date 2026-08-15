@@ -26,6 +26,7 @@
     <jetty.version>11.0.25</jetty.version>
     <jakarta.version>6.1.0</jakarta.version>
     <google.cloud.storage.version>2.60.0</google.cloud.storage.version>
+    <skedule.version>0.4.0</skedule.version>
     <!-- versions:test -->
     <testng.version>7.9.0</testng.version>
     <assertj.version>3.27.7</assertj.version>

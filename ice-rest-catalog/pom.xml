@@ -547,7 +547,7 @@
     <dependency>
       <groupId>com.github.shyiko.skedule</groupId>
       <artifactId>skedule</artifactId>
-      <version>0.4.0</version>
+      <version>${skedule.version}</version>
       <classifier>kalvanized</classifier>
     </dependency>
   </dependencies>

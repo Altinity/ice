@@ -526,6 +526,13 @@
       <artifactId>prometheus-metrics-exporter-servlet-jakarta</artifactId>
       <version>${prometheus.version}</version>
     </dependency>
+    <!-- skedule -->
+    <dependency>
+      <groupId>com.github.shyiko.skedule</groupId>
+      <artifactId>skedule</artifactId>
+      <version>${skedule.version}</version>
+      <classifier>kalvanized</classifier>
+    </dependency>
     <!-- picocli -->
     <dependency>
       <groupId>info.picocli</groupId>

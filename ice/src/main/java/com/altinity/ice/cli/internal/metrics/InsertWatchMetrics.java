@@ -10,6 +10,7 @@
 package com.altinity.ice.cli.internal.metrics;
 
 import io.prometheus.metrics.core.metrics.Counter;
+import io.prometheus.metrics.core.metrics.Gauge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +35,13 @@ public class InsertWatchMetrics {
   private static final String LABEL_TABLE = "table";
   private static final String LABEL_QUEUE = "queue";
   private static final String LABEL_QUEUE_TYPE = "queue_type";
+  private static final String LABEL_TRIGGER = "trigger";
 
   private static final String[] WATCH_LABELS = {LABEL_TABLE, LABEL_QUEUE, LABEL_QUEUE_TYPE};
+
+  private static final String[] FLUSH_LABELS = {
+    LABEL_TABLE, LABEL_QUEUE, LABEL_QUEUE_TYPE, LABEL_TRIGGER
+  };
 
   // Messages/Files processed
   private static final String MESSAGES_RECEIVED_TOTAL_NAME = "ice_watch_messages_received_total";
@@ -72,6 +78,19 @@ public class InsertWatchMetrics {
       "ice_watch_transactions_failed_total";
   private static final String TRANSACTIONS_FAILED_TOTAL_HELP =
       "Total number of insert transactions that failed";
+
+  // Commit batching
+  private static final String BUFFER_FILES_NAME = "ice_watch_buffer_files";
+  private static final String BUFFER_FILES_HELP =
+      "Number of files accumulated and waiting to be committed";
+
+  private static final String BUFFER_BYTES_NAME = "ice_watch_buffer_bytes";
+  private static final String BUFFER_BYTES_HELP =
+      "Total size of the files accumulated and waiting to be committed";
+
+  private static final String BUFFER_FLUSHES_TOTAL_NAME = "ice_watch_buffer_flushes_total";
+  private static final String BUFFER_FLUSHES_TOTAL_HELP =
+      "Total number of accumulated batches committed, by the threshold that triggered the commit";
 
   // Retry state
   private static final String RETRY_ATTEMPTS_TOTAL_NAME = "ice_watch_retry_attempts_total";
@@ -112,6 +131,9 @@ public class InsertWatchMetrics {
   private final Counter filesInsertedTotal;
   private final Counter transactionsTotal;
   private final Counter transactionsFailedTotal;
+  private final Gauge bufferFiles;
+  private final Gauge bufferBytes;
+  private final Counter bufferFlushesTotal;
   private final Counter retryAttemptsTotal;
   private final Counter queueReceiveErrorsTotal;
   private final Counter queueDeleteErrorsTotal;
@@ -178,6 +200,27 @@ public class InsertWatchMetrics {
             .name(TRANSACTIONS_FAILED_TOTAL_NAME)
             .help(TRANSACTIONS_FAILED_TOTAL_HELP)
             .labelNames(WATCH_LABELS)
+            .register();
+
+    this.bufferFiles =
+        Gauge.builder()
+            .name(BUFFER_FILES_NAME)
+            .help(BUFFER_FILES_HELP)
+            .labelNames(WATCH_LABELS)
+            .register();
+
+    this.bufferBytes =
+        Gauge.builder()
+            .name(BUFFER_BYTES_NAME)
+            .help(BUFFER_BYTES_HELP)
+            .labelNames(WATCH_LABELS)
+            .register();
+
+    this.bufferFlushesTotal =
+        Counter.builder()
+            .name(BUFFER_FLUSHES_TOTAL_NAME)
+            .help(BUFFER_FLUSHES_TOTAL_HELP)
+            .labelNames(FLUSH_LABELS)
             .register();
 
     this.retryAttemptsTotal =
@@ -248,6 +291,16 @@ public class InsertWatchMetrics {
 
   public void recordTransactionFailed(String table, String queue, String queueType) {
     transactionsFailedTotal.labelValues(table, queue, queueType).inc();
+  }
+
+  public void recordBufferState(
+      String table, String queue, String queueType, int files, long bytes) {
+    bufferFiles.labelValues(table, queue, queueType).set(files);
+    bufferBytes.labelValues(table, queue, queueType).set(bytes);
+  }
+
+  public void recordBufferFlush(String table, String queue, String queueType, String trigger) {
+    bufferFlushesTotal.labelValues(table, queue, queueType, trigger).inc();
   }
 
   public void recordRetryAttempt(String table, String queue, String queueType) {
