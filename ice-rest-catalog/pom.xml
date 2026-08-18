@@ -598,6 +598,7 @@
             <exclude>**/DockerScenarioBasedIT.java</exclude>
             <exclude>**/DockerLocalFileIOClickHouseIT.java</exclude>
             <exclude>**/DockerLocalFileIOClickHouseAllTypesIT.java</exclude>
+            <exclude>**/DockerElasticMQWatchIT.java</exclude>
           </excludes>
         </configuration>
       </plugin>
