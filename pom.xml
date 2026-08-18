@@ -34,6 +34,8 @@
     <caffeine.version>3.2.0</caffeine.version>
     <jline.version>3.26.1</jline.version>
     <commons.codec.version>1.18.0</commons.codec.version>
+    <httpclient5.version>5.4.3</httpclient5.version>
+    <httpcore5.version>5.4.3</httpcore5.version>
   </properties>
 
   <dependencyManagement>
@@ -44,6 +46,21 @@
         <version>${aws.java.sdk.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.client5</groupId>
+        <artifactId>httpclient5</artifactId>
+        <version>${httpclient5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5</artifactId>
+        <version>${httpcore5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5-h2</artifactId>
+        <version>${httpcore5.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
