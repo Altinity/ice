@@ -10,14 +10,22 @@ Create/delete tables, insert data with `ice insert -p ns1.table1 file://example.
 
 ## Installation
 
-Pre-built binaries\* (+ links to Docker images for [ice](https://hub.docker.com/r/altinity/ice) and [ice-rest-catalog](https://hub.docker.com/r/altinity/ice-rest-catalog)) are available from [GitHub Releases](https://github.com/Altinity/ice/releases) page.
-> \* currently require `java` 21+ to run (available [here](https://adoptium.net/installation/)).  
+Pre-built binaries (+ links to Docker images for [ice](https://hub.docker.com/r/altinity/ice) and [ice-rest-catalog](https://hub.docker.com/r/altinity/ice-rest-catalog)) are available from [GitHub Releases](https://github.com/Altinity/ice/releases) page.
+
+**Two types of binaries are available:**
+
+1. **Java-based binaries** - Require Java 21+ to run (available [here](https://adoptium.net/installation/))
+2. **Native binaries** - Standalone executables with no Java dependency
+   - `ice-native-amd64` - Dynamic binary for x86_64 Linux (requires glibc)
+   - `ice-native-arm64` - Dynamic binary for ARM64 Linux (requires glibc)
 
 ## Usage
 
 See [examples/](examples/).
 
 ## Development
+
+### Standard Build (Java-based)
 
 Install [sdkman](https://sdkman.io/install), then
 
@@ -33,6 +41,25 @@ sdk env
   
 # shows how to build, test, etc. project
 ./mvnw
+```
+
+### Native Image Build (Standalone)
+
+Build standalone native binaries with no Java dependency:
+
+```shell
+# Install prerequisites
+sdk env  # or ensure Java 21+ and GraalVM are available
+
+# Build ice binary (both amd64 and arm64)
+mvn -Pnative -pl ice clean package -Dmaven.test.skip=true
+
+# The output binary is at ice/target/ice
+
+# Docker builds
+docker build -f ice/Dockerfile.native -t ice-native:amd64 .
+
+docker build -f ice/Dockerfile.native -t ice-native:arm64 .
 ```
 
 ## License
