@@ -70,7 +70,7 @@
     <dependency>
       <groupId>org.apache.httpcomponents.client5</groupId>
       <artifactId>httpclient5</artifactId>
-      <version>5.4.3</version>
+      <version>${httpclient5.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.slf4j</groupId>
@@ -548,7 +548,7 @@
     <dependency>
       <groupId>com.github.shyiko.skedule</groupId>
       <artifactId>skedule</artifactId>
-      <version>0.4.0</version>
+      <version>${skedule.version}</version>
       <classifier>kalvanized</classifier>
     </dependency>
   </dependencies>
@@ -602,6 +602,7 @@
             <exclude>**/DockerScenarioBasedIT.java</exclude>
             <exclude>**/DockerLocalFileIOClickHouseIT.java</exclude>
             <exclude>**/DockerLocalFileIOClickHouseAllTypesIT.java</exclude>
+            <exclude>**/DockerElasticMQWatchIT.java</exclude>
           </excludes>
         </configuration>
       </plugin>

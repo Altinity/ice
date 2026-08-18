@@ -120,6 +120,9 @@ These metrics track S3 event-driven file insertions.
 | `ice_watch_queue_receive_errors_total` | Counter | table, queue, queue_type | Total errors when receiving messages from queue |
 | `ice_watch_queue_delete_errors_total` | Counter | table, queue, queue_type | Total errors when deleting/acknowledging messages |
 | `ice_watch_message_parse_errors_total` | Counter | table, queue, queue_type | Total message parsing errors |
+| `ice_watch_buffer_files` | Gauge | table, queue, queue_type | Files accumulated and waiting to be committed |
+| `ice_watch_buffer_bytes` | Gauge | table, queue, queue_type | Total size of files accumulated and waiting to be committed |
+| `ice_watch_buffer_flushes_total` | Counter | table, queue, queue_type, trigger | Accumulated batches committed, by the threshold that triggered the commit |
 
 ### Maintenance Metrics
 
