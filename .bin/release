@@ -7,7 +7,17 @@ test -n "$GITHUB_TOKEN" || (echo 'GITHUB_TOKEN env variable must be set' >&2; ex
 
 ./mvnw clean verify
 
+# Preserve native binaries staged by CI (release/native/*) across the wipe.
+native_stash=
+if [ -d release/native ]; then
+  native_stash=$(mktemp -d)
+  cp -a release/native "$native_stash/native"
+fi
 rm -rf release/
+if [ -n "$native_stash" ]; then
+  mkdir -p release
+  cp -a "$native_stash/native" release/native
+fi
 
 _undo_mvn_version_set() {
   ./mvnw versions:revert
@@ -51,6 +61,17 @@ sleep 7
 for f in ice ice-rest-catalog; do
     echo "Uploading $f..." >&2
     github-release upload --user altinity --repo ice --tag "$VERSION_TAG" --name "$f-$VERSION" --file "$f/target/$f-jar"
+done
+
+for arch in amd64 arm64; do
+  native_bin="release/native/ice-native-$arch"
+  if [ -f "$native_bin" ]; then
+    echo "Uploading ice-native-$arch..." >&2
+    github-release upload --user altinity --repo ice --tag "$VERSION_TAG" \
+      --name "ice-native-$arch-$VERSION" --file "$native_bin"
+  else
+    echo "Skipping ice-native-$arch (not found at $native_bin)" >&2
+  fi
 done
 
 echo >&2 'Pushing ice Docker image'
