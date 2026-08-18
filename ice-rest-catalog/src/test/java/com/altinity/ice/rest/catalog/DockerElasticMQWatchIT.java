@@ -25,6 +25,7 @@ import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.hadoop.HadoopOutputFile;
 import org.apache.iceberg.io.FileAppender;
+import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 import org.slf4j.Logger;
@@ -283,6 +284,122 @@ public class DockerElasticMQWatchIT {
     }
   }
 
+  @Test
+  public void testWatchMaxBytesTrigger() throws Exception {
+    String table = NAMESPACE + ".events_bytes";
+    String landingKey = "warehouse/watch_test/events_bytes/external/data.parquet";
+    long size = seedTableAndEnqueueEvent(table, landingKey);
+
+    ExecResult watch =
+        ice(
+            "insert",
+            table,
+            "-p",
+            "--force-no-copy",
+            "--skip-duplicates",
+            "--watch=" + QUEUE_URL_INTERNAL,
+            "--watch-endpoint=http://elasticmq:9324",
+            "--watch-max-bytes=" + size,
+            "--watch-fire-once",
+            "s3://" + BUCKET + "/warehouse/watch_test/events_bytes/external/*.parquet");
+    logger.info("watch stdout:\n{}", watch.getStdout());
+    logger.info("watch stderr:\n{}", watch.getStderr());
+    if (watch.getExitCode() != 0) {
+      throw new AssertionError(
+          "ice insert --watch exited " + watch.getExitCode() + ":\n" + watch.getStderr());
+    }
+    if (!watch.getStderr().contains("trigger: max_bytes")) {
+      throw new AssertionError(
+          "Expected flush trigger 'max_bytes' in watch stderr, got:\n" + watch.getStderr());
+    }
+
+    ExecResult scan = iceExecOrThrow("scan", table);
+    if (!scan.getStdout().contains("watch-it")) {
+      throw new AssertionError("Expected committed row in scan output, got:\n" + scan.getStdout());
+    }
+  }
+
+  @Test
+  public void testWatchScheduleOnlyTrigger() throws Exception {
+    String table = NAMESPACE + ".events_sched";
+    String landingKey = "warehouse/watch_test/events_sched/external/data.parquet";
+    seedTableAndEnqueueEvent(table, landingKey);
+
+    ExecResult watch =
+        ice(
+            "insert",
+            table,
+            "-p",
+            "--force-no-copy",
+            "--skip-duplicates",
+            "--watch=" + QUEUE_URL_INTERNAL,
+            "--watch-endpoint=http://elasticmq:9324",
+            "--watch-commit-schedule=every 1 minutes",
+            "--watch-fire-once",
+            "s3://" + BUCKET + "/warehouse/watch_test/events_sched/external/*.parquet");
+    logger.info("watch stdout:\n{}", watch.getStdout());
+    logger.info("watch stderr:\n{}", watch.getStderr());
+    if (watch.getExitCode() != 0) {
+      throw new AssertionError(
+          "ice insert --watch exited " + watch.getExitCode() + ":\n" + watch.getStderr());
+    }
+    if (!watch.getStderr().contains("trigger: fire_once")) {
+      throw new AssertionError(
+          "Expected flush trigger 'fire_once' in watch stderr, got:\n" + watch.getStderr());
+    }
+
+    ExecResult scan = iceExecOrThrow("scan", table);
+    if (!scan.getStdout().contains("watch-it")) {
+      throw new AssertionError("Expected committed row in scan output, got:\n" + scan.getStdout());
+    }
+  }
+
+  /**
+   * Writes a Parquet file, uploads it to MinIO, pre-creates the table from a local copy, and sends
+   * an S3 event to ElasticMQ. Returns the file size in bytes (useful for --watch-max-bytes).
+   */
+  private long seedTableAndEnqueueEvent(String table, String landingKey) throws Exception {
+    Path parquet = Files.createTempFile("watch-it-", ".parquet");
+    try {
+      writeParquet(parquet);
+      long size = Files.size(parquet);
+
+      String minioHostEndpoint = "http://" + minio.getHost() + ":" + minio.getMappedPort(9000);
+      try (S3Client s3 = minioS3(minioHostEndpoint)) {
+        s3.putObject(
+            PutObjectRequest.builder().bucket(BUCKET).key(landingKey).build(),
+            RequestBody.fromFile(parquet));
+      }
+      logger.info("Uploaded to s3://{}/{} ({} bytes)", BUCKET, landingKey, size);
+
+      catalog.copyFileToContainer(MountableFile.forHostPath(parquet), "/tmp/seed.parquet");
+      iceExecOrThrow("insert", "--create-table", table, "file:///tmp/seed.parquet");
+
+      String elasticmqHostEndpoint =
+          "http://" + elasticmq.getHost() + ":" + elasticmq.getMappedPort(9324);
+      String queueUrlHost = elasticmqHostEndpoint + "/000000000000/" + QUEUE_NAME;
+      try (SqsClient sqs =
+          SqsClient.builder()
+              .endpointOverride(URI.create(elasticmqHostEndpoint))
+              .region(Region.US_EAST_1)
+              .credentialsProvider(
+                  StaticCredentialsProvider.create(
+                      AwsBasicCredentials.create("minioadmin", "minioadmin")))
+              .build()) {
+        sqs.sendMessage(
+            SendMessageRequest.builder()
+                .queueUrl(queueUrlHost)
+                .messageBody(s3Event(BUCKET, landingKey, size))
+                .build());
+      }
+      logger.info("Sent S3 event for s3://{}/{}", BUCKET, landingKey);
+
+      return size;
+    } finally {
+      Files.deleteIfExists(parquet);
+    }
+  }
+
   private static String s3Event(String bucket, String key, long size) {
     return "{\"Records\":[{\"eventName\":\"ObjectCreated:Put\","
         + "\"eventTime\":\"2026-08-16T00:00:00.000Z\","
@@ -352,7 +469,7 @@ public class DockerElasticMQWatchIT {
     Record row = GenericRecord.create(schema);
     row.setField("id", 1);
     row.setField("name", "watch-it");
-    org.apache.iceberg.io.OutputFile outputFile =
+    OutputFile outputFile =
         HadoopOutputFile.fromPath(new org.apache.hadoop.fs.Path(file.toUri()), new Configuration());
     try (FileAppender<Record> writer =
         Parquet.write(outputFile)
