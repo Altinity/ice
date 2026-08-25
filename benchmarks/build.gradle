@@ -1,0 +1,57 @@
+plugins {
+    id 'scala'
+    id 'io.gatling.gradle' version '3.11.5.2'
+}
+
+group = 'com.altinity.ice.benchmarks'
+version = '0.0.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    gatlingVersion = '3.11.5'
+    scalaVersion = '2.13.14'
+}
+
+dependencies {
+    // Gatling dependencies
+    gatling "io.gatling.highcharts:gatling-charts-highcharts:${gatlingVersion}"
+    gatling "io.gatling:gatling-app:${gatlingVersion}"
+    gatling "io.gatling:gatling-recorder:${gatlingVersion}"
+    
+    // Scala
+    implementation "org.scala-lang:scala-library:${scalaVersion}"
+    
+    // JSON processing
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+    implementation 'com.fasterxml.jackson.module:jackson-module-scala_2.13:2.17.0'
+    
+    // Configuration
+    implementation 'com.typesafe:config:1.4.3'
+    
+    // Logging
+    implementation 'ch.qos.logback:logback-classic:1.5.6'
+}
+
+gatling {
+    // Gatling configuration
+    simulations = {
+        include "**/*Simulation.scala"
+    }
+    
+    // JVM arguments for Gatling
+    jvmArgs = [
+        '-Xms2G',
+        '-Xmx4G',
+        '-XX:+UseG1GC',
+        '-XX:MaxGCPauseMillis=30'
+    ]
+}
+
+tasks.withType(ScalaCompile) {
+    scalaCompileOptions.additionalParameters = ['-deprecation', '-feature']
+}
+
+
