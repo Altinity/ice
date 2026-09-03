@@ -244,7 +244,7 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"currentSnapshot","parameterTypes":[] }, {"name":"location","parameterTypes":[] }, {"name":"metrics","parameterTypes":[] }, {"name":"partitionSpecRaw","parameterTypes":[] }, {"name":"properties","parameterTypes":[] }, {"name":"schemaRaw","parameterTypes":[] }, {"name":"sortOrderRaw","parameterTypes":[] }]
+  "methods":[{"name":"currentSnapshot","parameterTypes":[] }, {"name":"formatVersion","parameterTypes":[] }, {"name":"location","parameterTypes":[] }, {"name":"metrics","parameterTypes":[] }, {"name":"partitionSpecRaw","parameterTypes":[] }, {"name":"properties","parameterTypes":[] }, {"name":"schemaRaw","parameterTypes":[] }, {"name":"sortOrderRaw","parameterTypes":[] }]
 },
 {
   "name":"com.altinity.ice.cli.internal.cmd.Describe$Table$Error",
