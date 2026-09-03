@@ -149,10 +149,20 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
       throw e;
     }
 
-    // Copy CLI config into container so ice CLI can talk to co-located REST server
+    // Copy CLI config into container so ice CLI can talk to co-located REST server.
+    // The s3 section lets CLI commands that read s3:// paths directly (e.g. describe-metadata on
+    // metadata.json) reach MinIO via its network alias instead of defaulting to AWS.
     File cliConfigHost = File.createTempFile("ice-docker-cli-", ".yaml");
     try {
-      Files.write(cliConfigHost.toPath(), "uri: http://localhost:5000\n".getBytes());
+      String cliConfig =
+          "uri: http://localhost:5000\n"
+              + "s3:\n"
+              + "  endpoint: http://minio:9000\n"
+              + "  pathStyleAccess: true\n"
+              + "  accessKeyID: minioadmin\n"
+              + "  secretAccessKey: minioadmin\n"
+              + "  region: us-east-1\n";
+      Files.writeString(cliConfigHost.toPath(), cliConfig);
       catalog.copyFileToContainer(
           MountableFile.forHostPath(cliConfigHost.toPath()), "/tmp/ice-cli.yaml");
     } finally {

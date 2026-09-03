@@ -1041,6 +1041,7 @@ public final class Insert {
       @Nullable String retryListFile,
       @Nullable List<Main.IcePartition> partitionList,
       @Nullable List<Main.IceSortOrder> sortOrderList,
+      int formatVersion,
       int threadCount,
       @Nullable String compression,
       int commitRetries,
@@ -1066,6 +1067,7 @@ public final class Insert {
       private String retryListFile;
       private List<Main.IcePartition> partitionList = List.of();
       private List<Main.IceSortOrder> sortOrderList = List.of();
+      private int formatVersion = 2;
       private int threadCount = Runtime.getRuntime().availableProcessors();
       private String compression;
       private int commitRetries = 10;
@@ -1148,6 +1150,11 @@ public final class Insert {
         return this;
       }
 
+      public Builder formatVersion(int formatVersion) {
+        this.formatVersion = formatVersion;
+        return this;
+      }
+
       public Builder threadCount(int threadCount) {
         this.threadCount = threadCount;
         return this;
@@ -1185,6 +1192,7 @@ public final class Insert {
             retryListFile,
             partitionList,
             sortOrderList,
+            formatVersion,
             threadCount,
             compression,
             commitRetries,

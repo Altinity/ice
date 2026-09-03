@@ -300,7 +300,7 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"addedFilesCount","parameterTypes":[] }, {"name":"dataFiles","parameterTypes":[] }, {"name":"deletedFilesCount","parameterTypes":[] }, {"name":"existingFilesCount","parameterTypes":[] }, {"name":"partitionSpecId","parameterTypes":[] }, {"name":"path","parameterTypes":[] }]
+  "methods":[{"name":"addedFilesCount","parameterTypes":[] }, {"name":"dataFiles","parameterTypes":[] }, {"name":"deletedFilesCount","parameterTypes":[] }, {"name":"existingFilesCount","parameterTypes":[] }, {"name":"firstRowId","parameterTypes":[] }, {"name":"partitionSpecId","parameterTypes":[] }, {"name":"path","parameterTypes":[] }]
 },
 {
   "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$MetadataInfo",
@@ -328,7 +328,7 @@
   "allDeclaredFields":true,
   "queryAllDeclaredMethods":true,
   "queryAllDeclaredConstructors":true,
-  "methods":[{"name":"current","parameterTypes":[] }, {"name":"manifestListLocation","parameterTypes":[] }, {"name":"operation","parameterTypes":[] }, {"name":"parentId","parameterTypes":[] }, {"name":"sequenceNumber","parameterTypes":[] }, {"name":"snapshotId","parameterTypes":[] }, {"name":"summary","parameterTypes":[] }, {"name":"timestamp","parameterTypes":[] }, {"name":"timestampMillis","parameterTypes":[] }]
+  "methods":[{"name":"current","parameterTypes":[] }, {"name":"firstRowId","parameterTypes":[] }, {"name":"manifestListLocation","parameterTypes":[] }, {"name":"operation","parameterTypes":[] }, {"name":"parentId","parameterTypes":[] }, {"name":"sequenceNumber","parameterTypes":[] }, {"name":"snapshotId","parameterTypes":[] }, {"name":"summary","parameterTypes":[] }, {"name":"timestamp","parameterTypes":[] }, {"name":"timestampMillis","parameterTypes":[] }]
 },
 {
   "name":"com.altinity.ice.cli.internal.cmd.DescribeMetadata$SnapshotLogEntry",
