@@ -11,6 +11,7 @@ package com.altinity.ice.cli.internal.cmd;
 
 import com.altinity.ice.internal.iceberg.io.SchemeFileIO;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
@@ -141,7 +142,8 @@ public final class DescribeMetadata {
               snapshot.operation(),
               currentSnapshotId != null && snapshot.snapshotId() == currentSnapshotId,
               snapshot.summary(),
-              snapshot.manifestListLocation()));
+              snapshot.manifestListLocation(),
+              snapshot.firstRowId()));
     }
     return result;
   }
@@ -213,6 +215,7 @@ public final class DescribeMetadata {
               manifest.existingFilesCount(),
               manifest.deletedFilesCount(),
               manifest.partitionSpecId(),
+              manifest.firstRowId(),
               dataFiles.isEmpty() ? null : dataFiles));
     }
 
@@ -272,7 +275,8 @@ public final class DescribeMetadata {
       String operation,
       boolean current,
       Map<String, String> summary,
-      String manifestListLocation) {}
+      String manifestListLocation,
+      @JsonProperty("first-row-id") Long firstRowId) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record HistoryInfo(
@@ -291,6 +295,7 @@ public final class DescribeMetadata {
       Integer existingFilesCount,
       Integer deletedFilesCount,
       int partitionSpecId,
+      @JsonProperty("first_row_id") Long firstRowId,
       List<DataFileInfo> dataFiles) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)

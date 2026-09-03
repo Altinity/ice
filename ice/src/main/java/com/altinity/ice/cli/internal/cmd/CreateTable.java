@@ -64,9 +64,14 @@ public final class CreateTable {
       boolean ignoreAlreadyExists,
       boolean useVendedCredentials,
       boolean s3NoSignRequest,
+      int formatVersion,
       @Nullable List<Main.IcePartition> partitionList,
       @Nullable List<Main.IceSortOrder> sortOrderList)
       throws IOException {
+    if (formatVersion != 2 && formatVersion != 3) {
+      throw new IllegalArgumentException(
+          "--format-version must be 2 or 3 (got " + formatVersion + ")");
+    }
     if (ignoreAlreadyExists && catalog.tableExists(nsTable)) {
       return;
     }
@@ -105,7 +110,12 @@ public final class CreateTable {
         // force name-based resolution instead of position-based resolution
         NameMapping mapping = MappingUtil.create(initialSchema);
         String mappingJson = NameMappingParser.toJson(mapping);
-        var props = Map.of(TableProperties.DEFAULT_NAME_MAPPING, mappingJson);
+        var props =
+            Map.of(
+                TableProperties.DEFAULT_NAME_MAPPING,
+                mappingJson,
+                TableProperties.FORMAT_VERSION,
+                String.valueOf(formatVersion));
 
         PartitionSpec partitionSpec =
             partitionList == null
