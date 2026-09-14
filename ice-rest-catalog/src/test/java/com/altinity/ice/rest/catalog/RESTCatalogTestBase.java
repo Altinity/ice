@@ -50,7 +50,7 @@ public abstract class RESTCatalogTestBase {
 
   @SuppressWarnings("rawtypes")
   protected final GenericContainer minio =
-      new GenericContainer("minio/minio:latest")
+      new GenericContainer("quay.io/minio/minio:latest")
           .withExposedPorts(9000)
           .withEnv("MINIO_ACCESS_KEY", "minioadmin")
           .withEnv("MINIO_SECRET_KEY", "minioadmin")
