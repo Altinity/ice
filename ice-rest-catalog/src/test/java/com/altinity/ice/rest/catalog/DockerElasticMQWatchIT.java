@@ -80,7 +80,7 @@ public class DockerElasticMQWatchIT {
   private static final String DEFAULT_CATALOG_IMAGE =
       "altinity/ice-rest-catalog:debug-with-ice-local";
   private static final String DEFAULT_ELASTICMQ_IMAGE = "softwaremill/elasticmq-native:1.6.15";
-  private static final String DEFAULT_MINIO_IMAGE = "minio/minio:latest";
+  private static final String DEFAULT_MINIO_IMAGE = "quay.io/minio/minio:latest";
 
   private static final String BUCKET = "test-bucket";
   private static final String QUEUE_NAME = "s3-events";

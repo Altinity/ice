@@ -61,7 +61,7 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
 
     // Start MinIO
     minio =
-        new GenericContainer<>("minio/minio:latest")
+        new GenericContainer<>("quay.io/minio/minio:latest")
             .withNetwork(network)
             .withNetworkAliases("minio")
             .withExposedPorts(9000)

@@ -6,7 +6,7 @@ uri: jdbc:sqlite:file:data/ice-rest-catalog/db.sqlite?journal_mode=WAL&synchrono
 warehouse: s3://bucket1
 
 s3:
-  endpoint: http://localhost:9000
+  endpoint: http://localhost:8999
   pathStyleAccess: true
   accessKeyID: miniouser
   secretAccessKey: miniopassword
@@ -16,5 +16,5 @@ bearerTokens:
 - value: foo
 
 anonymousAccess:
-  enabled: true
+  enabled: false
   accessConfig: {}
