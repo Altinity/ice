@@ -7,10 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.22.0](https://github.com/Altinity/ice/compare/v0.21.0...master)
 
-### Other
+### Added 
 
-- `ice` - Added docker compose setup for polaris, clickhouse and minio
 - `ice` - Add support to create iceberg v3 table using create-table.
+- `ice` - Added docker compose setup for polaris, clickhouse and minio
 - Changed docker image for minio to quay.io/minio
 
 ## [0.21.0](https://github.com/Altinity/ice/compare/v0.20.0...master)
