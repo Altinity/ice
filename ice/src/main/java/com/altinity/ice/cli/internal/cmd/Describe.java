@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Snapshot;
@@ -142,10 +143,13 @@ public final class Describe {
     }
 
     boolean includeSchema = optionsSet.contains(Option.INCLUDE_SCHEMA);
+    Integer formatVersion =
+        table instanceof BaseTable bt ? bt.operations().current().formatVersion() : null;
     return new Table.Data(
         includeSchema ? table.schema().toString() : null,
         includeSchema ? table.spec().toString() : null,
         includeSchema ? table.sortOrder().toString() : null,
+        formatVersion,
         optionsSet.contains(Option.INCLUDE_PROPERTIES) ? table.properties() : null,
         table.location(),
         snapshotInfo,
@@ -253,6 +257,7 @@ public final class Describe {
         String schemaRaw,
         String partitionSpecRaw,
         String sortOrderRaw,
+        Integer formatVersion,
         Map<String, String> properties,
         String location,
         Table.Snapshot currentSnapshot,

@@ -360,7 +360,12 @@ public final class Main {
               names = {"--sort"},
               description =
                   "Sort order, e.g. [{\"column\":\"name\", \"desc\":false, \"nullFirst\":false}]")
-          String sortOrderJson)
+          String sortOrderJson,
+      @CommandLine.Option(
+              names = {"--format-version"},
+              description = "Iceberg table format version (2 or 3). Default: 2",
+              defaultValue = "2")
+          int formatVersion)
       throws IOException {
     setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog()) {
@@ -387,6 +392,7 @@ public final class Main {
           createTableIfNotExists,
           useVendedCredentials,
           s3NoSignRequest,
+          formatVersion,
           partitions,
           sortOrders);
     }
@@ -518,6 +524,12 @@ public final class Main {
                   "Sort order, e.g. [{\"column\":\"name\", \"desc\":false, \"nullFirst\":false}]")
           String sortOrderJson,
       @CommandLine.Option(
+              names = {"--format-version"},
+              description =
+                  "Iceberg table format version (2 or 3) when creating the table with -p/--create-table. Default: 2",
+              defaultValue = "2")
+          int formatVersion,
+      @CommandLine.Option(
               names = {"--assume-sorted"},
               description = "Skip data sorting. Assume it's already sorted.")
           boolean assumeSorted,
@@ -639,6 +651,7 @@ public final class Main {
             createTableIfNotExists,
             useVendedCredentials,
             s3NoSignRequest,
+            formatVersion,
             partitions,
             sortOrders);
       } // delayed in watch mode
@@ -660,6 +673,7 @@ public final class Main {
               .retryListFile(retryList)
               .partitionList(partitions)
               .sortOrderList(sortOrders)
+              .formatVersion(formatVersion)
               .threadCount(
                   threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount)
               .commitRetries(commitRetries)
