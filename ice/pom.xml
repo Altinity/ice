@@ -386,7 +386,7 @@
     <dependency>
       <groupId>org.apache.httpcomponents.client5</groupId>
       <artifactId>httpclient5</artifactId>
-      <version>5.4.3</version>
+      <version>${httpclient5.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.slf4j</groupId>
@@ -525,6 +525,13 @@
       <groupId>io.prometheus</groupId>
       <artifactId>prometheus-metrics-exporter-servlet-jakarta</artifactId>
       <version>${prometheus.version}</version>
+    </dependency>
+    <!-- skedule -->
+    <dependency>
+      <groupId>com.github.shyiko.skedule</groupId>
+      <artifactId>skedule</artifactId>
+      <version>${skedule.version}</version>
+      <classifier>kalvanized</classifier>
     </dependency>
     <!-- picocli -->
     <dependency>
@@ -682,6 +689,42 @@
             <version>3.5.0</version>
             <configuration>
               <skip>true</skip>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>native</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>${native.maven.plugin.version}</version>
+            <extensions>true</extensions>
+            <executions>
+              <execution>
+                <id>build-native</id>
+                <goals>
+                  <goal>compile-no-fork</goal>
+                </goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+            <configuration>
+              <imageName>ice</imageName>
+              <mainClass>com.altinity.ice.cli.Main</mainClass>
+              <buildArgs>
+                <!-- Base configuration -->
+                <buildArg>--initialize-at-run-time=io.netty</buildArg>
+                <buildArg>--initialize-at-run-time=ch.qos.logback</buildArg>
+                <!-- We need dynamic libc, cannot be fully static -->
+                <buildArg>-H:+StaticExecutableWithDynamicLibC</buildArg>
+                <!-- Additional optimizations -->
+                <buildArg>-H:+RemoveUnusedSymbols</buildArg>
+                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+              </buildArgs>
             </configuration>
           </plugin>
         </plugins>

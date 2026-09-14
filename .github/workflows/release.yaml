@@ -9,7 +9,37 @@ on:
         required: true
 concurrency: release
 jobs:
+  native-build:
+    name: Build native ice (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'graalvm'
+          cache: maven
+      - name: Build native image
+        run: ./mvnw -Pnative -pl ice -am clean package -Dmaven.test.skip=true
+      - name: Stage artifact
+        run: |
+          mkdir -p dist
+          cp ice/target/ice dist/ice-native-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ice-native-${{ matrix.arch }}
+          path: dist/ice-native-${{ matrix.arch }}
+          if-no-files-found: error
+
   release:
+    needs: native-build
     runs-on: ubuntu-24.04
     steps:
       - uses: docker/login-action@v3
@@ -39,6 +69,13 @@ jobs:
           java-version: '21'
           distribution: 'graalvm'
           cache: maven
+
+      - name: Download native binaries
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          pattern: ice-native-*
+          path: release/native
+          merge-multiple: true
 
       - run: .bin/release --push
         env:

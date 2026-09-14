@@ -25,6 +25,8 @@ import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.CloseableIterator;
 import org.apache.iceberg.io.InputFile;
+import org.apache.iceberg.mapping.MappingUtil;
+import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 
@@ -104,9 +106,28 @@ public final class Sorting {
     return checkSorted(inputFile, tableSchema, sortOrder).ok;
   }
 
-  // TODO: check metadata first to avoid full scan when unsorted
+  public static boolean isSorted(
+      InputFile inputFile,
+      Schema tableSchema,
+      SortOrder sortOrder,
+      @Nullable NameMapping nameMapping)
+      throws IOException {
+    return checkSorted(inputFile, tableSchema, sortOrder, nameMapping).ok;
+  }
+
   public static SortCheckResult checkSorted(
       InputFile inputFile, Schema tableSchema, SortOrder sortOrder) throws IOException {
+    // Resolve columns by name for files that have no embedded field IDs (e.g. ClickHouse exports).
+    return checkSorted(inputFile, tableSchema, sortOrder, MappingUtil.create(tableSchema));
+  }
+
+  // TODO: check metadata first to avoid full scan when unsorted
+  public static SortCheckResult checkSorted(
+      InputFile inputFile,
+      Schema tableSchema,
+      SortOrder sortOrder,
+      @Nullable NameMapping nameMapping)
+      throws IOException {
     if (sortOrder.isUnsorted()) {
       return new SortCheckResult(false);
     }
@@ -135,11 +156,15 @@ public final class Sorting {
     }
     Schema projectedSchema = new Schema(projection);
 
-    try (CloseableIterable<Record> records =
+    Parquet.ReadBuilder readBuilder =
         Parquet.read(inputFile)
             .createReaderFunc(s -> GenericParquetReaders.buildReader(projectedSchema, s))
-            .project(projectedSchema)
-            .build()) {
+            .project(projectedSchema);
+    if (nameMapping != null) {
+      readBuilder = readBuilder.withNameMapping(nameMapping);
+    }
+
+    try (CloseableIterable<Record> records = readBuilder.build()) {
 
       CloseableIterator<Record> iter = records.iterator();
       if (iter.hasNext()) {

@@ -45,9 +45,114 @@ if [ "${SECOND_LINES}" -le "${FIRST_LINES}" ]; then
 fi
 echo "OK Second scan: ${SECOND_LINES} lines (rows inserted)"
 
+# alter_column: add an int column then widen to long
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} $'[{"op":"add_column","name":"an_int","type":"int"}]'
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/schema_ev_int.txt
+if ! grep -qF 'an_int: optional int' /tmp/schema_ev_int.txt; then
+  echo "FAIL add_column an_int as int not visible"
+  cat /tmp/schema_ev_int.txt
+  exit 1
+fi
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} $'[{"op":"alter_column","name":"an_int","type":"long"}]'
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/schema_ev_long.txt
+if ! grep -qF 'an_int: optional long' /tmp/schema_ev_long.txt; then
+  echo "FAIL alter_column int->long not applied"
+  cat /tmp/schema_ev_long.txt
+  exit 1
+fi
+echo "OK alter_column promoted int to long"
+
+# rename_column an_int -> a_long
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} $'[{"op":"rename_column","name":"an_int","new_name":"a_long"}]'
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/schema_ev_rename.txt
+if grep -qF ' an_int:' /tmp/schema_ev_rename.txt; then
+  echo "FAIL rename_column: old name 'an_int' still present"
+  cat /tmp/schema_ev_rename.txt
+  exit 1
+fi
+if ! grep -qF 'a_long: optional long' /tmp/schema_ev_rename.txt; then
+  echo "FAIL rename_column: new name 'a_long' not visible"
+  cat /tmp/schema_ev_rename.txt
+  exit 1
+fi
+echo "OK rename_column an_int -> a_long"
+
+# drop_column 'extra'
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} $'[{"op":"drop_column","name":"extra"}]'
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/schema_ev_drop.txt
+if grep -qF ' extra:' /tmp/schema_ev_drop.txt; then
+  echo "FAIL drop_column: 'extra' still present"
+  cat /tmp/schema_ev_drop.txt
+  exit 1
+fi
+echo "OK drop_column 'extra' removed"
+
+# set_tblproperty: set then remove (value=null)
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} $'[{"op":"set_tblproperty","key":"owner","value":"qa"}]'
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -p ${TABLE_NAME} > /tmp/schema_ev_props_set.txt
+if ! grep -qF 'owner: qa' /tmp/schema_ev_props_set.txt; then
+  echo "FAIL set_tblproperty owner=qa not visible in describe -p"
+  cat /tmp/schema_ev_props_set.txt
+  exit 1
+fi
+echo "OK set_tblproperty owner=qa"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} $'[{"op":"set_tblproperty","key":"owner","value":null}]'
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -p ${TABLE_NAME} > /tmp/schema_ev_props_unset.txt
+if grep -qF 'owner: qa' /tmp/schema_ev_props_unset.txt; then
+  echo "FAIL set_tblproperty value=null did not remove 'owner'"
+  cat /tmp/schema_ev_props_unset.txt
+  exit 1
+fi
+echo "OK set_tblproperty value=null removed 'owner'"
+
+# rename_to: ensure new name appears and old name disappears
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_NAME} "[{\"op\":\"rename_to\",\"new_name\":\"${TABLE_RENAMED}\"}]"
+{{ICE_CLI}} --config {{CLI_CONFIG}} list-tables ${NAMESPACE_NAME} > /tmp/schema_ev_rename_to.txt
+LISTED_NAMES=$(awk '/^- /{sub(/^- */,""); print}' /tmp/schema_ev_rename_to.txt)
+if grep -qFx "${TABLE_NAME}" <<<"${LISTED_NAMES}"; then
+  echo "FAIL rename_to: original table ${TABLE_NAME} still listed"
+  cat /tmp/schema_ev_rename_to.txt
+  exit 1
+fi
+if ! grep -qFx "${TABLE_RENAMED}" <<<"${LISTED_NAMES}"; then
+  echo "FAIL rename_to: renamed table ${TABLE_RENAMED} not listed"
+  cat /tmp/schema_ev_rename_to.txt
+  exit 1
+fi
+echo "OK rename_to ${TABLE_RENAMED}"
+
+# Rename back so the existing cleanup path still works
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_RENAMED} "[{\"op\":\"rename_to\",\"new_name\":\"${TABLE_NAME}\"}]"
+
+# drop_partition_field: needs a partitioned table
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table ${TABLE_PARTITIONED} "file://${INPUT_PATH}" \
+  --partition='[{"column":"variety","transform":"identity"}]'
+PART_BEFORE=$({{ICE_CLI}} --config {{CLI_CONFIG}} list-partitions ${TABLE_PARTITIONED})
+if ! grep -q "variety=" <<<"${PART_BEFORE}"; then
+  echo "FAIL partitioned table missing 'variety=' partition entries before drop"
+  printf '%s\n' "${PART_BEFORE}"
+  exit 1
+fi
+{{ICE_CLI}} --config {{CLI_CONFIG}} alter-table ${TABLE_PARTITIONED} $'[{"op":"drop_partition_field","name":"variety"}]'
+DESCRIBE_PART=$({{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_PARTITIONED})
+# After dropping, the partition spec should no longer reference 'variety' as an active field.
+# Iceberg renders dropped fields as "void(<name>)" in the spec; an active identity partition shows as "identity(variety)".
+if grep -qE "identity\(variety\)" <<<"${DESCRIBE_PART}"; then
+  echo "FAIL drop_partition_field: identity(variety) still active in spec"
+  printf '%s\n' "${DESCRIBE_PART}"
+  exit 1
+fi
+echo "OK drop_partition_field 'variety'"
+
 # Cleanup
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_PARTITIONED}
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+rm -f /tmp/schema_ev_describe.txt /tmp/schema_ev_scan1.txt /tmp/schema_ev_scan2.txt \
+      /tmp/schema_ev_int.txt /tmp/schema_ev_long.txt /tmp/schema_ev_rename.txt \
+      /tmp/schema_ev_drop.txt /tmp/schema_ev_props_set.txt /tmp/schema_ev_props_unset.txt \
+      /tmp/schema_ev_rename_to.txt
 echo "OK Cleanup done"
 
 echo "Schema evolution test completed successfully"

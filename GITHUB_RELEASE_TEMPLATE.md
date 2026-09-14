@@ -7,6 +7,20 @@ curl -sSL https://github.com/altinity/ice/releases/download/REPLACE_WITH_TAG/ice
   -o ice && chmod a+x ice && sudo mv ice /usr/local/bin/
 ```
 
+#### Native (no Java required; needs glibc)
+
+```sh
+# linux amd64
+curl -sSL https://github.com/altinity/ice/releases/download/REPLACE_WITH_TAG/ice-native-amd64-REPLACE_WITH_VER \
+  -o ice && chmod a+x ice && sudo mv ice /usr/local/bin/
+```
+
+```sh
+# linux arm64
+curl -sSL https://github.com/altinity/ice/releases/download/REPLACE_WITH_TAG/ice-native-arm64-REPLACE_WITH_VER \
+  -o ice && chmod a+x ice && sudo mv ice /usr/local/bin/
+```
+
 #### Docker
 
 <!-- TODO: @digest -->

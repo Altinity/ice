@@ -9,21 +9,27 @@
  */
 package com.altinity.ice.cli.internal.cmd;
 
+import com.altinity.ice.cli.internal.cmd.InsertWatchBuffer.BatchOptions;
+import com.altinity.ice.cli.internal.cmd.InsertWatchBuffer.FilterResult;
 import com.altinity.ice.cli.internal.metrics.InsertWatchMetrics;
 import com.altinity.ice.internal.io.Matcher;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.shyiko.skedule.Schedule;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
@@ -35,6 +41,9 @@ import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.SqsClientBuilder;
 import software.amazon.awssdk.services.sqs.model.BatchResultErrorEntry;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequest;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchRequestEntry;
+import software.amazon.awssdk.services.sqs.model.ChangeMessageVisibilityBatchResponse;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageBatchRequest;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageBatchRequestEntry;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageBatchResponse;
@@ -46,6 +55,13 @@ public class InsertWatch {
   private static final Logger logger = LoggerFactory.getLogger(InsertWatch.class);
   private static final ObjectMapper objectMapper = new ObjectMapper();
   private static final String QUEUE_TYPE_SQS = "sqs";
+
+  // Maximum number of entries accepted by the SQS batch APIs.
+  private static final int SQS_BATCH_LIMIT = 10;
+
+  // Floor for how long accumulated messages are kept invisible.
+  private static final int MIN_VISIBILITY_TIMEOUT_SECONDS = 60;
+  private static final int MAX_VISIBILITY_TIMEOUT_SECONDS = 43200; // SQS limit (12h)
 
   public static void run(
       RESTCatalog catalog,
@@ -65,6 +81,7 @@ public class InsertWatch {
         terminateAfterOneBatch,
         createTableIfNotExists,
         options,
+        BatchOptions.NONE,
         false);
   }
 
@@ -77,6 +94,7 @@ public class InsertWatch {
       boolean terminateAfterOneBatch,
       boolean createTableIfNotExists,
       Insert.Options options,
+      BatchOptions batchOptions,
       boolean metricsEnabled)
       throws IOException, InterruptedException {
 
@@ -97,6 +115,25 @@ public class InsertWatch {
     String tableLabel = nsTable.toString();
     String queueLabel = sqsQueueURL;
     String queueType = QUEUE_TYPE_SQS;
+
+    Schedule schedule =
+        batchOptions.commitSchedule() != null
+            ? Schedule.parse(batchOptions.commitSchedule())
+            : null;
+    ZonedDateTime nextCommitAt = schedule != null ? schedule.next(ZonedDateTime.now()) : null;
+
+    if (batchOptions.enabled()) {
+      logger.info(
+          "Batching commits (schedule: {}, max files: {}, max bytes: {})",
+          batchOptions.commitSchedule() != null ? batchOptions.commitSchedule() : "unset",
+          batchOptions.maxFiles() > 0 ? String.valueOf(batchOptions.maxFiles()) : "unset",
+          batchOptions.maxBytes() > 0
+              ? InsertWatchBuffer.formatBytes(batchOptions.maxBytes())
+              : "unset");
+      if (nextCommitAt != null) {
+        logger.info("Next commit scheduled for: {}", nextCommitAt);
+      }
+    }
 
     final SqsClient sqs = buildSqsClient(sqsOverrideEndpoint);
     ReceiveMessageRequest req =
@@ -121,6 +158,8 @@ public class InsertWatch {
           // TODO: implement
         };
 
+    final InsertWatchBuffer buffer = new InsertWatchBuffer();
+
     //noinspection LoopConditionNotUpdatedInsideLoop
     do {
       List<Message> batch = new LinkedList<>();
@@ -143,8 +182,9 @@ public class InsertWatch {
         Thread.sleep(delay);
         continue;
       }
-      if (!batch.isEmpty()) {
-        try {
+
+      try {
+        if (!batch.isEmpty()) {
           var maxBatchSize = 100; // FIXME: make configurable
 
           List<Message> tailMessages;
@@ -160,91 +200,201 @@ public class InsertWatch {
           logger.info("Processing {} message(s)", batch.size());
           // FIXME: handle files not found
 
-          var insertBatch = filter(batch, matchers, metrics, tableLabel, queueLabel, queueType);
-          if (!insertBatch.isEmpty()) {
-            logger.info("Inserting {}", insertBatch);
+          var filtered = filter(batch, matchers, metrics, tableLabel, queueLabel, queueType);
 
-            try {
-              Insert.Result result =
-                  Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
-              if (metrics != null) {
-                metrics.recordFilesInserted(tableLabel, queueLabel, queueType, insertBatch.size());
-                metrics.recordTransactionSuccess(tableLabel, queueLabel, queueType);
-              }
-              if (!result.ok()) {
-                logger.warn(
-                    "{}/{} file(s) failed to insert in this batch",
-                    result.totalNumberOfFiles(),
-                    result.numberOfFilesFailedToInsert());
-              }
-            } catch (NoSuchTableException e) {
-              if (!createTableIfNotExists) {
-                if (metrics != null) {
-                  metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
-                }
-                throw e;
-              }
-              boolean retryInsert = true;
-              try {
-                CreateTable.run(
-                    catalog,
-                    nsTable,
-                    insertBatch.iterator().next(),
-                    null,
-                    true,
-                    options.useVendedCredentials(),
-                    options.s3NoSignRequest(),
-                    null,
-                    null);
-              } catch (NotFoundException nfe) {
-                if (!options.ignoreNotFound()) {
-                  if (metrics != null) {
-                    metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
-                  }
-                  throw nfe;
-                }
-                logger.info("Table not created ({} don't exist)", insertBatch);
-                retryInsert = false;
-              }
-              if (retryInsert) {
-                Insert.run(catalog, nsTable, insertBatch.toArray(String[]::new), options);
-                if (metrics != null) {
-                  metrics.recordFilesInserted(
-                      tableLabel, queueLabel, queueType, insertBatch.size());
-                  metrics.recordTransactionSuccess(tableLabel, queueLabel, queueType);
-                }
-              }
-            }
-          }
+          // These contribute nothing to the next commit, so there is no reason to hold on to
+          // them until it happens.
+          confirmProcessed(
+              sqs,
+              sqsQueueURL,
+              filtered.unmatchedMessages(),
+              metrics,
+              tableLabel,
+              queueLabel,
+              queueType);
 
-          confirmProcessed(sqs, sqsQueueURL, batch, metrics, tableLabel, queueLabel, queueType);
-        } catch (InterruptedException e) {
-          // terminate
-          Thread.currentThread().interrupt();
-          throw new InterruptedException();
-        } catch (Exception e) {
-          if (metrics != null) {
-            metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
-            metrics.recordRetryAttempt(tableLabel, queueLabel, queueType);
-          }
-          Duration delay = backoff.get();
-          logger.error("Failed to process batch of messages (retry in {})", delay, e);
-          Thread.sleep(delay);
-          continue;
+          buffer.add(filtered);
         }
+
+        boolean scheduleDue = nextCommitAt != null && !ZonedDateTime.now().isBefore(nextCommitAt);
+        String trigger = buffer.flushTrigger(batchOptions, scheduleDue);
+        if (trigger == null && terminateAfterOneBatch && !buffer.isEmpty()) {
+          trigger = "fire_once";
+        }
+        if (trigger != null) {
+          flush(
+              catalog,
+              nsTable,
+              sqs,
+              sqsQueueURL,
+              buffer,
+              createTableIfNotExists,
+              options,
+              metrics,
+              tableLabel,
+              queueLabel,
+              queueType,
+              trigger);
+          if (schedule != null) {
+            nextCommitAt = rollForward(schedule, nextCommitAt, ZonedDateTime.now());
+            logger.info("Next commit scheduled for: {}", nextCommitAt);
+          }
+        } else if (!buffer.isEmpty()) {
+          keepInvisible(sqs, sqsQueueURL, buffer, nextCommitAt);
+          logBufferState(buffer, nextCommitAt);
+        } else if (scheduleDue && schedule != null) {
+          nextCommitAt = rollForward(schedule, nextCommitAt, ZonedDateTime.now());
+        }
+        if (metrics != null) {
+          metrics.recordBufferState(
+              tableLabel, queueLabel, queueType, buffer.fileCount(), buffer.bytes());
+        }
+      } catch (InterruptedException e) {
+        // terminate
+        Thread.currentThread().interrupt();
+        throw new InterruptedException();
+      } catch (Exception e) {
+        if (metrics != null) {
+          metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
+          metrics.recordRetryAttempt(tableLabel, queueLabel, queueType);
+        }
+        Duration delay = backoff.get();
+        logger.error("Failed to process batch of messages (retry in {})", delay, e);
+        Thread.sleep(delay);
+        continue;
       }
       resetBackoff.run();
     } while (!terminateAfterOneBatch);
   }
 
-  private static Collection<String> filter(
+  /**
+   * Advances {@code deadline} from itself (not from {@code now}) so that a relative schedule such
+   * as {@code every 5 minutes} keeps a fixed cadence instead of sliding forward on every poll.
+   */
+  private static ZonedDateTime rollForward(Schedule s, ZonedDateTime deadline, ZonedDateTime now) {
+    ZonedDateTime r = deadline;
+    while (!now.isBefore(r)) {
+      r = s.next(r);
+    }
+    return r;
+  }
+
+  /** Commits everything accumulated so far as a single snapshot and acknowledges the messages. */
+  private static void flush(
+      RESTCatalog catalog,
+      TableIdentifier nsTable,
+      SqsClient sqs,
+      String sqsQueueURL,
+      InsertWatchBuffer buffer,
+      boolean createTableIfNotExists,
+      Insert.Options options,
+      InsertWatchMetrics metrics,
+      String tableLabel,
+      String queueLabel,
+      String queueType,
+      String trigger)
+      throws IOException, InterruptedException {
+    String[] files = buffer.fileArray();
+    logger.info(
+        "Committing {} file(s) ({}) accumulated over {}s (trigger: {})",
+        files.length,
+        InsertWatchBuffer.formatBytes(buffer.bytes()),
+        buffer.age().toSeconds(),
+        trigger);
+    logger.info("Inserting {}", Arrays.asList(files));
+
+    insert(
+        catalog,
+        nsTable,
+        files,
+        createTableIfNotExists,
+        options,
+        metrics,
+        tableLabel,
+        queueLabel,
+        queueType);
+
+    confirmProcessed(
+        sqs, sqsQueueURL, buffer.messageList(), metrics, tableLabel, queueLabel, queueType);
+
+    if (metrics != null) {
+      metrics.recordBufferFlush(tableLabel, queueLabel, queueType, trigger);
+    }
+    buffer.clear();
+  }
+
+  private static void insert(
+      RESTCatalog catalog,
+      TableIdentifier nsTable,
+      String[] files,
+      boolean createTableIfNotExists,
+      Insert.Options options,
+      InsertWatchMetrics metrics,
+      String tableLabel,
+      String queueLabel,
+      String queueType)
+      throws IOException, InterruptedException {
+    try {
+      Insert.Result result = Insert.run(catalog, nsTable, files, options);
+      if (metrics != null) {
+        metrics.recordFilesInserted(tableLabel, queueLabel, queueType, files.length);
+        metrics.recordTransactionSuccess(tableLabel, queueLabel, queueType);
+      }
+      if (!result.ok()) {
+        logger.warn(
+            "{}/{} file(s) failed to insert in this batch",
+            result.totalNumberOfFiles(),
+            result.numberOfFilesFailedToInsert());
+      }
+    } catch (NoSuchTableException e) {
+      if (!createTableIfNotExists) {
+        if (metrics != null) {
+          metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
+        }
+        throw e;
+      }
+      boolean retryInsert = true;
+      try {
+        CreateTable.run(
+            catalog,
+            nsTable,
+            files[0],
+            null,
+            true,
+            options.useVendedCredentials(),
+            options.s3NoSignRequest(),
+            null,
+            null);
+      } catch (NotFoundException nfe) {
+        if (!options.ignoreNotFound()) {
+          if (metrics != null) {
+            metrics.recordTransactionFailed(tableLabel, queueLabel, queueType);
+          }
+          throw nfe;
+        }
+        logger.info("Table not created ({} don't exist)", Arrays.asList(files));
+        retryInsert = false;
+      }
+      if (retryInsert) {
+        Insert.run(catalog, nsTable, files, options);
+        if (metrics != null) {
+          metrics.recordFilesInserted(tableLabel, queueLabel, queueType, files.length);
+          metrics.recordTransactionSuccess(tableLabel, queueLabel, queueType);
+        }
+      }
+    }
+  }
+
+  private static FilterResult filter(
       List<Message> messages,
       Collection<Matcher> matchers,
       InsertWatchMetrics metrics,
       String tableLabel,
       String queueLabel,
       String queueType) {
-    Collection<String> r = new LinkedHashSet<>();
+    Map<String, Long> files = new LinkedHashMap<>();
+    List<Message> matched = new ArrayList<>();
+    List<Message> unmatched = new ArrayList<>();
     for (Message message : messages) {
       // Message body() example:
       //
@@ -274,8 +424,10 @@ public class InsertWatch {
           metrics.recordMessageParseError(tableLabel, queueLabel, queueType);
         }
         // TODO: dlq?
+        unmatched.add(message);
         continue;
       }
+      boolean messageMatched = false;
       // TODO: use type
       for (JsonNode record : root.path("Records")) {
         if (metrics != null) {
@@ -291,7 +443,8 @@ public class InsertWatch {
         if (eventName.startsWith("ObjectCreated:")) {
           // TODO: exclude metadata/data dirs by default
           if (matchers.stream().anyMatch(matcher -> matcher.test(target))) {
-            r.add(target);
+            files.putIfAbsent(target, record.at("/s3/object/size").asLong(0));
+            messageMatched = true;
             if (metrics != null) {
               metrics.recordEventMatched(tableLabel, queueLabel, queueType);
             }
@@ -310,8 +463,52 @@ public class InsertWatch {
           }
         }
       }
+      (messageMatched ? matched : unmatched).add(message);
     }
-    return r;
+    return new FilterResult(files, matched, unmatched);
+  }
+
+  /**
+   * Resets the visibility timeout of accumulated messages so that they are not redelivered while
+   * waiting for the next commit.
+   */
+  private static void keepInvisible(
+      SqsClient sqs, String sqsQueueURL, InsertWatchBuffer buffer, ZonedDateTime nextCommitAt) {
+    int timeout = visibilityTimeoutSeconds(nextCommitAt);
+    List<Message> messages = buffer.messageList();
+    int len = messages.size();
+    for (int i = 0; i < len; i = i + SQS_BATCH_LIMIT) {
+      List<Message> chunk = messages.subList(i, Math.min(i + SQS_BATCH_LIMIT, len));
+      // A message that stays visible is redelivered and re-accumulated rather than lost, so this
+      // is not worth failing the batch over.
+      try {
+        ChangeMessageVisibilityBatchResponse res =
+            changeMessageVisibilityBatch(sqs, sqsQueueURL, chunk, timeout);
+        for (BatchResultErrorEntry f : res.failed()) {
+          logger.warn("Failed to extend visibility of message#{}: {}", f.id(), f.message());
+        }
+      } catch (SdkException e) {
+        logger.warn("Failed to extend visibility of {} accumulated message(s)", chunk.size(), e);
+      }
+    }
+  }
+
+  private static int visibilityTimeoutSeconds(ZonedDateTime nextCommitAt) {
+    if (nextCommitAt == null) {
+      return MIN_VISIBILITY_TIMEOUT_SECONDS;
+    }
+    long secsUntil = Duration.between(ZonedDateTime.now(), nextCommitAt).toSeconds();
+    long v = Math.max(MIN_VISIBILITY_TIMEOUT_SECONDS, secsUntil * 2);
+    return (int) Math.min(v, MAX_VISIBILITY_TIMEOUT_SECONDS);
+  }
+
+  private static void logBufferState(InsertWatchBuffer buffer, ZonedDateTime nextCommitAt) {
+    logger.info(
+        "Accumulated {} file(s) ({}) over {}s; next commit at {}",
+        buffer.fileCount(),
+        InsertWatchBuffer.formatBytes(buffer.bytes()),
+        buffer.age().toSeconds(),
+        nextCommitAt != null ? nextCommitAt : "n/a");
   }
 
   private static void confirmProcessed(
@@ -322,10 +519,13 @@ public class InsertWatch {
       String tableLabel,
       String queueLabel,
       String queueType) {
+    if (messages.isEmpty()) {
+      return;
+    }
     int failedCount = 0;
     int len = messages.size();
-    for (int i = 0; i < len; i = i + 10) {
-      List<Message> batch = messages.subList(i, Math.min(i + 10, len));
+    for (int i = 0; i < len; i = i + SQS_BATCH_LIMIT) {
+      List<Message> batch = messages.subList(i, Math.min(i + SQS_BATCH_LIMIT, len));
       DeleteMessageBatchResponse res = deleteMessageBatch(sqs, sqsQueueURL, batch);
       if (res.hasFailed()) {
         List<BatchResultErrorEntry> failed = res.failed();
@@ -353,6 +553,24 @@ public class InsertWatch {
                             DeleteMessageBatchRequestEntry.builder()
                                 .id(m.messageId())
                                 .receiptHandle(m.receiptHandle())
+                                .build())
+                    .toList())
+            .build());
+  }
+
+  private static ChangeMessageVisibilityBatchResponse changeMessageVisibilityBatch(
+      SqsClient sqs, String sqsQueueURL, List<Message> messages, int visibilityTimeoutSeconds) {
+    return sqs.changeMessageVisibilityBatch(
+        ChangeMessageVisibilityBatchRequest.builder()
+            .queueUrl(sqsQueueURL)
+            .entries(
+                messages.stream()
+                    .map(
+                        m ->
+                            ChangeMessageVisibilityBatchRequestEntry.builder()
+                                .id(m.messageId())
+                                .receiptHandle(m.receiptHandle())
+                                .visibilityTimeout(visibilityTimeoutSeconds)
                                 .build())
                     .toList())
             .build());

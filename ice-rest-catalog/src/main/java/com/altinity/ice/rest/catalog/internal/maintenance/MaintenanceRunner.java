@@ -35,18 +35,26 @@ public record MaintenanceRunner(Catalog catalog, Collection<MaintenanceJob> jobs
 
     logger.info("Performing catalog maintenance");
     for (Namespace namespace : namespaces) {
-      List<TableIdentifier> tables = catalog.listTables(namespace);
-      for (TableIdentifier tableIdent : tables) {
-        Table table = catalog.loadTable(tableIdent);
-        logger.info("Performing maintenance on table: {}", table.name());
-        MDC.put("msgContext", table.name() + ": ");
-        try {
-          for (MaintenanceJob job : jobs) {
-            job.perform(table);
+      try {
+        List<TableIdentifier> tables = catalog.listTables(namespace);
+        for (TableIdentifier tableIdent : tables) {
+          try {
+            Table table = catalog.loadTable(tableIdent);
+            logger.info("Performing maintenance on table: {}", table.name());
+            MDC.put("msgContext", table.name() + ": ");
+            try {
+              for (MaintenanceJob job : jobs) {
+                job.perform(table);
+              }
+            } finally {
+              MDC.remove("msgContext");
+            }
+          } catch (Exception e) {
+            logger.error("Maintenance failed for table {}", tableIdent, e);
           }
-        } finally {
-          MDC.remove("msgContext");
         }
+      } catch (Exception e) {
+        logger.error("Maintenance failed for namespace {}", namespace, e);
       }
     }
     logger.info("Catalog maintenance completed");

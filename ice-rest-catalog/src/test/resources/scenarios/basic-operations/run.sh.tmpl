@@ -30,6 +30,10 @@ echo "OK list-namespaces listed ${NAMESPACE_NAME}"
 {{ICE_CLI}} --config {{CLI_CONFIG}} describe
 echo "OK Listed namespaces"
 
+# Check configuration
+{{ICE_CLI}} --config {{CLI_CONFIG}} check
+echo "OK checked configuration"
+
 # Explicit create-table (staged create + commit); regression for RESTCatalogAdapter UPDATE_TABLE path
 {{ICE_CLI}} --config {{CLI_CONFIG}} create-table ${TABLE_CREATE_VIA_CLI} --schema-from-parquet "file://${INPUT_PATH}"
 echo "OK create-table ${TABLE_CREATE_VIA_CLI}"

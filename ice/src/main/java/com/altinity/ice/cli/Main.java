@@ -26,6 +26,7 @@ import com.altinity.ice.cli.internal.cmd.DescribeParquet;
 import com.altinity.ice.cli.internal.cmd.Files;
 import com.altinity.ice.cli.internal.cmd.Insert;
 import com.altinity.ice.cli.internal.cmd.InsertWatch;
+import com.altinity.ice.cli.internal.cmd.InsertWatchBuffer;
 import com.altinity.ice.cli.internal.cmd.ListNamespaces;
 import com.altinity.ice.cli.internal.cmd.ListPartitions;
 import com.altinity.ice.cli.internal.cmd.ListSnapshots;
@@ -557,7 +558,25 @@ public final class Main {
       @CommandLine.Option(
               names = {"--watch-debug-addr"},
               description = "")
-          String watchDebugAddr)
+          String watchDebugAddr,
+      @CommandLine.Option(
+              names = {"--watch-commit-schedule"},
+              description =
+                  "Accumulate incoming files and commit them as a single snapshot on this schedule,"
+                      + " in https://github.com/shyiko/skedule format, e.g. \"every 5 minutes\","
+                      + " \"every day 02:00\" (default: commit on every poll)")
+          String watchCommitSchedule,
+      @CommandLine.Option(
+              names = {"--watch-max-files"},
+              description = "Commit as soon as this many files are accumulated (default: no limit)",
+              defaultValue = "0")
+          int watchMaxFiles,
+      @CommandLine.Option(
+              names = {"--watch-max-bytes"},
+              description =
+                  "Commit as soon as accumulated files add up to this many bytes (default: no limit)",
+              defaultValue = "0")
+          long watchMaxBytes)
       throws IOException, InterruptedException {
     if (s3NoSignRequest && s3CopyObject) {
       throw new UnsupportedOperationException(
@@ -605,6 +624,11 @@ public final class Main {
 
       TableIdentifier tableId = TableIdentifier.parse(name);
       boolean watchMode = !Strings.isNullOrEmpty(watch);
+
+      if (!watchMode && (watchCommitSchedule != null || watchMaxFiles > 0 || watchMaxBytes > 0)) {
+        throw new IllegalArgumentException(
+            "--watch-commit-schedule/--watch-max-files/--watch-max-bytes require --watch");
+      }
 
       if (createTableIfNotExists && !watchMode) {
         CreateTable.run(
@@ -679,6 +703,7 @@ public final class Main {
             watchFireOnce,
             createTableIfNotExists,
             options,
+            new InsertWatchBuffer.BatchOptions(watchCommitSchedule, watchMaxFiles, watchMaxBytes),
             metricsEnabled);
       }
     }

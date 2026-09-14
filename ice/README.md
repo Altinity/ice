@@ -18,6 +18,8 @@ A CLI for loading data into Iceberg REST catalogs.
   - [Inspect](#inspect)
   - [S3 with Public Data](#s3-with-public-data)
   - [Describe Metadata](#describe-metadata)
+  - [Insert Watch](../docs/insert-watch.md) - Read messages from SQS and insert data into Iceberg tables.
+
 
 ## Usage
 
