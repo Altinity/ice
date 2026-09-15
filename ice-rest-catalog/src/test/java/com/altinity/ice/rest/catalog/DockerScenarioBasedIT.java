@@ -20,6 +20,7 @@ import java.util.Map;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.utility.MountableFile;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -48,6 +49,8 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
   private GenericContainer<?> catalog;
 
   private GenericContainer<?> clickhouse;
+
+  private GenericContainer<?> pyiceberg;
 
   @Override
   @BeforeClass
@@ -149,6 +152,29 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
       throw e;
     }
 
+    // PyIceberg container: independent Iceberg implementation used by scenarios (validate.py)
+    // to cross-check tables/data written by ice. Built locally from test resources.
+    URL pyicebergDockerfile = getClass().getClassLoader().getResource("pyiceberg/Dockerfile");
+    if (pyicebergDockerfile == null) {
+      throw new IllegalStateException("pyiceberg/Dockerfile not found on classpath");
+    }
+    pyiceberg =
+        new GenericContainer<>(
+                new ImageFromDockerfile("ice-test-pyiceberg", false)
+                    .withDockerfile(Paths.get(pyicebergDockerfile.toURI())))
+            .withNetwork(network)
+            .withNetworkAliases("pyiceberg")
+            .withCopyFileToContainer(MountableFile.forHostPath(scenariosDir), "/scenarios")
+            .withCommand("sleep infinity");
+    try {
+      pyiceberg.start();
+    } catch (Exception e) {
+      if (pyiceberg != null) {
+        logger.error("PyIceberg container logs: {}", pyiceberg.getLogs());
+      }
+      throw e;
+    }
+
     // Copy CLI config into container so ice CLI can talk to co-located REST server.
     // The s3 section lets CLI commands that read s3:// paths directly (e.g. describe-metadata on
     // metadata.json) reach MinIO via its network alias instead of defaulting to AWS.
@@ -180,6 +206,9 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
   @Override
   @AfterClass
   public void tearDown() {
+    if (pyiceberg != null) {
+      pyiceberg.close();
+    }
     if (clickhouse != null) {
       clickhouse.close();
     }
@@ -220,9 +249,25 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
           "Could not set ClickHouse wrapper script executable: " + chWrapperScript);
     }
 
+    // Wrapper script on host: docker exec <pyiceberg container> python3 "$@" (runs validate.py
+    // inside the pyiceberg container; /scenarios is mounted at the same path as in catalog)
+    File pyWrapperScript = File.createTempFile("py-docker-exec-", ".sh");
+    pyWrapperScript.deleteOnExit();
+    Files.writeString(
+        pyWrapperScript.toPath(),
+        "#!/bin/sh\nexec docker exec -e CATALOG_URI_INTERNAL=http://catalog:5000"
+            + " -e S3_ENDPOINT_INTERNAL=http://minio:9000 "
+            + pyiceberg.getContainerId()
+            + " python3 \"$@\"\n");
+    if (!pyWrapperScript.setExecutable(true)) {
+      throw new IllegalStateException(
+          "Could not set PyIceberg wrapper script executable: " + pyWrapperScript);
+    }
+
     Map<String, String> templateVars = new HashMap<>();
     templateVars.put("ICE_CLI", wrapperScript.getAbsolutePath());
     templateVars.put("CH_EXEC", chWrapperScript.getAbsolutePath());
+    templateVars.put("PY_EXEC", pyWrapperScript.getAbsolutePath());
     templateVars.put("CLI_CONFIG", "/tmp/ice-cli.yaml");
     templateVars.put("SCENARIO_DIR", "/scenarios/" + scenarioName);
     templateVars.put("MINIO_ENDPOINT", "");

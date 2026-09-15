@@ -34,6 +34,7 @@ import com.altinity.ice.cli.internal.cmd.ListTables;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
+import com.altinity.ice.cli.internal.util.IceSchemaParser;
 import com.altinity.ice.internal.jetty.DebugServer;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
@@ -346,10 +347,16 @@ public final class Main {
           boolean s3NoSignRequest,
       @CommandLine.Option(
               arity = "1",
-              required = true,
               names = "--schema-from-parquet",
               description = "/path/to/file.parquet")
           String schemaFile,
+      @CommandLine.Option(
+              names = {"--schema"},
+              description =
+                  "Table schema as JSON, e.g. [{\"name\":\"id\",\"type\":\"long\",\"required\":true}]."
+                      + " Supports types not representable in Parquet (e.g. v3-only unknown, variant, geometry)."
+                      + " Mutually exclusive with --schema-from-parquet")
+          String schemaJson,
       @CommandLine.Option(
               names = {"--partition"},
               description =
@@ -384,17 +391,34 @@ public final class Main {
         partitions = Arrays.asList(parts);
       }
 
-      CreateTable.run(
-          catalog,
-          TableIdentifier.parse(name),
-          schemaFile,
-          location,
-          createTableIfNotExists,
-          useVendedCredentials,
-          s3NoSignRequest,
-          formatVersion,
-          partitions,
-          sortOrders);
+      if ((schemaFile == null) == (schemaJson == null || schemaJson.isEmpty())) {
+        throw new IllegalArgumentException(
+            "exactly one of --schema-from-parquet or --schema is required");
+      }
+
+      if (schemaJson != null && !schemaJson.isEmpty()) {
+        CreateTable.run(
+            catalog,
+            TableIdentifier.parse(name),
+            IceSchemaParser.parse(schemaJson),
+            location,
+            createTableIfNotExists,
+            formatVersion,
+            partitions,
+            sortOrders);
+      } else {
+        CreateTable.run(
+            catalog,
+            TableIdentifier.parse(name),
+            schemaFile,
+            location,
+            createTableIfNotExists,
+            useVendedCredentials,
+            s3NoSignRequest,
+            formatVersion,
+            partitions,
+            sortOrders);
+      }
     }
   }
 
