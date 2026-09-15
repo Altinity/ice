@@ -1,0 +1,62 @@
+#!/bin/bash
+set -e
+
+echo "Running Iceberg v3 unknown-type (--schema) test..."
+
+# Create namespace
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "OK Created namespace: ${NAMESPACE_NAME}"
+
+# Create a v3 table with an explicit schema containing a v3-only unknown column
+# (not representable in Parquet, so --schema-from-parquet cannot express it)
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-table ${TABLE_NAME} --format-version=3 \
+  --schema '[{"name":"id","type":"long","required":true},{"name":"payload","type":"unknown"}]'
+echo "OK Created table ${TABLE_NAME} via --schema (unknown column)"
+
+# Verify schema output shows the unknown column
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe -s ${TABLE_NAME} > /tmp/v3_unknown_schema.txt
+if ! grep -q "payload: optional unknown" /tmp/v3_unknown_schema.txt; then
+  echo "FAIL describe -s output missing 'payload: optional unknown'"
+  cat /tmp/v3_unknown_schema.txt
+  exit 1
+fi
+echo "OK describe -s shows payload: optional unknown"
+
+# Verify describe output shows formatVersion 3 (Iceberg strips format-version from properties)
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe ${TABLE_NAME} > /tmp/v3_unknown_describe.txt
+if ! grep -q "formatVersion: 3" /tmp/v3_unknown_describe.txt; then
+  echo "FAIL describe output missing 'formatVersion: 3'"
+  cat /tmp/v3_unknown_describe.txt
+  exit 1
+fi
+echo "OK describe shows formatVersion: 3"
+
+# Negative: unknown type must be rejected without --format-version=3 (default is v2)
+if {{ICE_CLI}} --config {{CLI_CONFIG}} create-table ${NAMESPACE_NAME}.t2 \
+    --schema '[{"name":"payload","type":"unknown"}]' > /tmp/v3_unknown_v2.out 2>&1; then
+  echo "FAIL create-table with unknown type on v2 succeeded unexpectedly"
+  exit 1
+fi
+if ! grep -q "not supported until v3" /tmp/v3_unknown_v2.out; then
+  echo "FAIL v2 rejection missing 'not supported until v3'"
+  cat /tmp/v3_unknown_v2.out
+  exit 1
+fi
+echo "OK v2 table with unknown type rejected"
+
+# Independent validation via pyiceberg (Docker runner only; empty PY_EXEC = skipped)
+if [ -n "{{PY_EXEC}}" ]; then
+  {{PY_EXEC}} "${SCENARIO_DIR}/validate.py" ${TABLE_NAME}
+  echo "OK pyiceberg validation passed"
+else
+  echo "SKIP pyiceberg validation (PY_EXEC not available)"
+fi
+
+# Cleanup
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+echo "OK Deleted table: ${TABLE_NAME}"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "OK Deleted namespace: ${NAMESPACE_NAME}"
+
+echo "Iceberg v3 unknown-type test completed successfully"
