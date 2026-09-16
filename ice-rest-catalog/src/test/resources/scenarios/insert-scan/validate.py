@@ -26,6 +26,9 @@ def main() -> int:
         uri=catalog_uri,
         warehouse="s3://test-bucket/warehouse",
         **{
+            # ice-rest-catalog test config uses anonymous access; without this, pyiceberg
+            # sends "Authorization: Bearer None" (LegacyOAuth2AuthManager) -> 403 Invalid token
+            "auth": {"type": "noop"},
             "s3.endpoint": s3_endpoint,
             "s3.access-key-id": "minioadmin",
             "s3.secret-access-key": "minioadmin",
