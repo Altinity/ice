@@ -37,8 +37,8 @@ public final class S3ObjectMetadataInterceptor implements ExecutionInterceptor {
   }
 
   /**
-   * Extracts object metadata from catalog properties. Keys are stripped of METADATA_PREFIX
-   * (both x-amz-meta-foo and foo result in the x-amz-meta-foo header).
+   * Extracts object metadata from catalog properties. Keys are stripped of METADATA_PREFIX (both
+   * x-amz-meta-foo and foo result in the x-amz-meta-foo header).
    */
   public static Map<String, String> metadataFromProperties(Map<String, String> properties) {
     Map<String, String> m = new LinkedHashMap<>();
