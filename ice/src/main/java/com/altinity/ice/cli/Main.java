@@ -391,12 +391,14 @@ public final class Main {
         partitions = Arrays.asList(parts);
       }
 
-      if ((schemaFile == null) == (schemaJson == null || schemaJson.isEmpty())) {
+      boolean hasSchemaFile = schemaFile != null && !schemaFile.isEmpty();
+      boolean hasSchemaJson = schemaJson != null && !schemaJson.isEmpty();
+      if (hasSchemaFile == hasSchemaJson) {
         throw new IllegalArgumentException(
             "exactly one of --schema-from-parquet or --schema is required");
       }
 
-      if (schemaJson != null && !schemaJson.isEmpty()) {
+      if (hasSchemaJson) {
         CreateTable.run(
             catalog,
             TableIdentifier.parse(name),

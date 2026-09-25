@@ -69,9 +69,14 @@ public class IceSchemaParserTest {
             "[{\"name\":\"a\",\"type\":\"struct<x:string,y:long>\"},"
                 + "{\"name\":\"b\",\"type\":\"list<string>\"}]");
     Map<Integer, Types.NestedField> byId = TypeUtil.indexById(schema.asStruct());
-    // a, x, y, b, list element
+    // IDs are assigned from a single shared counter, depth-first in declaration order:
+    // a, then its nested x and y, then b, then b's list element.
     assertThat(byId).hasSize(5);
-    assertThat(byId.keySet()).containsExactlyInAnyOrder(1, 2, 3, 4, 5);
+    assertThat(byId.get(1).name()).isEqualTo("a");
+    assertThat(byId.get(2).name()).isEqualTo("x");
+    assertThat(byId.get(3).name()).isEqualTo("y");
+    assertThat(byId.get(4).name()).isEqualTo("b");
+    assertThat(byId.get(5).name()).isEqualTo("element");
   }
 
   @Test
