@@ -14,9 +14,10 @@ body = """
     ### {{ group | upper_first }}
     {% for commit in commits %}
         {%- set display_scope = commit.scope %}
-        {%- if commit.remote.pr_labels is containing("ice-rest-catalog") %}
+        {%- set pr_labels = commit.remote.pr_labels | default(value=[]) %}
+        {%- if pr_labels is containing("ice-rest-catalog") %}
             {%- set display_scope = "ice-rest-catalog" %}
-        {%- elif commit.remote.pr_labels is containing("ice") %}
+        {%- elif pr_labels is containing("ice") %}
             {%- set display_scope = "ice" %}
         {%- endif %}
         - {% if display_scope %}`{{ display_scope }}` - {% endif %}{{ commit.message | upper_first }}\
