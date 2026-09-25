@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
 
 /**
@@ -33,8 +34,10 @@ import org.apache.iceberg.types.Types;
  * represent (e.g. v3-only types such as {@code unknown}, {@code variant}, {@code geometry}).
  *
  * <p>Placeholder field IDs are assigned from a single counter shared across top-level and nested
- * fields so they are unique within the schema. Iceberg reassigns fresh IDs when the table is
- * created, so placeholder values are safe.
+ * fields so they are unique during construction, then reassigned via {@link
+ * TypeUtil#assignIncreasingFreshIds} to match the IDs the catalog assigns at table creation (see
+ * {@code TableMetadata#newTableMetadata}), keeping the {@code schema.name-mapping.default} table
+ * property consistent with the stored schema.
  */
 public final class IceSchemaParser {
 
@@ -80,6 +83,6 @@ public final class IceSchemaParser {
               ? Types.NestedField.required(fieldId, field.name(), type, field.doc())
               : Types.NestedField.optional(fieldId, field.name(), type, field.doc()));
     }
-    return new Schema(columns);
+    return TypeUtil.assignIncreasingFreshIds(new Schema(columns));
   }
 }
