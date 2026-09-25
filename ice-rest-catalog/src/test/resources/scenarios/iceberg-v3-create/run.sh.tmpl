@@ -1,0 +1,71 @@
+#!/bin/bash
+set -e
+
+echo "Running Iceberg v3 table creation test..."
+
+# Create namespace
+{{ICE_CLI}} --config {{CLI_CONFIG}} create-namespace ${NAMESPACE_NAME}
+echo "OK Created namespace: ${NAMESPACE_NAME}"
+
+# Get the full path to the input file (relative to scenario directory)
+SCENARIO_DIR="{{SCENARIO_DIR}}"
+INPUT_PATH="${SCENARIO_DIR}/${INPUT_FILE}"
+
+# Create a format-version 3 table and insert data
+{{ICE_CLI}} --config {{CLI_CONFIG}} insert --create-table --format-version=3 ${TABLE_NAME} ${INPUT_PATH}
+echo "OK Created table ${TABLE_NAME} with --format-version=3 and inserted ${INPUT_FILE}"
+
+# Verify describe output shows formatVersion 3 (Iceberg strips format-version from properties)
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe ${TABLE_NAME} > /tmp/v3_create_describe.txt
+if ! grep -q "formatVersion: 3" /tmp/v3_create_describe.txt; then
+  echo "FAIL describe output missing 'formatVersion: 3'"
+  cat /tmp/v3_create_describe.txt
+  exit 1
+fi
+echo "OK describe shows formatVersion: 3"
+
+# Locate the current metadata.json via the REST catalog (works in both local and Docker runners)
+TABLE_SHORT="${TABLE_NAME##*.}"
+METADATA_FILE=$(curl -sf "{{CATALOG_URI}}/v1/namespaces/${NAMESPACE_NAME}/tables/${TABLE_SHORT}" \
+  | grep -o '"metadata-location": *"[^"]*"' | sed 's/.*: *"//; s/"$//')
+if [ -z "${METADATA_FILE}" ]; then
+  echo "FAIL Could not determine metadata location for ${TABLE_NAME} via {{CATALOG_URI}}"
+  exit 1
+fi
+echo "OK Current metadata file: ${METADATA_FILE}"
+
+# Verify metadata summary shows formatVersion 3
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe-metadata -s "${METADATA_FILE}" > /tmp/v3_create_metadata_summary.txt
+if ! grep -q "formatVersion: 3" /tmp/v3_create_metadata_summary.txt; then
+  echo "FAIL describe-metadata -s output missing 'formatVersion: 3'"
+  cat /tmp/v3_create_metadata_summary.txt
+  exit 1
+fi
+echo "OK describe-metadata -s shows formatVersion: 3"
+
+# Verify v3 row lineage: snapshot carries first-row-id
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe-metadata --snapshots "${METADATA_FILE}" > /tmp/v3_create_metadata_snapshots.txt
+if ! grep -q "first-row-id:" /tmp/v3_create_metadata_snapshots.txt; then
+  echo "FAIL describe-metadata --snapshots output missing 'first-row-id' (v3 row lineage)"
+  cat /tmp/v3_create_metadata_snapshots.txt
+  exit 1
+fi
+echo "OK describe-metadata --snapshots shows first-row-id (row lineage)"
+
+# Verify v3 row lineage: manifest carries first_row_id
+{{ICE_CLI}} --config {{CLI_CONFIG}} describe-metadata --manifests "${METADATA_FILE}" > /tmp/v3_create_metadata_manifests.txt
+if ! grep -q "first_row_id:" /tmp/v3_create_metadata_manifests.txt; then
+  echo "FAIL describe-metadata --manifests output missing 'first_row_id' (v3 row lineage)"
+  cat /tmp/v3_create_metadata_manifests.txt
+  exit 1
+fi
+echo "OK describe-metadata --manifests shows first_row_id (row lineage)"
+
+# Cleanup
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
+echo "OK Deleted table: ${TABLE_NAME}"
+
+{{ICE_CLI}} --config {{CLI_CONFIG}} delete-namespace ${NAMESPACE_NAME}
+echo "OK Deleted namespace: ${NAMESPACE_NAME}"
+
+echo "Iceberg v3 table creation test completed successfully"

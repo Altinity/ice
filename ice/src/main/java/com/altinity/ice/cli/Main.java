@@ -34,6 +34,7 @@ import com.altinity.ice.cli.internal.cmd.ListTables;
 import com.altinity.ice.cli.internal.cmd.Scan;
 import com.altinity.ice.cli.internal.config.Config;
 import com.altinity.ice.cli.internal.iceberg.rest.RESTCatalogFactory;
+import com.altinity.ice.cli.internal.util.IceSchemaParser;
 import com.altinity.ice.internal.jetty.DebugServer;
 import com.altinity.ice.internal.picocli.VersionProvider;
 import com.altinity.ice.internal.strings.Strings;
@@ -346,10 +347,16 @@ public final class Main {
           boolean s3NoSignRequest,
       @CommandLine.Option(
               arity = "1",
-              required = true,
               names = "--schema-from-parquet",
               description = "/path/to/file.parquet")
           String schemaFile,
+      @CommandLine.Option(
+              names = {"--schema"},
+              description =
+                  "Table schema as JSON, e.g. [{\"name\":\"id\",\"type\":\"long\",\"required\":true}]."
+                      + " Supports types not representable in Parquet (e.g. v3-only unknown, variant, geometry)."
+                      + " Mutually exclusive with --schema-from-parquet")
+          String schemaJson,
       @CommandLine.Option(
               names = {"--partition"},
               description =
@@ -360,7 +367,12 @@ public final class Main {
               names = {"--sort"},
               description =
                   "Sort order, e.g. [{\"column\":\"name\", \"desc\":false, \"nullFirst\":false}]")
-          String sortOrderJson)
+          String sortOrderJson,
+      @CommandLine.Option(
+              names = {"--format-version"},
+              description = "Iceberg table format version (2 or 3). Default: 2",
+              defaultValue = "2")
+          int formatVersion)
       throws IOException {
     setAWSRegion(s3Region);
     try (RESTCatalog catalog = loadCatalog()) {
@@ -379,16 +391,36 @@ public final class Main {
         partitions = Arrays.asList(parts);
       }
 
-      CreateTable.run(
-          catalog,
-          TableIdentifier.parse(name),
-          schemaFile,
-          location,
-          createTableIfNotExists,
-          useVendedCredentials,
-          s3NoSignRequest,
-          partitions,
-          sortOrders);
+      boolean hasSchemaFile = schemaFile != null && !schemaFile.isEmpty();
+      boolean hasSchemaJson = schemaJson != null && !schemaJson.isEmpty();
+      if (hasSchemaFile == hasSchemaJson) {
+        throw new IllegalArgumentException(
+            "exactly one of --schema-from-parquet or --schema is required");
+      }
+
+      if (hasSchemaJson) {
+        CreateTable.run(
+            catalog,
+            TableIdentifier.parse(name),
+            IceSchemaParser.parse(schemaJson),
+            location,
+            createTableIfNotExists,
+            formatVersion,
+            partitions,
+            sortOrders);
+      } else {
+        CreateTable.run(
+            catalog,
+            TableIdentifier.parse(name),
+            schemaFile,
+            location,
+            createTableIfNotExists,
+            useVendedCredentials,
+            s3NoSignRequest,
+            formatVersion,
+            partitions,
+            sortOrders);
+      }
     }
   }
 
@@ -518,6 +550,12 @@ public final class Main {
                   "Sort order, e.g. [{\"column\":\"name\", \"desc\":false, \"nullFirst\":false}]")
           String sortOrderJson,
       @CommandLine.Option(
+              names = {"--format-version"},
+              description =
+                  "Iceberg table format version (2 or 3) when creating the table with -p/--create-table. Default: 2",
+              defaultValue = "2")
+          int formatVersion,
+      @CommandLine.Option(
               names = {"--assume-sorted"},
               description = "Skip data sorting. Assume it's already sorted.")
           boolean assumeSorted,
@@ -639,6 +677,7 @@ public final class Main {
             createTableIfNotExists,
             useVendedCredentials,
             s3NoSignRequest,
+            formatVersion,
             partitions,
             sortOrders);
       } // delayed in watch mode
@@ -660,6 +699,7 @@ public final class Main {
               .retryListFile(retryList)
               .partitionList(partitions)
               .sortOrderList(sortOrders)
+              .formatVersion(formatVersion)
               .threadCount(
                   threadCount < 1 ? Runtime.getRuntime().availableProcessors() : threadCount)
               .commitRetries(commitRetries)

@@ -363,6 +363,7 @@ public class InsertWatch {
             true,
             options.useVendedCredentials(),
             options.s3NoSignRequest(),
+            options.formatVersion(),
             null,
             null);
       } catch (NotFoundException nfe) {

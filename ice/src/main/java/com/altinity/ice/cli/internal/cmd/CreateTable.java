@@ -64,9 +64,14 @@ public final class CreateTable {
       boolean ignoreAlreadyExists,
       boolean useVendedCredentials,
       boolean s3NoSignRequest,
+      int formatVersion,
       @Nullable List<Main.IcePartition> partitionList,
       @Nullable List<Main.IceSortOrder> sortOrderList)
       throws IOException {
+    if (formatVersion != 2 && formatVersion != 3) {
+      throw new IllegalArgumentException(
+          "--format-version must be 2 or 3 (got " + formatVersion + ")");
+    }
     if (ignoreAlreadyExists && catalog.tableExists(nsTable)) {
       return;
     }
@@ -105,7 +110,12 @@ public final class CreateTable {
         // force name-based resolution instead of position-based resolution
         NameMapping mapping = MappingUtil.create(initialSchema);
         String mappingJson = NameMappingParser.toJson(mapping);
-        var props = Map.of(TableProperties.DEFAULT_NAME_MAPPING, mappingJson);
+        var props =
+            Map.of(
+                TableProperties.DEFAULT_NAME_MAPPING,
+                mappingJson,
+                TableProperties.FORMAT_VERSION,
+                String.valueOf(formatVersion));
 
         PartitionSpec partitionSpec =
             partitionList == null
@@ -136,6 +146,64 @@ public final class CreateTable {
     } finally {
       if (s3ClientLazy.hasValue()) {
         s3ClientLazy.getValue().close();
+      }
+    }
+  }
+
+  /**
+   * Create table with an explicit schema (no input file). Supports types that cannot be inferred
+   * from Parquet (e.g. v3-only types such as unknown, variant, geometry).
+   */
+  public static void run(
+      RESTCatalog catalog,
+      TableIdentifier nsTable,
+      Schema initialSchema,
+      String location,
+      boolean ignoreAlreadyExists,
+      int formatVersion,
+      @Nullable List<Main.IcePartition> partitionList,
+      @Nullable List<Main.IceSortOrder> sortOrderList) {
+    if (formatVersion != 2 && formatVersion != 3) {
+      throw new IllegalArgumentException(
+          "--format-version must be 2 or 3 (got " + formatVersion + ")");
+    }
+    if (ignoreAlreadyExists && catalog.tableExists(nsTable)) {
+      return;
+    }
+    try {
+      // force name-based resolution instead of position-based resolution
+      NameMapping mapping = MappingUtil.create(initialSchema);
+      String mappingJson = NameMappingParser.toJson(mapping);
+      var props =
+          Map.of(
+              TableProperties.DEFAULT_NAME_MAPPING,
+              mappingJson,
+              TableProperties.FORMAT_VERSION,
+              String.valueOf(formatVersion));
+
+      PartitionSpec partitionSpec =
+          partitionList == null
+              ? PartitionSpec.unpartitioned()
+              : Partitioning.newPartitionSpec(initialSchema, partitionList);
+
+      if (ignoreAlreadyExists) { // -p
+        createNamespace(catalog, nsTable.namespace());
+      }
+
+      // if we don't set location, it's automatically set to $warehouse/$namespace/$table
+      Transaction tx =
+          catalog.newCreateTableTransaction(nsTable, initialSchema, partitionSpec, location, props);
+
+      if (sortOrderList != null && !sortOrderList.isEmpty()) {
+        ReplaceSortOrder op = tx.replaceSortOrder();
+        Sorting.apply(op, sortOrderList);
+        op.commit();
+      }
+
+      tx.commitTransaction();
+    } catch (AlreadyExistsException e) {
+      if (!ignoreAlreadyExists) {
+        throw e;
       }
     }
   }

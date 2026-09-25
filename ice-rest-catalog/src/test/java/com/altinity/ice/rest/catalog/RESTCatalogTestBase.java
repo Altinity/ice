@@ -50,11 +50,11 @@ public abstract class RESTCatalogTestBase {
 
   @SuppressWarnings("rawtypes")
   protected final GenericContainer minio =
-      new GenericContainer("minio/minio:latest")
+      new GenericContainer("rustfs/rustfs:1.0.0")
           .withExposedPorts(9000)
-          .withEnv("MINIO_ACCESS_KEY", "minioadmin")
-          .withEnv("MINIO_SECRET_KEY", "minioadmin")
-          .withCommand("server", "/data");
+          .withEnv("RUSTFS_ACCESS_KEY", "minioadmin")
+          .withEnv("RUSTFS_SECRET_KEY", "minioadmin")
+          .withCommand("/data");
 
   @BeforeClass
   public void setUp() throws Exception {

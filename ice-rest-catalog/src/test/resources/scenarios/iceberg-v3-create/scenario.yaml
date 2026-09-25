@@ -1,0 +1,10 @@
+name: "Iceberg v3 Table Creation"
+description: "Tests creating a format-version 3 table via insert --create-table --format-version=3 and verifies v3 metadata (row lineage)"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_v3"
+  TABLE_NAME: "test_v3.t1"
+  INPUT_FILE: "input.parquet"

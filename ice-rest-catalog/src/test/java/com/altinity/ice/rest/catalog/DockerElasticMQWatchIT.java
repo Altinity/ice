@@ -80,7 +80,7 @@ public class DockerElasticMQWatchIT {
   private static final String DEFAULT_CATALOG_IMAGE =
       "altinity/ice-rest-catalog:debug-with-ice-local";
   private static final String DEFAULT_ELASTICMQ_IMAGE = "softwaremill/elasticmq-native:1.6.15";
-  private static final String DEFAULT_MINIO_IMAGE = "minio/minio:latest";
+  private static final String DEFAULT_MINIO_IMAGE = "rustfs/rustfs:1.0.0";
 
   private static final String BUCKET = "test-bucket";
   private static final String QUEUE_NAME = "s3-events";
@@ -116,10 +116,10 @@ public class DockerElasticMQWatchIT {
             .withNetwork(network)
             .withNetworkAliases("minio")
             .withExposedPorts(9000)
-            .withEnv("MINIO_ACCESS_KEY", "minioadmin")
-            .withEnv("MINIO_SECRET_KEY", "minioadmin")
-            .withCommand("server", "/data")
-            .waitingFor(Wait.forHttp("/minio/health/live").forPort(9000));
+            .withEnv("RUSTFS_ACCESS_KEY", "minioadmin")
+            .withEnv("RUSTFS_SECRET_KEY", "minioadmin")
+            .withCommand("/data")
+            .waitingFor(Wait.forHttp("/health").forPort(9000));
     minio.start();
 
     String minioHostEndpoint = "http://" + minio.getHost() + ":" + minio.getMappedPort(9000);
