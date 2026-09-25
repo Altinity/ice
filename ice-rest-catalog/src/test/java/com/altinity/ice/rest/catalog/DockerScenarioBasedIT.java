@@ -64,14 +64,14 @@ public class DockerScenarioBasedIT extends RESTCatalogTestBase {
 
     // Start MinIO
     minio =
-        new GenericContainer<>("quay.io/minio/minio:latest")
+        new GenericContainer<>("rustfs/rustfs:1.0.0")
             .withNetwork(network)
             .withNetworkAliases("minio")
             .withExposedPorts(9000)
-            .withEnv("MINIO_ACCESS_KEY", "minioadmin")
-            .withEnv("MINIO_SECRET_KEY", "minioadmin")
-            .withCommand("server", "/data")
-            .waitingFor(Wait.forHttp("/minio/health/live").forPort(9000));
+            .withEnv("RUSTFS_ACCESS_KEY", "minioadmin")
+            .withEnv("RUSTFS_SECRET_KEY", "minioadmin")
+            .withCommand("/data")
+            .waitingFor(Wait.forHttp("/health").forPort(9000));
     minio.start();
 
     // Create test bucket via MinIO's host-mapped port
