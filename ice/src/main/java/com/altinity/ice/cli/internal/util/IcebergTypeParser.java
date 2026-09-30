@@ -49,7 +49,7 @@ public final class IcebergTypeParser {
       return parseStruct(s, nextId);
     }
 
-    return Types.fromPrimitiveString(s);
+    return Types.fromTypeName(s);
   }
 
   private static Types.ListType parseList(String s, AtomicInteger nextId) {

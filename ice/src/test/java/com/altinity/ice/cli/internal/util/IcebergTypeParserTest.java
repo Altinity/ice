@@ -40,6 +40,8 @@ public class IcebergTypeParserTest {
       {"struct<a:string,b:long>", Type.TypeID.STRUCT},
       {"struct<name:string,tags:list<string>>", Type.TypeID.STRUCT},
       {"list<struct<id:long,name:string>>", Type.TypeID.LIST},
+      {"variant", Type.TypeID.VARIANT},
+      {"VARIANT", Type.TypeID.VARIANT},
     };
   }
 
@@ -70,6 +72,19 @@ public class IcebergTypeParserTest {
     assertThat(inner.fields()).hasSize(2);
     assertThat(inner.field("id").type().typeId()).isEqualTo(Type.TypeID.LONG);
     assertThat(inner.field("name").type().typeId()).isEqualTo(Type.TypeID.STRING);
+  }
+
+  @Test
+  public void testNestedVariant() {
+    Types.StructType struct =
+        (Types.StructType) IcebergTypeParser.parseType("struct<a:string,b:variant>");
+    assertThat(struct.field("b").type().typeId()).isEqualTo(Type.TypeID.VARIANT);
+
+    Types.ListType list = (Types.ListType) IcebergTypeParser.parseType("list<variant>");
+    assertThat(list.elementType().typeId()).isEqualTo(Type.TypeID.VARIANT);
+
+    Types.MapType map = (Types.MapType) IcebergTypeParser.parseType("map<string,variant>");
+    assertThat(map.valueType().typeId()).isEqualTo(Type.TypeID.VARIANT);
   }
 
   @DataProvider(name = "invalidTypes")
