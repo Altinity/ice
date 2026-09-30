@@ -1,0 +1,9 @@
+name: "Iceberg v3 Variant Type via --schema"
+description: "Tests create-table --schema with v3-only variant columns (top-level and nested); verifies via ice describe"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_v3_variant"
+  TABLE_NAME: "test_v3_variant.t1"
