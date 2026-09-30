@@ -45,10 +45,19 @@ public class IceSchemaParserTest {
         IceSchemaParser.parse(
             "[{\"name\":\"u\",\"type\":\"unknown\"},"
                 + "{\"name\":\"t\",\"type\":\"timestamp_ns\"},"
-                + "{\"name\":\"g\",\"type\":\"geometry\"}]");
+                + "{\"name\":\"g\",\"type\":\"geometry\"},"
+                + "{\"name\":\"v\",\"type\":\"variant\"}]");
     assertThat(schema.findField("u").type().typeId()).isEqualTo(Type.TypeID.UNKNOWN);
     assertThat(schema.findField("t").type().typeId()).isEqualTo(Type.TypeID.TIMESTAMP_NANO);
     assertThat(schema.findField("g").type().typeId()).isEqualTo(Type.TypeID.GEOMETRY);
+    assertThat(schema.findField("v").type().typeId()).isEqualTo(Type.TypeID.VARIANT);
+  }
+
+  @Test
+  public void testVariant() throws IOException {
+    Schema schema = IceSchemaParser.parse("[{\"name\":\"v\",\"type\":\"variant\"}]");
+    assertThat(schema.columns()).hasSize(1);
+    assertThat(schema.findField("v").type().typeId()).isEqualTo(Type.TypeID.VARIANT);
   }
 
   @Test
