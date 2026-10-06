@@ -31,7 +31,7 @@ public final class IcebergTypeParser {
     return parseType(typeString, new AtomicInteger(0));
   }
 
-  private static Type parseType(String typeString, AtomicInteger nextId) {
+  public static Type parseType(String typeString, AtomicInteger nextId) {
     String s = typeString.strip();
     if (s.isEmpty()) {
       throw new IllegalArgumentException("Type string must not be empty");

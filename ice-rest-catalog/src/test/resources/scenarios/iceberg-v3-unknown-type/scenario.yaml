@@ -1,0 +1,9 @@
+name: "Iceberg v3 Unknown Type via --schema"
+description: "Tests create-table --schema with a v3-only unknown column; verifies via ice describe and pyiceberg (independent reader)"
+
+catalogConfig:
+  warehouse: "s3://test-bucket/warehouse"
+
+env:
+  NAMESPACE_NAME: "test_v3_unknown"
+  TABLE_NAME: "test_v3_unknown.t1"

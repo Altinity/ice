@@ -39,6 +39,8 @@ public class ScenarioBasedIT extends RESTCatalogTestBase {
     templateVars.put("CATALOG_URI", getCatalogUri());
     // DockerScenarioBasedIT sets these for ClickHouse; empty so basic-operations skips CH block.
     templateVars.put("CH_EXEC", "");
+    // DockerScenarioBasedIT sets this for PyIceberg; empty so scenarios skip pyiceberg validation.
+    templateVars.put("PY_EXEC", "");
     templateVars.put("CATALOG_URI_INTERNAL", "");
     templateVars.put("S3_ENDPOINT_INTERNAL", "");
 

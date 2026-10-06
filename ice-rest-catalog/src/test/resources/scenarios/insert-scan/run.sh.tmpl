@@ -34,6 +34,14 @@ fi
 
 echo "OK Scan output contains expected columns"
 
+# Independent validation via pyiceberg (Docker runner only; empty PY_EXEC = skipped)
+if [ -n "{{PY_EXEC}}" ]; then
+  {{PY_EXEC}} "${SCENARIO_DIR}/validate.py" ${TABLE_NAME} "${INPUT_PATH}"
+  echo "OK pyiceberg validation passed"
+else
+  echo "SKIP pyiceberg validation (PY_EXEC not available)"
+fi
+
 # Cleanup
 {{ICE_CLI}} --config {{CLI_CONFIG}} delete-table ${TABLE_NAME}
 echo "OK Deleted table: ${TABLE_NAME}"
