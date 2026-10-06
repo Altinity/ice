@@ -95,7 +95,7 @@ public abstract class RESTCatalogTestBase {
             "jdbc:sqlite::memory:", // uri
             "s3://test-bucket/warehouse", // warehouse
             null, // localFileIOBaseDir
-            new Config.S3(minioEndpoint, true, "minioadmin", "minioadmin", "us-east-1"), // s3
+            new Config.S3(minioEndpoint, true, "minioadmin", "minioadmin", "us-east-1", null), // s3
             null, // bearerTokens
             new Config.AnonymousAccess(
                 true,

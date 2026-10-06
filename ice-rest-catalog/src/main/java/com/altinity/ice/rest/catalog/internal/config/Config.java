@@ -13,6 +13,8 @@ import com.altinity.ice.internal.iceberg.io.LocalFileIO;
 import com.altinity.ice.internal.iceberg.io.SchemeFileIO;
 import com.altinity.ice.internal.strings.Strings;
 import com.altinity.ice.rest.catalog.internal.aws.CustomS3TablesCatalog;
+import com.altinity.ice.rest.catalog.internal.aws.IceAwsClientFactory;
+import com.altinity.ice.rest.catalog.internal.aws.S3ObjectMetadataInterceptor;
 import com.altinity.ice.rest.catalog.internal.etcd.EtcdCatalog;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -127,7 +129,26 @@ public record Config(
           String secretAccessKey,
       @JsonPropertyDescription(
               "AWS_REGION (see https://docs.aws.amazon.com/cli/v1/userguide/cli-configure-envvars.html#envvars-list)")
-          String region) {}
+          String region,
+      @JsonPropertyDescription(
+              "User-defined metadata to attach to every object created by the catalog, e.g. \"x-amz-meta-expiration-seconds: 1000\" (the x-amz-meta- prefix is optional). Empty by default")
+          Map<String, String> metadata) {
+
+    public S3(
+        String endpoint,
+        boolean pathStyleAccess,
+        String accessKeyID,
+        String secretAccessKey,
+        String region,
+        Map<String, String> metadata) {
+      this.endpoint = endpoint;
+      this.pathStyleAccess = pathStyleAccess;
+      this.accessKeyID = accessKeyID;
+      this.secretAccessKey = secretAccessKey;
+      this.region = region;
+      this.metadata = Objects.requireNonNullElse(metadata, Map.of());
+    }
+  }
 
   public record Token(
       @JsonPropertyDescription("Name") String name,
@@ -248,6 +269,13 @@ public record Config(
       m.putNotNullOrEmpty(AwsClientProperties.CLIENT_REGION, s3.region);
       if (s3.pathStyleAccess) {
         m.putNotNullOrEmpty(S3FileIOProperties.PATH_STYLE_ACCESS, "true");
+      }
+      if (!s3.metadata.isEmpty()) {
+        for (Map.Entry<String, String> e : s3.metadata.entrySet()) {
+          m.putNotNullOrEmpty(
+              S3ObjectMetadataInterceptor.METADATA_PREFIX + e.getKey(), e.getValue());
+        }
+        m.put(S3FileIOProperties.CLIENT_FACTORY, IceAwsClientFactory.class.getName());
       }
     }
 
