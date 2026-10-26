@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.altinity.ice</groupId>
+    <artifactId>pom</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+  </parent>
+
+  <!-- Iceberg table encryption for REST catalog clients (ice CLI, Spark via catalog-impl).
+       Iceberg dependencies are "provided" so that the jar can be dropped next to iceberg-spark-runtime. -->
+  <artifactId>ice-encryption</artifactId>
+
+  <properties>
+    <!-- loaded by Spark images that may run on Java 17 -->
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.release>17</maven.compiler.release>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.iceberg</groupId>
+      <artifactId>iceberg-core</artifactId>
+      <version>${iceberg.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.iceberg</groupId>
+      <artifactId>iceberg-bundled-guava</artifactId>
+      <version>${iceberg.version}</version>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+</project>

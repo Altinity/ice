@@ -10,6 +10,8 @@ WORKDIR /app
 COPY .mvn/ .mvn/
 COPY mvnw .
 COPY pom.xml .
+COPY ice-test-support/pom.xml ice-test-support/pom.xml
+COPY ice-encryption/pom.xml ice-encryption/pom.xml
 COPY ice/pom.xml ice/pom.xml
 COPY ice-rest-catalog/pom.xml ice-rest-catalog/pom.xml
 RUN ./mvnw -am -pl ice dependency:go-offline
@@ -19,7 +21,7 @@ ARG VERSION
 COPY . .
 
 RUN ./mvnw versions:set -DnewVersion=${VERSION}
-RUN ./mvnw -Pno-check -pl ice clean package -Dmaven.test.skip=true
+RUN ./mvnw -Pno-check -am -pl ice clean package -Dmaven.test.skip=true
 
 FROM gcr.io/distroless/java21-debian12:${BASE_IMAGE_TAG}
 

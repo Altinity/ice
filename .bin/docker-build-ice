@@ -6,7 +6,7 @@ test -n "$VERSION" || (echo "VERSION env variable must be set" >&2; exit 1)
 IMAGE_TAG="${IMAGE_TAG:-$VERSION}"
 
 if [[ "${SKIP_VERIFY:-}" != "1" ]]; then
-  ./mvnw -pl ice validate # fail-fast
+  ./mvnw -am -pl ice validate # fail-fast
 fi
 
 image_name=altinity/ice

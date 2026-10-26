@@ -10,6 +10,8 @@ WORKDIR /app
 COPY .mvn/ .mvn/
 COPY mvnw .
 COPY pom.xml .
+COPY ice-test-support/pom.xml ice-test-support/pom.xml
+COPY ice-encryption/pom.xml ice-encryption/pom.xml
 COPY ice/pom.xml ice/pom.xml
 COPY ice-rest-catalog/pom.xml ice-rest-catalog/pom.xml
 RUN ./mvnw -am -pl ice-rest-catalog dependency:go-offline

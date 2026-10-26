@@ -78,6 +78,8 @@
   </dependencyManagement>
 
   <modules>
+    <module>ice-test-support</module>
+    <module>ice-encryption</module>
     <module>ice</module>
     <module>ice-rest-catalog</module>
   </modules>
