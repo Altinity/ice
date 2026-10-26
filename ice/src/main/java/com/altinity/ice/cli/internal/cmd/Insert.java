@@ -625,7 +625,7 @@ public final class Insert {
             Parquet.write(outputFile)
                 .setAll(table.properties())
                 .overwrite(dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL)
-                .createWriterFunc(GenericParquetWriter::buildWriter)
+                .createWriterFunc(GenericParquetWriter::create)
                 .metricsConfig(metricsConfig)
                 .schema(tableSchema);
         if (compressionCodecOverride != null) {
@@ -713,7 +713,7 @@ public final class Insert {
           Parquet.write(outputFile)
               .setAll(tableProperties)
               .overwrite(true) // FIXME
-              .createWriterFunc(GenericParquetWriter::buildWriter)
+              .createWriterFunc(GenericParquetWriter::create)
               .metricsConfig(metricsConfig)
               .schema(tableSchema);
       if (compressionCodecOverride != null) {
@@ -799,7 +799,7 @@ public final class Insert {
             .setAll(tableProperties)
             .overwrite(
                 dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL) // FIXME
-            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .createWriterFunc(GenericParquetWriter::create)
             .metricsConfig(metricsConfig)
             .schema(tableSchema);
     if (compressionCodecOverride != null) {

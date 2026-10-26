@@ -14,9 +14,9 @@
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
     <!-- versions -->
-    <iceberg.version>1.9.2</iceberg.version>
+    <iceberg.version>1.11.0</iceberg.version>
     <hadoop.version>3.4.1</hadoop.version>
-    <parquet.version>1.15.2</parquet.version>
+    <parquet.version>1.17.1</parquet.version>
     <aws.java.sdk.version>2.31.13</aws.java.sdk.version>
     <picocli.version>4.7.6</picocli.version>
     <jackson.version>2.18.8</jackson.version>
@@ -36,6 +36,8 @@
     <commons.codec.version>1.18.0</commons.codec.version>
     <httpclient5.version>5.4.3</httpclient5.version>
     <httpcore5.version>5.4.3</httpcore5.version>
+    <commons.io.version>2.20.0</commons.io.version>
+    <commons.lang3.version>3.18.0</commons.lang3.version>
   </properties>
 
   <dependencyManagement>
@@ -61,6 +63,16 @@
         <groupId>org.apache.httpcomponents.core5</groupId>
         <artifactId>httpcore5-h2</artifactId>
         <version>${httpcore5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>${commons.io.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>${commons.lang3.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

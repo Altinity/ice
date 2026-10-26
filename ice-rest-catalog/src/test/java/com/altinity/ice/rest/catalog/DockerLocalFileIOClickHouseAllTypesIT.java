@@ -333,7 +333,7 @@ public class DockerLocalFileIOClickHouseAllTypesIT {
         Parquet.write(outputFile)
             .schema(schema)
             .setAll(java.util.Map.of())
-            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .createWriterFunc(GenericParquetWriter::create)
             .metricsConfig(MetricsConfig.getDefault())
             .overwrite()
             .build()) {
