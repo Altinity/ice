@@ -23,6 +23,7 @@ import com.altinity.ice.cli.internal.s3.S3;
 import com.altinity.ice.internal.iceberg.io.SchemeFileIO;
 import com.altinity.ice.internal.strings.Strings;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,6 +66,9 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
+import org.apache.iceberg.encryption.EncryptedOutputFile;
+import org.apache.iceberg.encryption.EncryptionManager;
+import org.apache.iceberg.encryption.PlaintextEncryptionManager;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.CommitFailedException;
@@ -75,7 +79,6 @@ import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileAppender;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.InputFile;
-import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.mapping.MappingUtil;
 import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.mapping.NameMappingParser;
@@ -514,7 +517,16 @@ public final class Insert {
           file
               + " cannot be added to catalog without copy (file is located outside table.location and --force-no-copy isn't set)");
     }
+    EncryptionManager encryption = table.encryption();
+    if (!(encryption instanceof PlaintextEncryptionManager)
+        && (options.noCopy() || options.s3CopyObject())) {
+      throw new BadRequestException(
+          String.format(
+              "%s: --no-copy/--s3-copy-object are not supported for encrypted tables (%s is set)",
+              file, TableProperties.ENCRYPTION_TABLE_KEY));
+    }
     long dataFileSizeInBytes;
+    ByteBuffer keyMetadata = null;
 
     MetricsConfig metricsConfig = MetricsConfig.forTable(table);
     Metrics metrics = null;
@@ -575,6 +587,7 @@ public final class Insert {
             sortOrder,
             metricsConfig,
             tableIO,
+            encryption,
             inputFile,
             dstDataFileSource,
             table.properties(),
@@ -590,6 +603,7 @@ public final class Insert {
                 sortOrder,
                 metricsConfig,
                 tableIO,
+                encryption,
                 inputFile,
                 dataFileNamingStrategy,
                 partitionKey,
@@ -608,8 +622,9 @@ public final class Insert {
         if (checkNotExists.apply(dstDataFile)) {
           return Collections.emptyList();
         }
-        OutputFile outputFile =
-            tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
+        EncryptedOutputFile outputFile =
+            encryption.encrypt(
+                tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://")));
         // TODO: support transferTo below (note that compression, etc. might be different)
         // try (var d = outputFile.create()) {
         //   try (var s = inputFile.newStream()) { s.transferTo(d); }
@@ -625,7 +640,7 @@ public final class Insert {
             Parquet.write(outputFile)
                 .setAll(table.properties())
                 .overwrite(dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL)
-                .createWriterFunc(GenericParquetWriter::buildWriter)
+                .createWriterFunc(GenericParquetWriter::create)
                 .metricsConfig(metricsConfig)
                 .schema(tableSchema);
         if (compressionCodecOverride != null) {
@@ -646,6 +661,7 @@ public final class Insert {
         }
 
         dataFile = dstDataFile;
+        keyMetadata = outputFile.keyMetadata().buffer();
       }
     }
     logger.info(
@@ -662,6 +678,7 @@ public final class Insert {
             .withFileSizeInBytes(dataFileSizeInBytes)
             .withMetrics(metrics)
             .withPartition(partitionKey)
+            .withEncryptionKeyMetadata(keyMetadata)
             .build();
     return Collections.singletonList(dataFileObj);
   }
@@ -673,6 +690,7 @@ public final class Insert {
       SortOrder sortOrder,
       MetricsConfig metricsConfig,
       FileIO tableIO,
+      EncryptionManager encryption,
       InputFile inputFile,
       DataFileNamingStrategy dstDataFileSource,
       Map<String, String> tableProperties,
@@ -703,8 +721,9 @@ public final class Insert {
       }
 
       String dstDataFile = dstDataFileSource.get(partitionSpec, partKey, file);
-      OutputFile outputFile =
-          tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
+      EncryptedOutputFile outputFile =
+          encryption.encrypt(
+              tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://")));
 
       long fileSizeInBytes;
       Metrics metrics;
@@ -713,7 +732,7 @@ public final class Insert {
           Parquet.write(outputFile)
               .setAll(tableProperties)
               .overwrite(true) // FIXME
-              .createWriterFunc(GenericParquetWriter::buildWriter)
+              .createWriterFunc(GenericParquetWriter::create)
               .metricsConfig(metricsConfig)
               .schema(tableSchema);
       if (compressionCodecOverride != null) {
@@ -733,11 +752,12 @@ public final class Insert {
       logger.info("{}: adding data file: {}", file, dstDataFile);
       dataFiles.add(
           DataFiles.builder(partitionSpec)
-              .withPath(outputFile.location())
+              .withPath(outputFile.encryptingOutputFile().location())
               .withFileSizeInBytes(fileSizeInBytes)
               .withFormat(FileFormat.PARQUET)
               .withMetrics(metrics)
               .withPartition(partKey)
+              .withEncryptionKeyMetadata(outputFile.keyMetadata())
               .build());
     }
 
@@ -760,6 +780,7 @@ public final class Insert {
       SortOrder sortOrder,
       MetricsConfig metricsConfig,
       FileIO tableIO,
+      EncryptionManager encryption,
       InputFile inputFile,
       DataFileNamingStrategy.Name dataFileNamingStrategy,
       PartitionKey partitionKey,
@@ -771,8 +792,9 @@ public final class Insert {
 
     long start = System.currentTimeMillis();
 
-    OutputFile outputFile =
-        tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://"));
+    EncryptedOutputFile outputFile =
+        encryption.encrypt(
+            tableIO.newOutputFile(Strings.replacePrefix(dstDataFile, "s3://", "s3a://")));
 
     Parquet.ReadBuilder readBuilder =
         Parquet.read(inputFile)
@@ -799,7 +821,7 @@ public final class Insert {
             .setAll(tableProperties)
             .overwrite(
                 dataFileNamingStrategy == DataFileNamingStrategy.Name.PRESERVE_ORIGINAL) // FIXME
-            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .createWriterFunc(GenericParquetWriter::create)
             .metricsConfig(metricsConfig)
             .schema(tableSchema);
     if (compressionCodecOverride != null) {
@@ -824,11 +846,12 @@ public final class Insert {
         (System.currentTimeMillis() - start) / 1000);
 
     return new DataFiles.Builder(partitionSpec)
-        .withPath(outputFile.location())
+        .withPath(outputFile.encryptingOutputFile().location())
         .withFormat("PARQUET")
         .withFileSizeInBytes(fileSizeInBytes)
         .withMetrics(metrics)
         .withPartition(partitionKey)
+        .withEncryptionKeyMetadata(outputFile.keyMetadata())
         .build();
   }
 

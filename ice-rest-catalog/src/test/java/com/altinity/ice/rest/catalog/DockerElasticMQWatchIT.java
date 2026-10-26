@@ -475,7 +475,7 @@ public class DockerElasticMQWatchIT {
         Parquet.write(outputFile)
             .schema(schema)
             .setAll(java.util.Map.of())
-            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .createWriterFunc(GenericParquetWriter::create)
             .metricsConfig(MetricsConfig.getDefault())
             // Files.createTempFile already created the file, so allow overwriting it.
             .overwrite()

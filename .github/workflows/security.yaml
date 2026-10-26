@@ -32,7 +32,7 @@ jobs:
           queries: +security-extended
 
       - name: Build with Maven
-        run: ./mvnw -B compile -DskipTests -pl ice,ice-rest-catalog
+        run: ./mvnw -B compile -DskipTests -am -pl ice,ice-rest-catalog
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@9e0d7b8d25671d64c341c19c0152d693099fb5ba # v4.35.5

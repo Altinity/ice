@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
@@ -40,6 +41,11 @@ public record MaintenanceRunner(Catalog catalog, Collection<MaintenanceJob> jobs
         for (TableIdentifier tableIdent : tables) {
           try {
             Table table = catalog.loadTable(tableIdent);
+            if (table.properties().containsKey(TableProperties.ENCRYPTION_TABLE_KEY)) {
+              // catalog has no access to the KMS (keys are wrapped/unwrapped by clients)
+              logger.info("Skipping maintenance on encrypted table: {}", table.name());
+              continue;
+            }
             logger.info("Performing maintenance on table: {}", table.name());
             MDC.put("msgContext", table.name() + ": ");
             try {

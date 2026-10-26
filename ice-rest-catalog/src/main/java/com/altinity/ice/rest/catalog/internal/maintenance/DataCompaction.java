@@ -179,7 +179,7 @@ public record DataCompaction(
         Parquet.write(outputFile)
             .setAll(table.properties())
             .overwrite(false)
-            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .createWriterFunc(GenericParquetWriter::create)
             .metricsConfig(metricsConfig)
             .schema(tableSchema);
 

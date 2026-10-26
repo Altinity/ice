@@ -534,6 +534,13 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <!-- jar is copied into containers by DockerEncryptionIT -->
+      <groupId>com.altinity.ice</groupId>
+      <artifactId>ice-test-support</artifactId>
+      <version>0.0.0-SNAPSHOT</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
       <version>${assertj.version}</version>
@@ -603,6 +610,7 @@
             <exclude>**/DockerLocalFileIOClickHouseIT.java</exclude>
             <exclude>**/DockerLocalFileIOClickHouseAllTypesIT.java</exclude>
             <exclude>**/DockerElasticMQWatchIT.java</exclude>
+            <exclude>**/DockerEncryptionIT.java</exclude>
           </excludes>
         </configuration>
       </plugin>

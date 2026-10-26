@@ -19,8 +19,10 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.io.SeekableInputStream;
+import org.apache.parquet.ParquetReadOptions;
 import org.apache.parquet.bytes.ByteBufferInputStream;
 import org.apache.parquet.bytes.HeapByteBufferAllocator;
+import org.apache.parquet.conf.PlainParquetConfiguration;
 import org.apache.parquet.crypto.ParquetCryptoRuntimeException;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
@@ -47,7 +49,11 @@ public final class Metadata {
               s.seek(newPos);
             }
           };
-      return readFooter(inputFile, ds, new ParquetMetadataConverter());
+      // ParquetMetadataConverter() without options yields maxMessageSize=-1, which parquet 1.17
+      // rejects when reading the footer.
+      ParquetReadOptions options =
+          ParquetReadOptions.builder(new PlainParquetConfiguration()).build();
+      return readFooter(inputFile, ds, new ParquetMetadataConverter(options));
     }
   }
 

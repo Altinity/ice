@@ -9,6 +9,7 @@
  */
 package com.altinity.ice.cli.internal.iceberg.rest;
 
+import com.altinity.ice.encryption.EncryptingRESTCatalog;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.KeyManagementException;
@@ -39,7 +40,7 @@ public class RESTCatalogFactory {
 
   public static RESTCatalog create(byte[] caCrt, boolean sslVerify) {
     if (caCrt == null && sslVerify) {
-      return new RESTCatalog();
+      return new EncryptingRESTCatalog();
     }
     SSLContext sslContext;
     try {
@@ -59,7 +60,7 @@ public class RESTCatalogFactory {
         sslVerify ? HttpsSupport.getDefaultHostnameVerifier() : (hostname, session) -> true;
     TlsSocketStrategy tlsSocketStrategy =
         new DefaultClientTlsStrategy(sslContext, hostnameVerifier);
-    return new RESTCatalog(
+    return new EncryptingRESTCatalog(
         SessionCatalog.SessionContext.createEmpty(),
         x ->
             HTTPClient.builder(x)
