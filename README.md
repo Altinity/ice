@@ -52,7 +52,7 @@ Build standalone native binaries with no Java dependency:
 sdk env  # or ensure Java 21+ and GraalVM are available
 
 # Build ice binary (both amd64 and arm64)
-mvn -Pnative -pl ice clean package -Dmaven.test.skip=true
+mvn -Pnative -am -pl ice clean package -Dmaven.test.skip=true
 
 # The output binary is at ice/target/ice
 
