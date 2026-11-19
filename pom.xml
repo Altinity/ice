@@ -36,10 +36,17 @@
     <commons.codec.version>1.18.0</commons.codec.version>
     <httpclient5.version>5.4.3</httpclient5.version>
     <httpcore5.version>5.4.3</httpcore5.version>
+    <guava.version>33.7.2-jre</guava.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
+      <!-- pin transitive guava to a fixed release (Trivy: CVE-2026-102554) -->
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>${guava.version}</version>
+      </dependency>
       <dependency>
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>bom</artifactId>
