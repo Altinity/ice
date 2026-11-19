@@ -145,11 +145,11 @@ public class ParquetUtil {
             if (field != null && stats.hasNonNullValue() && shouldStoreBounds(column, fileSchema)) {
               Literal<?> min =
                   ParquetConversions.fromParquetPrimitive(
-                      field.type(), column.getPrimitiveType(), stats.genericGetMin());
+                      field.type(), column.getPrimitiveType(), stats.genericGetMin(), true);
               updateMin(lowerBounds, fieldId, field.type(), min, metricsMode);
               Literal<?> max =
                   ParquetConversions.fromParquetPrimitive(
-                      field.type(), column.getPrimitiveType(), stats.genericGetMax());
+                      field.type(), column.getPrimitiveType(), stats.genericGetMax(), false);
               updateMax(upperBounds, fieldId, field.type(), max, metricsMode);
             }
           }

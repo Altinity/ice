@@ -37,7 +37,8 @@ class ParquetConversions {
   private ParquetConversions() {}
 
   @SuppressWarnings("unchecked")
-  static <T> Literal<T> fromParquetPrimitive(Type type, PrimitiveType parquetType, Object value) {
+  static <T> Literal<T> fromParquetPrimitive(
+      Type type, PrimitiveType parquetType, Object value, boolean lowerBound) {
     switch (type.typeId()) {
       case BOOLEAN:
         return (Literal<T>) Literal.of((Boolean) value);
@@ -50,12 +51,8 @@ class ParquetConversions {
       case TIMESTAMP:
         // time & timestamp/timestamptz are stored in microseconds
         // https://iceberg.apache.org/spec/#parquet
-        var millis =
-            (parquetType.getLogicalTypeAnnotation()
-                    instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation t
-                && t.getUnit() == LogicalTypeAnnotation.TimeUnit.MILLIS);
-        var v = ((Number) value).longValue();
-        return (Literal<T>) Literal.of(millis ? v * 1000L : v);
+        return (Literal<T>)
+            Literal.of(toMicroseconds(parquetType, ((Number) value).longValue(), lowerBound));
       case FLOAT:
         return (Literal<T>) Literal.of((Float) value);
       case DOUBLE:
@@ -76,6 +73,35 @@ class ParquetConversions {
       default:
         throw new IllegalArgumentException("Unsupported primitive type: " + type);
     }
+  }
+
+  // Iceberg timestamp/timestamptz values are microseconds. NANOS footer stats are divided by
+  // 1000; a remainder widens the bound so the range still contains the original instant.
+  private static long toMicroseconds(PrimitiveType parquetType, long value, boolean lowerBound) {
+    if (!(parquetType.getLogicalTypeAnnotation()
+        instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation timestamp)) {
+      return value;
+    }
+    return switch (timestamp.getUnit()) {
+      case MILLIS -> value * 1000L;
+      case NANOS -> nanosecondsToMicroseconds(value, lowerBound);
+      case MICROS -> value;
+    };
+  }
+
+  private static long nanosecondsToMicroseconds(long nanoseconds, boolean lowerBound) {
+    long microseconds = nanoseconds / 1000L;
+    if (nanoseconds % 1000L == 0) {
+      return microseconds;
+    }
+    if (lowerBound) {
+      if (nanoseconds < 0) {
+        microseconds--;
+      }
+    } else if (nanoseconds > 0) {
+      microseconds++;
+    }
+    return microseconds;
   }
 
   // Iceberg 1.9 introduced this API in upstream ParquetConversions and uses it from
