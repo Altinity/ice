@@ -47,17 +47,18 @@
         <artifactId>guava</artifactId>
         <version>${guava.version}</version>
       </dependency>
+      <!-- converge jspecify (enforcer DependencyConvergence): guava, caffeine, google-cloud-storage disagree -->
+      <dependency>
+        <groupId>org.jspecify</groupId>
+        <artifactId>jspecify</artifactId>
+        <version>1.0.0</version>
+      </dependency>
       <dependency>
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>bom</artifactId>
         <version>${aws.java.sdk.version}</version>
         <type>pom</type>
         <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.google.guava</groupId>
-        <artifactId>guava</artifactId>
-        <version>${guava.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.httpcomponents.client5</groupId>
