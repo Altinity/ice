@@ -32,5 +32,6 @@ EXPOSE 5001
 
 ENV ICE_REST_CATALOG_CONFIG=/etc/ice/ice-rest-catalog.yaml
 
-# using java -jar instead of executing jar directly as there is not shell in non-"debug" version of distroless
-ENTRYPOINT ["java", "-jar", "/usr/local/bin/ice-rest-catalog"]
+# Mitigate Java4Shell (CVE in HotSpot x86-64 AVX-512 Base64 intrinsic).
+# Do NOT use -XX:UseAVX=2 here — it is x86-only and breaks arm64.
+ENTRYPOINT ["java", "-XX:-UseBASE64Intrinsics", "-jar", "/usr/local/bin/ice-rest-catalog"]

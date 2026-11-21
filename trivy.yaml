@@ -1,0 +1,2 @@
+# Trivy configuration file.
+# CVE suppressions are in .trivyignore (loaded automatically).

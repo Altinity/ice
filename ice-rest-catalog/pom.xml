@@ -510,7 +510,7 @@
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>${guava.version}</version>
+      <version>33.7.2-jre</version>
       <exclusions>
         <exclusion>
           <groupId>org.checkerframework</groupId>
@@ -651,7 +651,7 @@
         <artifactId>really-executable-jar-maven-plugin</artifactId>
         <version>2.1.1</version>
         <configuration>
-          <flags>-XX:MaxRAMPercentage=75.0</flags>
+          <flags>-XX:MaxRAMPercentage=75.0 -XX:-UseBASE64Intrinsics</flags>
           <inputFile>target/ice-rest-catalog-${project.version}-shaded.jar</inputFile>
           <programFile>ice-rest-catalog-jar</programFile>
         </configuration>
