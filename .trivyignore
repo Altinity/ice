@@ -1,0 +1,39 @@
+# Maven dependency false positive
+# guava is resolved to 33.7.2-jre via dependencyManagement in pom.xml.
+# Trivy's static pom parser sees 33.5.0-jre from iceberg-bundled-guava's
+# transitive dependency, but Maven overrides it.
+CVE-2026-102554
+
+# distroless base image (gcr.io/distroless/java21-debian12)
+# These are unpatched in Debian 12 bookworm. The latest distroless image
+# ships the same vulnerable versions. Nothing to fix on our side; suppress
+# until Debian releases patches and distroless rebuilds.
+
+# libbrotli1 - Out-of-Bounds Write (fix available but not yet in distroless)
+CVE-2026-111497
+
+# libexpat1
+CVE-2024-28757
+CVE-2025-59375
+CVE-2026-113351
+CVE-2026-115506
+CVE-2026-117610
+CVE-2026-118370
+CVE-2026-25210
+CVE-2026-45186
+CVE-2026-66046
+CVE-2026-76957
+CVE-2026-77214
+CVE-2026-93990
+
+# liblcms2-2
+CVE-2026-41254
+
+# libuuid1 (util-linux) - all status: affected, no fix
+CVE-2026-53613
+CVE-2026-53615
+CVE-2026-78410
+
+# zlib1g - will_not_fix / affected
+CVE-2023-45853
+CVE-2026-85091
