@@ -1,0 +1,6 @@
+vulnerability:
+  ignoredVulns:
+    - id: CVE-2026-102554
+      # guava is resolved to 33.7.2-jre via dependencyManagement in pom.xml.
+      # Trivy's static pom parser sees 33.5.0-jre from iceberg-bundled-guava's
+      # transitive dependency, but Maven overrides it. False positive.
