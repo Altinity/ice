@@ -36,10 +36,23 @@
     <commons.codec.version>1.18.0</commons.codec.version>
     <httpclient5.version>5.6.3</httpclient5.version>
     <httpcore5.version>5.4.3</httpcore5.version>
+    <guava.version>33.7.2-jre</guava.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
+      <!-- pin transitive guava to a fixed release (Trivy: CVE-2026-102554) -->
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>${guava.version}</version>
+      </dependency>
+      <!-- converge jspecify (enforcer DependencyConvergence): guava, caffeine, google-cloud-storage disagree -->
+      <dependency>
+        <groupId>org.jspecify</groupId>
+        <artifactId>jspecify</artifactId>
+        <version>1.0.0</version>
+      </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
