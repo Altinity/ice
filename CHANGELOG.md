@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0](https://github.com/Altinity/ice/compare/v0.23.0...master)
+
+### Fixed 
+
+- Mitigate Java4Shell: disable Base64 AVX-512 intrinsic ([#230](https://github.com/Altinity/ice/pull/230)) ([#231](https://github.com/Altinity/ice/pull/231))
+- `ice` - Convert Parquet NANOS footer stats to microseconds in manifest bounds ([#228](https://github.com/Altinity/ice/pull/228))
+
 ## [0.23.0](https://github.com/Altinity/ice/compare/v0.22.0...master)
 
 ### Added
